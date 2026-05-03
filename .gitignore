@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Data (geospatial + ML outputs)
+data/
+*.nc
+*.tif
+*.parquet
+
+# Models
+*.pkl
+*.joblib
+
+# Environments
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
