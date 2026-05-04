@@ -1,13 +1,11 @@
 name: nfcc
 channels:
-  - conda-forge
+  - defaults
 dependencies:
   - python=3.10
   - numpy
   - pandas
   - scipy
-
-  # Geospatial
   - gdal
   - rasterio
   - geopandas
@@ -16,25 +14,13 @@ dependencies:
   - pyproj
   - xarray
   - rioxarray
-
-  # ML
   - scikit-learn
   - xgboost
-
-  # Visualization
   - matplotlib
   - plotly
   - streamlit
   - folium
-
-  # API
   - fastapi
   - uvicorn
-
   - pip
-  - pip:
-      - shap
-      - python-dotenv
-      - tqdm
-      - click
-      - pyyaml
+prefix: /home/nfcc/miniconda3/envs/nfcc
