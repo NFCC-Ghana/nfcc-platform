@@ -7,3 +7,4 @@ Initial repository setup complete.
 
 ## Next Step
 Build data pipeline and install dependencies.
+# CI test
