@@ -4,16 +4,17 @@ National Flood Control Centre — Accra, Ghana
 Phase 3C — FastAPI Live Scoring Endpoint
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
-from pathlib import Path
-from datetime import datetime
-import pandas as pd
-import numpy as np
-import joblib
 import json
 import logging
+from datetime import datetime
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, field_validator
 
 # ── Logging ───────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -78,10 +79,14 @@ class RainfallInput(BaseModel):
         description="ISO timestamp of observation",
     )
 
-    @validator("roll_3d")
-    def roll3d_gte_precip(cls, v, values):
+    @field_validator("roll_3d")
+    @classmethod
+    def roll3d_gte_precip(cls, v, info):
+        values = info.data
+
         if "precipitation" in values and v < values["precipitation"]:
             raise ValueError("roll_3d (3-day total) must be >= today's precipitation")
+
         return v
 
 
