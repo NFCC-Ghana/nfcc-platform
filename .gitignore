@@ -73,3 +73,7 @@ reports/
 
 # Coverage
 coverage.xml
+.env
+logs/*.jsonl
+.env
+logs/*.jsonl
