@@ -176,7 +176,7 @@ def api_client(trained_model):
 
 @pytest.fixture
 def mock_provider():
-    from src.alerts.providers.mock import MockAlertProvider
+    from src.alerts.providers.mock_provider import MockAlertProvider
 
     return MockAlertProvider()
 
