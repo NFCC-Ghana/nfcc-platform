@@ -1,7 +1,5 @@
 """Integration tests — Full data pipeline from raw rainfall to alert dispatch."""
 
-import numpy as np
-
 
 class TestFullPipeline:
     def test_dataframe_loads_and_scores(self, sample_dataframe, alert_engine):
@@ -23,10 +21,13 @@ class TestFullPipeline:
         self, alert_engine, critical_risk_observation
     ):
         """Verify mock provider receives and processes alert."""
-        # CORRECT FIX: mock the predict method's return value
-        alert_engine.model.predict = lambda x: np.array([85.0])
+
         result = alert_engine.process(
-            critical_risk_observation, location="Integration Test", force=True
+            risk_score=85.0,
+            location="Integration Test",
+            observation=critical_risk_observation,
+            force=True,
         )
+
         assert result["dispatched"] is True
         assert any(r["success"] for r in result["results"])

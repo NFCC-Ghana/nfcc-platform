@@ -188,7 +188,6 @@ def alert_engine(trained_model, mock_provider):
     engine = AlertEngine(
         providers=[mock_provider],
         alert_threshold=50.0,
-        critical_threshold=75.0,
         rate_limit_minutes=60,
     )
     # CRITICAL FIX: Set the model on the engine

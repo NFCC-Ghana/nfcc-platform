@@ -30,11 +30,39 @@ class AlertEngine:
         self,
         providers: Optional[List[BaseAlertProvider]] = None,
         alert_threshold: float = 50.0,
+        critical_threshold: float = 70.0,
+        rate_limit_minutes: int = 20,
+        logger_instance=None,
     ):
+        """
+        Initialize AlertEngine.
+
+        Parameters
+        ----------
+        providers : list
+            Alert provider instances.
+        alert_threshold : float
+            Minimum score to trigger alerts.
+        critical_threshold : float
+            Backward compatibility for older tests.
+        rate_limit_minutes : int
+            Backward compatibility for older tests.
+        logger_instance : optional
+            Optional injected logger.
+        """
+
         self.providers = providers or [MockAlertProvider()]
         self.alert_threshold = alert_threshold
+
+        # Backward compatibility attributes
+        self.critical_threshold = critical_threshold
+        self.rate_limit_minutes = rate_limit_minutes
+
         self.rate_limiter = RateLimiter(max_alerts_per_hour=3)
-        logger.info(
+
+        self.logger = logger_instance or logger
+
+        self.logger.info(
             f"Alert engine initialized | Providers: {[p.name for p in self.providers]}"
         )
 
@@ -66,6 +94,11 @@ class AlertEngine:
         Returns:
             Event record with dispatch results
         """
+        # Backward compatibility:
+        # integration tests may pass a dict instead of raw float
+        if isinstance(risk_score, dict):
+            risk_score = risk_score.get("risk_score", 0)
+
         risk_tier = get_risk_tier(risk_score)
         alert = self.should_alert(risk_score)
         timestamp = datetime.now().isoformat()
@@ -77,6 +110,8 @@ class AlertEngine:
             "risk_tier": risk_tier,
             "alert": alert,
             "observation": observation or {},
+            "dispatched": False,
+            "results": [],
         }
 
         if not alert:
