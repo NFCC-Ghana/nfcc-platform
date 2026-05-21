@@ -58,6 +58,7 @@ data/interim/
 # Models
 # ==========================================
 *.pkl
+!models/xgboost_flood_risk.pkl
 *.joblib
 
 # ==========================================
