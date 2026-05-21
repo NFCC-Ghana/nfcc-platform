@@ -2,39 +2,18 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-ENV PYTHONUNBUFFERED=1
-ENV GDAL_CONFIG=/usr/bin/gdal-config
-
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    gdal-bin \
-    libgdal-dev \
-    libproj-dev \
-    libgeos-dev \
-    curl \
+    gcc g++ gdal-bin libgdal-dev libproj-dev libgeos-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first
 COPY requirements.txt .
-
-# Upgrade pip
 RUN pip install --upgrade pip
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
 COPY . .
 
-# Expose API port
-EXPOSE 8000
+# Generate the model at build time (critical for Railway)
+RUN python src/models/train_model.py
 
-# Healthcheck
-HEALTHCHECK CMD curl --fail http://localhost:8000/health || exit 1
-
-# Start API
-CMD ["uvicorn", "src.api.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000"]
+# Use Railway's PORT environment variable
+CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
