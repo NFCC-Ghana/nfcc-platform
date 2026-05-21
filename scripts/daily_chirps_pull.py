@@ -32,7 +32,6 @@ from typing import Any
 
 import ee
 
-
 PROJECT_ID = os.getenv("GEE_PROJECT_ID", "nfcc-earth-engine-2026")
 CHIRPS_COLLECTION = "UCSB-CHG/CHIRPS/DAILY"
 
