@@ -9,3 +9,4 @@ Initial repository setup complete.
 Build data pipeline and install dependencies.
 # CI test
 # Phase 3E: Testing Infrastructure
+# Railway rebuild trigger
