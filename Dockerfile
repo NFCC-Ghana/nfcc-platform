@@ -12,35 +12,33 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Ensure models directory exists
-RUN mkdir -p models
+# Create required directories
+RUN mkdir -p models logs data/processed
 
-# Create dummy model with explicit error handling
+# Create dummy model
 RUN python -c "
-import sys
-import os
 import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 
-try:
-    # Create dummy training data
-    X_dummy = np.random.rand(100, 6)
-    y_dummy = np.random.rand(100)
-    
-    # Train dummy model
-    model = RandomForestRegressor(n_estimators=10, random_state=42)
-    model.fit(X_dummy, y_dummy)
-    
-    # Save model
-    joblib.dump(model, 'models/xgboost_flood_risk.pkl')
-    print('✅ Dummy model created successfully')
-except Exception as e:
-    print(f'❌ Error creating dummy model: {e}')
-    sys.exit(1)
+X_dummy = np.random.rand(100, 6)
+y_dummy = np.random.rand(100)
+model = RandomForestRegressor(n_estimators=10, random_state=42)
+model.fit(X_dummy, y_dummy)
+joblib.dump(model, 'models/xgboost_flood_risk.pkl')
+print('✅ Dummy model created')
 "
 
-# Test that the model file exists
-RUN test -f models/xgboost_flood_risk.pkl && echo "✅ Model file verified" || (echo "❌ Model file missing" && exit 1)
+# Create dummy feature data (if needed by API at import time)
+RUN python -c "
+import pandas as pd
+import numpy as np
+dates = pd.date_range('2024-01-01', '2024-12-31', freq='D')
+df = pd.DataFrame({'date': dates})
+for col in ['precipitation', 'roll_3d', 'roll_7d', 'roll_30d', 'cumulative', 'z_score', 'flood_risk_score']:
+    df[col] = np.random.rand(len(dates)) * 100
+df.to_parquet('data/processed/accra_features_2024.parquet')
+print('✅ Dummy feature data created')
+"
 
 CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
