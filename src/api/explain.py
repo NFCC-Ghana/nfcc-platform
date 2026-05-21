@@ -10,7 +10,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from src.api.schemas import RainfallInput
+from src.api.main import RainfallInput, rainfall_features_dict
 from src.models.train_model import FEATURE_COLS
 
 logger = logging.getLogger("nfcc-api")
@@ -59,19 +59,7 @@ class ExplainResponse(BaseModel):
 
 
 def _row_frame(record: RainfallInput) -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {
-                "precipitation": record.precipitation,
-                "roll_3d": record.roll_3d,
-                "roll_7d": record.roll_7d,
-                "roll_30d": record.roll_30d,
-                "cumulative": record.cumulative,
-                "z_score": record.z_score,
-            }
-        ],
-        columns=FEATURE_COLS,
-    )
+    return pd.DataFrame([rainfall_features_dict(record)], columns=FEATURE_COLS)
 
 
 def _coerce_float_scalar(val: Any) -> float:
@@ -209,7 +197,6 @@ def explain_rainfall(payload: RainfallInput) -> ExplainResponse:
     """
     import src.api.main as api_main
 
-    api_main.require_model()
     model = api_main.model
     X = _row_frame(payload)
 
