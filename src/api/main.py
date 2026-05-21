@@ -8,13 +8,16 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Optional
 
 import joblib
 import numpy as np
 import pandas as pd
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator
+
+from src.api.explain import router as explain_router
+from src.api.schemas import BatchInput, RainfallInput, RiskResponse
 
 # ── Logging ───────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -29,12 +32,36 @@ MODEL_PATH = BASE_DIR / "models" / "xgboost_flood_risk.pkl"
 LOG_PATH = BASE_DIR / "logs" / "alert_log.jsonl"
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-# ── Load Model ────────────────────────────────────────────────────────
-if not MODEL_PATH.exists():
-    raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
+# ── Load Model (optional at startup — scoring routes return 503 if missing) ──
+model: Optional[Any] = None
+if MODEL_PATH.exists():
+    model = joblib.load(MODEL_PATH)
+    logger.info("✅ Model loaded from %s", MODEL_PATH)
+else:
+    logger.warning(
+        "No model file at %s — API starts without scoring. "
+        "Train or copy xgboost_flood_risk.pkl to enable /score and /explain.",
+        MODEL_PATH,
+    )
 
-model = joblib.load(MODEL_PATH)
-logger.info(f"✅ Model loaded from {MODEL_PATH}")
+
+def require_model() -> None:
+    """Ensure the risk model is loaded; raise 503 if the file is missing or unloadable."""
+    global model
+    if model is None and MODEL_PATH.exists():
+        try:
+            model = joblib.load(MODEL_PATH)
+            logger.info("✅ Model loaded from %s", MODEL_PATH)
+        except Exception as e:
+            logger.error("Failed to load model from %s: %s", MODEL_PATH, e)
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Risk model is not loaded. Add models/xgboost_flood_risk.pkl "
+                "(e.g. run python -m src.models.train_model) to enable scoring."
+            ),
+        )
 
 # ── App ───────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -42,7 +69,8 @@ app = FastAPI(
     description=(
         "National Flood Control Centre — Accra, Ghana. "
         "Live flood-risk scoring from rainfall features. "
-        "Phase 3C — Risk Emulation (XGBoost)."
+        "Phase 3C — Risk Emulation (XGBoost). "
+        "POST /explain returns SHAP-based local feature importance for any valid input."
     ),
     version="1.0.0",
 )
@@ -54,57 +82,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ══════════════════════════════════════════════════════════════════════
-# SCHEMAS
-# ══════════════════════════════════════════════════════════════════════
-
-
-class RainfallInput(BaseModel):
-    precipitation: float = Field(..., ge=0, le=500, description="Today's rainfall (mm)")
-    roll_3d: float = Field(..., ge=0, le=1000, description="3-day total rainfall (mm)")
-    roll_7d: float = Field(..., ge=0, le=500, description="7-day rolling average (mm)")
-    roll_30d: float = Field(
-        ..., ge=0, le=200, description="30-day rolling average (mm)"
-    )
-    cumulative: float = Field(
-        ..., ge=0, le=5000, description="Year-to-date cumulative rainfall (mm)"
-    )
-    z_score: float = Field(
-        ..., ge=-5, le=10, description="Rainfall z-score (30-day window)"
-    )
-    location: str = Field(default="Accra", description="District or station name")
-    timestamp: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat(),
-        description="ISO timestamp of observation",
-    )
-
-    @field_validator("roll_3d")
-    @classmethod
-    def roll3d_gte_precip(cls, v, info):
-        values = info.data
-
-        if "precipitation" in values and v < values["precipitation"]:
-            raise ValueError("roll_3d (3-day total) must be >= today's precipitation")
-
-        return v
-
-
-class RiskResponse(BaseModel):
-    risk_score: float
-    risk_tier: str
-    alert: bool
-    location: str
-    timestamp: str
-    model_version: str = "xgboost-phase3a"
-    note: str = (
-        "Phase 3A risk emulation. Score derived from rainfall features. "
-        "Not yet a true flood forecast."
-    )
-
-
-class BatchInput(BaseModel):
-    records: list[RainfallInput]
+app.include_router(explain_router)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -125,6 +103,7 @@ def compute_risk_tier(score: float) -> str:
 
 
 def score_record(record: RainfallInput) -> float:
+    require_model()
     features = pd.DataFrame(
         [
             {
@@ -216,9 +195,11 @@ def score_single(
         )
         return response
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Scoring error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # ── Batch Scoring ─────────────────────────────────────────────────────
@@ -237,6 +218,8 @@ def score_batch(
         raise HTTPException(
             status_code=400, detail="Batch limited to 365 records per request."
         )
+
+    require_model()
 
     results = []
     alerts = []
