@@ -9,18 +9,21 @@ __pycache__/
 # Jupyter
 # ==========================================
 .ipynb_checkpoints/
+**/.ipynb_checkpoints/
 
 # ==========================================
-# Virtual Environments
+# Environment / Secrets
 # ==========================================
-.env.production
+.env
 .env.local
 .env.development
+.env.production
+
 *.pem
 *.key
 service-account*.json
 
-.env
+# Virtual environments
 .venv/
 venv/
 nfcc/
@@ -30,7 +33,9 @@ nfcc/
 # ==========================================
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
+reports/
 
 # ==========================================
 # Build / Distribution
@@ -59,9 +64,10 @@ data/interim/
 # Logs
 # ==========================================
 logs/
+logs/*.jsonl
 
 # ==========================================
-# VS Code
+# IDE / Editor
 # ==========================================
 .vscode/
 
@@ -71,16 +77,7 @@ logs/
 .DS_Store
 Thumbs.db
 
-
-# Pytest
-.pytest_cache/
-.coverage
-htmlcov/
-reports/
-
-# Coverage
-coverage.xml
-.env
-logs/*.jsonl
-.env
-logs/*.jsonl
+# ==========================================
+# Deployment
+# ==========================================
+railway.toml
