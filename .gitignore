@@ -64,3 +64,16 @@ logs/
 .DS_Store
 Thumbs.db
 
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+reports/
+
+# Coverage
+coverage.xml
+.env
+logs/*.jsonl
+.env
+logs/*.jsonl
