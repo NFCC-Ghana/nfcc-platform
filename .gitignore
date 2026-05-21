@@ -13,6 +13,13 @@ __pycache__/
 # ==========================================
 # Virtual Environments
 # ==========================================
+.env.production
+.env.local
+.env.development
+*.pem
+*.key
+service-account*.json
+
 .env
 .venv/
 venv/
