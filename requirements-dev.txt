@@ -3,6 +3,9 @@ pytest-cov
 pytest-asyncio
 pytest-mock
 httpx
+geopandas
+rasterio
+xarray
 black
 flake8
 pre-commit
