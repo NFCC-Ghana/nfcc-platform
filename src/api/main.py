@@ -8,6 +8,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Optional
 
 import joblib
 import numpy as np
@@ -29,12 +30,36 @@ MODEL_PATH = BASE_DIR / "models" / "xgboost_flood_risk.pkl"
 LOG_PATH = BASE_DIR / "logs" / "alert_log.jsonl"
 LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-# ── Load Model ────────────────────────────────────────────────────────
-if not MODEL_PATH.exists():
-    raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
+# ── Load Model (optional at import so pytest/CI can patch before scoring) ──
+model: Optional[Any] = None
+if MODEL_PATH.exists():
+    model = joblib.load(MODEL_PATH)
+    logger.info("✅ Model loaded from %s", MODEL_PATH)
+else:
+    logger.warning(
+        "No model file at %s — scoring routes return 503 until it exists or tests inject a mock.",
+        MODEL_PATH,
+    )
 
-model = joblib.load(MODEL_PATH)
-logger.info(f"✅ Model loaded from {MODEL_PATH}")
+
+def require_model() -> None:
+    """Load model from disk if needed; raise 503 if still unavailable."""
+    global model
+    if model is None and MODEL_PATH.exists():
+        try:
+            model = joblib.load(MODEL_PATH)
+            logger.info("✅ Model loaded from %s", MODEL_PATH)
+        except Exception as e:
+            logger.error("Failed to load model from %s: %s", MODEL_PATH, e)
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Risk model is not loaded. Add models/xgboost_flood_risk.pkl "
+                "(e.g. run python -m src.models.train_model) to enable scoring."
+            ),
+        )
+
 
 # ── App ───────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -143,6 +168,7 @@ def compute_risk_tier(score: float) -> str:
 
 
 def score_record(record: RainfallInput) -> float:
+    require_model()
     features = pd.DataFrame([rainfall_features_dict(record)])
     raw = model.predict(features)[0]
     return float(np.clip(raw, 0, 100))
@@ -239,6 +265,8 @@ def score_batch(
         raise HTTPException(
             status_code=400, detail="Batch limited to 365 records per request."
         )
+
+    require_model()
 
     results = []
     alerts = []

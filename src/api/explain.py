@@ -197,6 +197,7 @@ def explain_rainfall(payload: RainfallInput) -> ExplainResponse:
     """
     import src.api.main as api_main
 
+    api_main.require_model()
     model = api_main.model
     X = _row_frame(payload)
 
