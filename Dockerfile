@@ -4,13 +4,13 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc g++ gdal-bin libgdal-dev libproj-dev libgeos-dev \
+    gcc g++ gdal-bin libgdal-dev libproj-dev libgeos-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt scikit-learn pandas numpy pyarrow
 
 # Copy application code
 COPY . .
@@ -18,7 +18,9 @@ COPY . .
 # Create required directories
 RUN mkdir -p models logs data/processed
 
-# Generate dummy model (REQUIRED for API startup)
+# ============================================
+# CRITICAL: Generate dummy model for Railway
+# ============================================
 RUN python -c "
 import joblib
 import numpy as np
@@ -38,7 +40,7 @@ print('✅ Dummy model created at models/xgboost_flood_risk.pkl')
 # Verify model exists (critical check)
 RUN test -f models/xgboost_flood_risk.pkl && echo "✅ Model verified" || (echo "❌ Model missing" && exit 1)
 
-# Generate dummy feature data (if needed by other parts of the app)
+# Generate dummy feature data
 RUN python -c "
 import pandas as pd
 import numpy as np
@@ -51,7 +53,7 @@ for col in ['precipitation', 'roll_3d', 'roll_7d', 'roll_30d', 'cumulative', 'z_
     df[col] = np.random.rand(len(dates)) * 100
 os.makedirs('data/processed', exist_ok=True)
 df.to_parquet('data/processed/accra_features_2024.parquet')
-print('✅ Dummy feature data created at data/processed/accra_features_2024.parquet')
+print('✅ Dummy feature data created')
 "
 
 EXPOSE 8000
