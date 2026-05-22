@@ -1,5 +1,6 @@
 ```dockerfile
 FROM python:3.10-slim
+LABEL railway-rebuild="2026-05-21-v2"
 
 WORKDIR /app
 
