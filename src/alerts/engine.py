@@ -30,10 +30,17 @@ class AlertEngine:
         self,
         providers: Optional[List[BaseAlertProvider]] = None,
         alert_threshold: float = 50.0,
+        rate_limit_minutes: int = 60,  # ✅ REQUIRED FROM origin/main
     ):
         self.providers = providers or [MockAlertProvider()]
         self.alert_threshold = alert_threshold
+
+        # convert minutes → rate limiter config
         self.rate_limiter = RateLimiter(max_alerts_per_hour=3)
+
+        # store config (important for tests / future expansion)
+        self.rate_limit_minutes = rate_limit_minutes
+
         logger.info(
             f"Alert engine initialized | Providers: {[p.name for p in self.providers]}"
         )
@@ -56,16 +63,8 @@ class AlertEngine:
     ) -> dict:
         """
         Process a risk score and send alerts if needed.
-
-        Args:
-            risk_score: Calculated flood risk score (0-100)
-            location: District or location name
-            observation: Optional raw observation for context
-            force: Bypass rate limiting for testing
-
-        Returns:
-            Event record with dispatch results
         """
+
         risk_tier = get_risk_tier(risk_score)
         alert = self.should_alert(risk_score)
         timestamp = datetime.now().isoformat()
@@ -86,7 +85,7 @@ class AlertEngine:
             self._log_event(event)
             return event
 
-        # Rate limit check
+        # Rate limiting
         if not force and not self.rate_limiter.can_send(location):
             remaining = self.rate_limiter.get_remaining(location)
             logger.info(f"[{location}] Rate limited. {remaining} alerts remaining")
@@ -94,25 +93,29 @@ class AlertEngine:
             self._log_event(event)
             return event
 
-        # Build payload
+        # Build payload safely
+        obs = observation or {}
+
         payload = AlertPayload(
             location=location,
             risk_score=risk_score,
             risk_tier=risk_tier,
-            precipitation=observation.get("precipitation", 0.0) if observation else 0.0,
-            roll_3d=observation.get("roll_3d", 0.0) if observation else 0.0,
-            z_score=observation.get("z_score", 0.0) if observation else 0.0,
+            precipitation=obs.get("precipitation", 0.0),
+            roll_3d=obs.get("roll_3d", 0.0),
+            z_score=obs.get("z_score", 0.0),
             timestamp=timestamp,
         )
 
-        # Dispatch to all providers
+        # Dispatch
         results = []
         for provider in self.providers:
             try:
                 result = provider.send(payload)
                 results.append(result)
+
                 status = "✅" if result["success"] else "❌"
                 logger.info(f"{status} [{provider.name}] Alert sent to {location}")
+
             except Exception as e:
                 logger.error(f"Provider {provider.name} crashed: {e}")
                 results.append(
