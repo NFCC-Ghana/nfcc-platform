@@ -2,9 +2,13 @@
 
 import pytest
 
-pytest.skip("SMS provider tests require Twilio credentials - run manually", allow_module_level=True)
+pytest.skip(
+    "SMS provider tests require Twilio credentials - run manually",
+    allow_module_level=True,
+)
 
 
 class TestSMSProviderComprehensive:
     """Placeholder for SMS provider tests."""
+
     pass

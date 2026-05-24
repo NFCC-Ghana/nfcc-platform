@@ -1,29 +1,36 @@
 """Mock alert provider for testing — no real messages sent."""
 
 import logging
-from src.alerts.providers.base import BaseAlertProvider, AlertPayload
+from src.alerts.providers.base import BaseAlertProvider
+from src.alerts.models import AlertPayload
 
 logger = logging.getLogger("nfcc.alert.mock")
 
 
 class MockAlertProvider(BaseAlertProvider):
     """Mock provider that prints alerts to console."""
-
+    
     name = "mock"
-
+    
     def send(self, payload: AlertPayload) -> dict:
+        # Use payload.score (not risk_score)
         logger.info(
-            f"[MOCK ALERT] {payload.risk_tier} | "
-            f"{payload.location} | Score: {payload.risk_score:.1f}"
+            "[MOCK] %s | %s | Score: %.1f",
+            payload.risk_tier,
+            payload.location,
+            payload.score,
         )
-        print("\n" + "=" * 60)
-        print(f"  [MOCK] ALERT WOULD BE SENT TO: {payload.location}")
-        print("=" * 60)
-        print(payload.message)
-        print("=" * 60 + "\n")
+        print("\n" + "=" * 50)
+        print(f"  [MOCK] ALERT: {payload.location}")
+        print("=" * 50)
+        print(f"  Risk Tier : {payload.risk_tier}")
+        print(f"  Risk Score: {payload.score:.1f}/100")
+        print("-" * 50)
+        print(f"  {payload.message}")
+        print("=" * 50 + "\n")
+        
         return {
             "success": True,
             "provider": self.name,
             "message_id": f"mock-{payload.timestamp}",
-            "error": None,
         }

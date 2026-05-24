@@ -42,5 +42,5 @@ def sample_alert_payload():
         message="Test alert message",
         precipitation=10.0,
         roll_3d=25.0,
-        z_score=1.5
+        z_score=1.5,
     )

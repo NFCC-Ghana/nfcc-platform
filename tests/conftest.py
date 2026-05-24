@@ -194,9 +194,11 @@ def alert_engine(trained_model, mock_provider):
     engine.model = trained_model
     return engine
 
+
 # ============================================================
 # PROVIDER TEST FIXTURES
 # ============================================================
+
 
 @pytest.fixture
 def mock_email_config(monkeypatch):
@@ -230,6 +232,7 @@ def mock_whatsapp_config(monkeypatch):
 def sample_alert_payload():
     """Create sample AlertPayload for testing."""
     from src.alerts.models import AlertPayload
+
     return AlertPayload(
         location="Accra",
         score=85.0,
@@ -237,5 +240,5 @@ def sample_alert_payload():
         message="Test alert message",
         precipitation=10.0,
         roll_3d=25.0,
-        z_score=1.5
+        z_score=1.5,
     )

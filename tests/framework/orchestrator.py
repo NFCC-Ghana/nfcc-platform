@@ -129,48 +129,52 @@ if __name__ == "__main__":
 
 # Add to existing orchestrator.py
 
+
 def run_with_isolation():
     """Run resilience tests with plugin isolation."""
     from tests.framework.plugin.isolation import PluginSandbox, ResourceQuota
-    
+
     sandbox = PluginSandbox()
     sandbox.register_standard_plugins()
-    
+
     context = {
         "payload": PayloadFixtures.valid_payload(),
         "client": None,  # Would need to be pickle-able
         "config": {},
-        "metadata": {"timestamp": datetime.now().isoformat()}
+        "metadata": {"timestamp": datetime.now().isoformat()},
     }
-    
+
     # Run plugins in isolation
     plugins = [
         ("tests.framework.chaos.engine", "ChaosEngine"),
         ("tests.framework.security.dos", "DoSTester"),
         ("tests.framework.security.injection", "InjectionTester"),
     ]
-    
+
     results = []
     for plugin_module, plugin_class in plugins:
         result = sandbox.execute_safe(plugin_module, plugin_class, context)
         results.append(result)
-        print(f"Plugin {plugin_class}: {'✅' if result.success else '❌'} ({result.execution_time_ms}ms)")
-    
+        print(
+            f"Plugin {plugin_class}: {'✅' if result.success else '❌'} ({result.execution_time_ms}ms)"
+        )
+
     return results
+
 
 def run_vector_clustering():
     """Run vector similarity clustering on failures."""
     from tests.framework.analytics.vector_similarity import VectorSimilarityEngine
-    
+
     engine = VectorSimilarityEngine()
-    
+
     # Load failures (would come from previous runs)
     # engine.add_failure(failure)
-    
+
     clusters = engine.cluster_failures_semantic()
     root_causes = engine.find_root_cause_clusters()
-    
+
     print(f"Found {len(clusters)} failure clusters")
     print(f"Identified {len(root_causes)} root causes")
-    
+
     return {"clusters": clusters, "root_causes": root_causes}
