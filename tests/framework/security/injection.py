@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 
 class InjectionTester:
     """Test injection vulnerabilities."""
-    
+
     @staticmethod
     def sql_injection_payloads() -> List[Dict[str, Any]]:
         """Generate SQL injection payloads."""
@@ -18,17 +18,20 @@ class InjectionTester:
             {"roll_3d": "1 AND 1=1"},
             {"roll_7d": "1 AND 1=2"},
         ]
-        
-        return [{
-            "precipitation": 10,
-            "roll_3d": 10,
-            "roll_7d": 20,
-            "roll_30d": 30,
-            "cumulative": 100,
-            "z_score": 1.5,
-            **injection,
-        } for injection in injections]
-    
+
+        return [
+            {
+                "precipitation": 10,
+                "roll_3d": 10,
+                "roll_7d": 20,
+                "roll_30d": 30,
+                "cumulative": 100,
+                "z_score": 1.5,
+                **injection,
+            }
+            for injection in injections
+        ]
+
     @staticmethod
     def nosql_injection_payloads() -> List[Dict[str, Any]]:
         """Generate NoSQL injection payloads."""
@@ -40,17 +43,20 @@ class InjectionTester:
             {"roll_3d": {"$in": [1, 2, 3]}},
             {"$where": "function() { return true; }"},
         ]
-        
-        return [{
-            "precipitation": 10,
-            "roll_3d": 10,
-            "roll_7d": 20,
-            "roll_30d": 30,
-            "cumulative": 100,
-            "z_score": 1.5,
-            **injection,
-        } for injection in injections]
-    
+
+        return [
+            {
+                "precipitation": 10,
+                "roll_3d": 10,
+                "roll_7d": 20,
+                "roll_30d": 30,
+                "cumulative": 100,
+                "z_score": 1.5,
+                **injection,
+            }
+            for injection in injections
+        ]
+
     @staticmethod
     def xss_injection_payloads() -> List[Dict[str, Any]]:
         """Generate XSS injection payloads."""
@@ -61,17 +67,20 @@ class InjectionTester:
             {"location": "<svg onload=alert(1)>"},
             {"location": "';alert('XSS');//"},
         ]
-        
-        return [{
-            "precipitation": 10,
-            "roll_3d": 10,
-            "roll_7d": 20,
-            "roll_30d": 30,
-            "cumulative": 100,
-            "z_score": 1.5,
-            **injection,
-        } for injection in injections]
-    
+
+        return [
+            {
+                "precipitation": 10,
+                "roll_3d": 10,
+                "roll_7d": 20,
+                "roll_30d": 30,
+                "cumulative": 100,
+                "z_score": 1.5,
+                **injection,
+            }
+            for injection in injections
+        ]
+
     @staticmethod
     def path_traversal_payloads() -> List[Dict[str, Any]]:
         """Generate path traversal payloads."""
@@ -81,21 +90,29 @@ class InjectionTester:
             {"location": "%2e%2e%2f%2e%2e%2f"},
             {"location": "....//....//....//etc/passwd"},
         ]
-        
-        return [{
-            "precipitation": 10,
-            "roll_3d": 10,
-            "roll_7d": 20,
-            "roll_30d": 30,
-            "cumulative": 100,
-            "z_score": 1.5,
-            **injection,
-        } for injection in injections]
-    
+
+        return [
+            {
+                "precipitation": 10,
+                "roll_3d": 10,
+                "roll_7d": 20,
+                "roll_30d": 30,
+                "cumulative": 100,
+                "z_score": 1.5,
+                **injection,
+            }
+            for injection in injections
+        ]
+
     @staticmethod
     def assert_no_injection_success(response):
         """Assert injection attempt didn't succeed."""
         # Should either reject or fail safely
-        assert response.status_code in (200, 400, 422, 403, 401), \
-            f"Injection may have succeeded: {response.status_code}"
+        assert response.status_code in (
+            200,
+            400,
+            422,
+            403,
+            401,
+        ), f"Injection may have succeeded: {response.status_code}"
         return True

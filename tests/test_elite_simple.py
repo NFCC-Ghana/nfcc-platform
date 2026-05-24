@@ -19,7 +19,7 @@ class TestEliteResilience:
             "z_score": 1.2,
             "location": "Accra",
         }
-        
+
         scores = []
         for i in range(5):
             response = api_client.post("/score", json=payload)
@@ -28,17 +28,17 @@ class TestEliteResilience:
             score = data.get("risk_score", data.get("score"))
             scores.append(score)
             time.sleep(0.05)
-        
+
         # All scores should be identical
         assert all(s == scores[0] for s in scores), f"Scores not consistent: {scores}"
 
     def test_replay_failure(self, api_client):
         """Test that failures are reproducible."""
         invalid_payload = {"precipitation": -50, "roll_3d": 10}
-        
+
         response1 = api_client.post("/score", json=invalid_payload)
         response2 = api_client.post("/score", json=invalid_payload)
-        
+
         assert response1.status_code == response2.status_code
         assert response1.status_code in (400, 422)
 
@@ -53,19 +53,19 @@ class TestEliteResilience:
             "z_score": 1.2,
             "location": "Accra",
         }
-        
+
         results = []
-        
+
         def make_request():
             response = api_client.post("/score", json=payload)
             results.append(response.status_code)
-        
+
         threads = [threading.Thread(target=make_request) for _ in range(10)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
-        
+
         # All should succeed or be rate-limited
         for status in results:
             assert status in (200, 429, 400), f"Unexpected status: {status}"
@@ -78,13 +78,15 @@ class TestEliteResilience:
             ("/districts", "get"),
             ("/alerts", "get"),
         ]
-        
+
         for endpoint, method in endpoints:
             if method == "get":
                 response = api_client.get(endpoint)
             else:
                 response = api_client.post(endpoint, json={})
-            assert response.status_code == 200, f"Endpoint {endpoint} failed: {response.status_code}"
+            assert (
+                response.status_code == 200
+            ), f"Endpoint {endpoint} failed: {response.status_code}"
 
     def test_graceful_degradation(self, api_client, monkeypatch):
         """Test graceful degradation under model failure."""
@@ -97,14 +99,14 @@ class TestEliteResilience:
             "z_score": 1.2,
             "location": "Accra",
         }
-        
+
         import src.api.main as api_module
-        
+
         def failing_predict(*args, **kwargs):
             raise Exception("Model unavailable")
-        
+
         original_predict = api_module.model.predict
-        
+
         try:
             api_module.model.predict = failing_predict
             response = api_client.post("/score", json=payload)
@@ -137,7 +139,7 @@ class TestEliteResilience:
                 },
             ]
         }
-        
+
         response = api_client.post("/score/batch", json=payload)
         assert response.status_code == 200
         data = response.json()
@@ -155,17 +157,19 @@ class TestEliteResilience:
             "z_score": 1.2,
             "location": "Accra",
         }
-        
+
         statuses = []
         for i in range(50):
             response = api_client.post("/score", json=payload)
             statuses.append(response.status_code)
             if i % 10 == 0:
                 time.sleep(0.01)
-        
+
         # Should have some successes
         successes = [s for s in statuses if s == 200]
         assert len(successes) > 0, "No successful requests"
-        
+
         # Rate limiting may or may not kick in
-        print(f"Status distribution: {dict((s, statuses.count(s)) for s in set(statuses))}")
+        print(
+            f"Status distribution: {dict((s, statuses.count(s)) for s in set(statuses))}"
+        )

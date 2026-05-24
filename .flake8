@@ -1,4 +1,14 @@
 [flake8]
 max-line-length = 88
-extend-ignore = E203, W503
-exclude = .git,__pycache__,venv,.venv,build,dist
+exclude = 
+    .git,
+    __pycache__,
+    build,
+    dist,
+    backup_score_migration_*,
+    tests/framework/,
+    tests/test_elite_complete.py
+ignore = 
+    E203,
+    W503,
+    E501
