@@ -6,3 +6,9 @@ httpx
 black
 flake8
 pre-commit
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0
+pytest-timeout>=2.0.0
+pytest-randomly>=3.0.0
+jsonschema>=4.0.0
+httpx>=0.24.0

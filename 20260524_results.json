@@ -1,0 +1,32 @@
+{
+  "results": [
+    {
+      "plugin": "chaos",
+      "status": "success",
+      "result": {
+        "strategy": "drop_required_field",
+        "severity": "high",
+        "changes": []
+      }
+    },
+    {
+      "plugin": "security",
+      "status": "success",
+      "result": {
+        "injection_tested": true,
+        "dos_tested": true
+      }
+    },
+    {
+      "plugin": "observability",
+      "status": "success",
+      "result": {
+        "logs_validated": true,
+        "traces_validated": true
+      }
+    }
+  ],
+  "analysis": {
+    "total_events": 0
+  }
+}

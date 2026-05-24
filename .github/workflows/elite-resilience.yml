@@ -1,0 +1,78 @@
+name: Elite Resilience Tests
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        test-type: [deterministic, chaos, security, fuzz, stress]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements-dev.txt') }}
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements-dev.txt
+        pip install pytest-cov pytest-xdist pytest-timeout pytest-randomly
+    
+    - name: Run ${{ matrix.test-type }} tests
+      run: |
+        if [ "${{ matrix.test-type }}" = "deterministic" ]; then
+          pytest tests/test_elite_complete.py::TestEliteComprehensive::test_determinism_idempotent -v --cov=src --cov-report=xml
+        elif [ "${{ matrix.test-type }}" = "chaos" ]; then
+          pytest tests/test_elite_complete.py::TestEliteComprehensive::test_chaos_all_strategies -v --cov=src --cov-append
+        elif [ "${{ matrix.test-type }}" = "security" ]; then
+          pytest tests/test_elite_complete.py::TestEliteComprehensive::test_security_dos tests/test_elite_complete.py::TestEliteComprehensive::test_security_injection -v
+        elif [ "${{ matrix.test-type }}" = "fuzz" ]; then
+          pytest tests/test_elite_complete.py -v --randomly-seed=42
+        else
+          pytest tests/test_elite_complete.py::TestEliteComprehensive::test_abuse_resilience tests/test_elite_complete.py::TestEliteComprehensive::test_latency_injection -v
+        fi
+      timeout-minutes: 15
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+    
+    - name: Archive test reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-reports-${{ matrix.test-type }}
+        path: |
+          reports/
+          htmlcov/
+          pytest.xml
+
+  enforce-coverage:
+    runs-on: ubuntu-latest
+    needs: resilience
+    steps:
+    - name: Check coverage threshold
+      run: |
+        coverage report --fail-under=85
+        echo "✅ Coverage threshold met"
