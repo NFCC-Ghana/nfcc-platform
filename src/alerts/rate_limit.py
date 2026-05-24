@@ -1,66 +1,59 @@
-"""Rate limiter for alerts to prevent spam."""
+"""Rate limiting for alerts to prevent spam."""
 
-import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Union
-from datetime import datetime
+import time
+import threading
+from typing import Dict, List, Optional
 
 
 class RateLimiter:
-    """
-    Rate limiter for alerts.
+    """Thread-safe rate limiter for alerts per location."""
 
-    Prevents excessive alerts to the same location within a time window.
-    """
+    def __init__(self, max_alerts_per_hour: int = 3, window_seconds: int = 3600):
+        """
+        Initialize rate limiter.
 
-    def __init__(
-        self,
-        max_alerts_per_hour: int = 3,
-        window_seconds: int = 3600,
-        max_alerts: int = None,
-    ):
-        self.max_alerts = max_alerts if max_alerts is not None else max_alerts_per_hour
+        Args:
+            max_alerts_per_hour: Maximum alerts allowed per location per hour
+            window_seconds: Time window in seconds (default 1 hour = 3600 seconds)
+        """
+        self.max_alerts_per_hour = max_alerts_per_hour
         self.window_seconds = window_seconds
-        self.alerts: Dict[str, List[Union[float, datetime]]] = defaultdict(list)
-
-    def _to_timestamp(self, value: Union[float, datetime]) -> float:
-        """Convert datetime or timestamp to float timestamp."""
-        if isinstance(value, datetime):
-            return value.timestamp()
-        return value
+        self.alerts: Dict[str, List[float]] = defaultdict(list)
+        self._lock = threading.Lock()
 
     def can_send(self, location: str) -> bool:
-        """Check if an alert can be sent to a location."""
-        current_time = time.time()
-        cutoff_time = current_time - self.window_seconds
+        """
+        Check whether an alert can be sent to this location.
 
-        # Clean old alerts (keep only those within window)
-        self.alerts[location] = [
-            ts for ts in self.alerts[location] if self._to_timestamp(ts) > cutoff_time
-        ]
-
-        return len(self.alerts[location]) < self.max_alerts
+        This method checks the rate limit but does NOT record the send.
+        The caller must call record_send() after successful dispatch.
+        """
+        with self._lock:
+            self._prune_old_entries(location)
+            return len(self.alerts[location]) < self.max_alerts_per_hour
 
     def record_send(self, location: str) -> None:
         """Record that an alert was sent."""
-        self.alerts[location].append(time.time())
+        with self._lock:
+            self.alerts[location].append(time.time())
 
     def get_remaining(self, location: str) -> int:
-        """Get remaining alerts allowed for a location."""
-        current_time = time.time()
-        cutoff_time = current_time - self.window_seconds
-
-        # Clean old alerts
-        self.alerts[location] = [
-            ts for ts in self.alerts[location] if self._to_timestamp(ts) > cutoff_time
-        ]
-
-        remaining = self.max_alerts - len(self.alerts[location])
-        return max(0, remaining)
+        """Get remaining alerts allowed for this hour."""
+        with self._lock:
+            self._prune_old_entries(location)
+            remaining = self.max_alerts_per_hour - len(self.alerts[location])
+            return max(0, remaining)
 
     def reset(self, location: Optional[str] = None) -> None:
-        """Reset rate limits."""
-        if location:
-            self.alerts[location] = []
-        else:
-            self.alerts.clear()
+        """Reset rate limiter state (useful for testing)."""
+        with self._lock:
+            if location:
+                self.alerts[location] = []
+            else:
+                self.alerts.clear()
+
+    def _prune_old_entries(self, location: str):
+        """Remove expired timestamps."""
+        cutoff = time.time() - self.window_seconds
+        self.alerts[location] = [ts for ts in self.alerts[location] if ts > cutoff]
