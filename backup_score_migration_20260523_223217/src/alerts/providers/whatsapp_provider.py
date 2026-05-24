@@ -15,7 +15,9 @@ try:
     TWILIO_AVAILABLE = True
 except ImportError:
     TWILIO_AVAILABLE = False
-    logger.warning("Twilio not installed. WhatsApp provider will run in mock mode.")
+    logger.warning(
+        "Twilio not installed. WhatsApp provider will be limited to mock mode."
+    )
 
 
 class WhatsAppAlertProvider(BaseAlertProvider):
@@ -23,52 +25,30 @@ class WhatsAppAlertProvider(BaseAlertProvider):
 
     name = "whatsapp"
 
-    def __init__(
-        self,
-        account_sid=None,
-        auth_token=None,
-        from_number=None,
-        to_numbers=None,
-        max_retries=3,
-    ):
+    def __init__(self, recipients: List[str] = None, **kwargs):
         """
         Initialize WhatsApp provider.
 
         Args:
-            account_sid: Twilio account SID
-            auth_token: Twilio auth token
-            from_number: Twilio WhatsApp sender number
-            to_numbers: List[str] or comma-separated recipients
-            max_retries: Retry attempts
+            recipients: List of phone numbers with country code
+            account_sid: Twilio account SID (default from env)
+            auth_token: Twilio auth token (default from env)
+            from_number: Twilio WhatsApp number (default from env)
         """
-
-        self.account_sid = account_sid or os.getenv("TWILIO_ACCOUNT_SID")
-
-        self.auth_token = auth_token or os.getenv("TWILIO_AUTH_TOKEN")
-
-        self.from_number = (
-            from_number or os.getenv("TWILIO_WHATSAPP_FROM") or "whatsapp:+14155238886"
+        self.recipients = recipients or os.getenv(
+            "ALERT_WHATSAPP_RECIPIENTS", ""
+        ).split(",")
+        self.account_sid = kwargs.get("account_sid", os.getenv("TWILIO_ACCOUNT_SID"))
+        self.auth_token = kwargs.get("auth_token", os.getenv("TWILIO_AUTH_TOKEN"))
+        self.from_number = kwargs.get(
+            "from_number", os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+14155238886")
         )
 
-        # Ensure whatsapp prefix
+        # Ensure from_number has whatsapp: prefix
         if not self.from_number.startswith("whatsapp:"):
             self.from_number = f"whatsapp:{self.from_number}"
 
-        raw_numbers = (
-            to_numbers
-            or os.getenv("ALERT_WHATSAPP_NUMBERS")
-            or os.getenv("ALERT_WHATSAPP_RECIPIENTS", "")
-        )
-
-        # Accept list OR comma-separated string
-        if isinstance(raw_numbers, str):
-            self.to_numbers = [n.strip() for n in raw_numbers.split(",") if n.strip()]
-        else:
-            self.to_numbers = raw_numbers or []
-
-        self.max_retries = max_retries
-
-        if not self.to_numbers:
+        if not self.recipients or not self.recipients[0]:
             raise ValueError("WhatsApp recipients must be configured")
 
     def send(self, payload: AlertPayload) -> Dict[str, Any]:
@@ -76,84 +56,65 @@ class WhatsAppAlertProvider(BaseAlertProvider):
         Send WhatsApp alert.
 
         Args:
-            payload: Alert payload
+            payload: AlertPayload object
 
         Returns:
-            Standardized provider response
+            Success response or error
         """
-
         self.validate_payload(payload)
 
         message_text = self._format_message(payload)
+        results = []
 
-        sent_count = 0
-        errors = []
-
-        for recipient in self.to_numbers:
-
-            # Ensure whatsapp prefix
+        for recipient in self.recipients:
+            # Ensure recipient has whatsapp: prefix
             if not recipient.startswith("whatsapp:"):
                 recipient = f"whatsapp:{recipient}"
 
-            success = False
-
-            for attempt in range(self.max_retries):
-
+            for attempt in range(3):
                 try:
                     if TWILIO_AVAILABLE and self.account_sid:
-
                         client = Client(self.account_sid, self.auth_token)
-
                         message = client.messages.create(
                             body=message_text, from_=self.from_number, to=recipient
                         )
-
+                        results.append({"recipient": recipient, "sid": message.sid})
                         logger.info(
                             "WhatsApp sent to %s | SID: %s", recipient, message.sid
                         )
-
+                        break
                     else:
-                        # Mock mode
-                        logger.info("Mock WhatsApp sent to %s", recipient)
-
-                    sent_count += 1
-                    success = True
-                    break
+                        # Mock mode for testing
+                        logger.info(
+                            "WhatsApp sent to %s | SID: MOCK_%s",
+                            recipient,
+                            payload.timestamp,
+                        )
+                        results.append(
+                            {"recipient": recipient, "sid": f"MOCK_{payload.timestamp}"}
+                        )
+                        break
 
                 except Exception as e:
-
                     logger.warning(
                         "Attempt %d failed for %s: %s", attempt + 1, recipient, str(e)
                     )
-
-                    if attempt == self.max_retries - 1:
+                    if attempt == 2:
                         logger.error(
-                            "WhatsApp failed after %d attempts for %s",
-                            self.max_retries,
-                            recipient,
+                            "WhatsApp failed after 3 attempts for %s", recipient
                         )
-                        errors.append(str(e))
+                        results.append({"recipient": recipient, "error": str(e)})
 
-            if not success:
-                logger.error("Failed sending WhatsApp to %s", recipient)
-
-        if sent_count > 0:
-            return {
-                "success": True,
-                "sent": sent_count,
-                "provider": self.name,
-            }
+        success = any("sid" in r for r in results)
 
         return {
-            "success": False,
-            "sent": 0,
+            "success": success,
             "provider": self.name,
-            "error": "; ".join(errors) if errors else "Unknown error",
+            "results": results,
         }
 
     def _format_message(self, payload: AlertPayload) -> str:
         """Format WhatsApp message."""
-
         emoji_map = {
             "EXTREME": "🔴🚨🔥",
             "CRITICAL": "🔴🚨",
@@ -161,7 +122,6 @@ class WhatsAppAlertProvider(BaseAlertProvider):
             "MODERATE": "🟡📢",
             "LOW": "🟢ℹ️",
         }
-
         emoji = emoji_map.get(payload.risk_tier, "⚠️")
 
         return (

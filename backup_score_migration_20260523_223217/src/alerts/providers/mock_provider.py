@@ -1,8 +1,5 @@
-"""Mock alert provider for testing — no real messages sent."""
-
 import logging
 from typing import Dict, Any
-
 from src.alerts.providers.base import BaseAlertProvider
 from src.alerts.models import AlertPayload
 
@@ -10,40 +7,25 @@ logger = logging.getLogger("nfcc.alert.mock")
 
 
 class MockAlertProvider(BaseAlertProvider):
-    """Mock provider that prints alerts to console and returns success."""
-
     name = "mock"
 
     def send(self, payload: AlertPayload) -> Dict[str, Any]:
-        """
-        Send mock alert (prints to console, doesn't actually send).
-
-        Args:
-            payload: AlertPayload object with all alert data
-
-        Returns:
-            Success response with mock message ID
-        """
         logger.info(
-            "[MOCK] %s | %s | Score: %.1f",
+            "[MOCK ALERT] %s | %s | Score: %.1f",
             payload.risk_tier,
             payload.location,
             payload.score,
         )
-
-        # Pretty print for visibility during testing
         print("\n" + "=" * 60)
         print(f"  [MOCK] ALERT TO: {payload.location}")
         print("=" * 60)
         print(f"  Risk Tier : {payload.risk_tier}")
         print(f"  Risk Score: {payload.score:.1f}/100")
         print("-" * 60)
-        print(f"  {payload.message if payload.message else 'Alert message'}")
+        print(f"  {payload.message if payload.message else 'No message'}")
         print("=" * 60 + "\n")
-
         return {
             "success": True,
             "provider": self.name,
             "message_id": f"mock-{payload.timestamp}",
-            "error": None,
         }

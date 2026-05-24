@@ -9,7 +9,7 @@ def get_risk_tier(score: float) -> str:
     Get risk tier from score.
 
     Args:
-        score: score (0-100)
+        score: Risk score (0-100)
 
     Returns:
         Risk tier string (LOW, MODERATE, HIGH, EXTREME)
@@ -44,7 +44,7 @@ def get_instruction(tier: str) -> str:
 
 def format_alert(
     location: str,
-    score: float,
+    risk_score: float,
     risk_tier: Optional[str] = None,
     timestamp: Optional[datetime] = None,
     include_instruction: bool = True,
@@ -54,7 +54,7 @@ def format_alert(
 
     Args:
         location: Location name
-        score: score (0-100)
+        risk_score: Risk score (0-100)
         risk_tier: Risk tier (auto-inferred if not provided)
         timestamp: Alert timestamp (defaults to now)
         include_instruction: Whether to include action instruction
@@ -63,7 +63,7 @@ def format_alert(
         Formatted alert string
     """
     if risk_tier is None:
-        risk_tier = get_risk_tier(score)
+        risk_tier = get_risk_tier(risk_score)
 
     if timestamp is None:
         timestamp = datetime.now()
@@ -81,7 +81,7 @@ def format_alert(
         f"{emoji} NFCC FLOOD ALERT {emoji}",
         "=" * 60,
         f"Location    : {location}",
-        f"score  : {score:.1f} / 100",
+        f"Risk Score  : {risk_score:.1f} / 100",
         f"Risk Tier   : {risk_tier}",
         f"Time        : {timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
     ]

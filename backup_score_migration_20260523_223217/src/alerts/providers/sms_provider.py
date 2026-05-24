@@ -24,46 +24,22 @@ class SMSAlertProvider(BaseAlertProvider):
 
     name = "sms"
 
-    def __init__(
-        self,
-        to_numbers: List[str] = None,
-        account_sid: str = None,
-        auth_token: str = None,
-        from_number: str = None,
-        max_retries: int = 3,
-        **kwargs,
-    ):
+    def __init__(self, recipients: List[str] = None, **kwargs):
         """
         Initialize SMS provider.
 
         Args:
-            to_numbers: List of destination phone numbers
-            account_sid: Twilio account SID
-            auth_token: Twilio auth token
-            from_number: Twilio sender number
-            max_retries: Retry attempts per recipient
+            recipients: List of phone numbers
+            account_sid: Twilio account SID (default from env)
+            auth_token: Twilio auth token (default from env)
+            from_number: Twilio from number (default from env)
         """
+        self.recipients = recipients or os.getenv("ALERT_SMS_RECIPIENTS", "").split(",")
+        self.account_sid = kwargs.get("account_sid", os.getenv("TWILIO_ACCOUNT_SID"))
+        self.auth_token = kwargs.get("auth_token", os.getenv("TWILIO_AUTH_TOKEN"))
+        self.from_number = kwargs.get("from_number", os.getenv("TWILIO_FROM_NUMBER"))
 
-        # Twilio credentials
-        self.account_sid = account_sid or os.getenv("TWILIO_ACCOUNT_SID")
-        self.auth_token = auth_token or os.getenv("TWILIO_AUTH_TOKEN")
-        self.from_number = from_number or os.getenv("TWILIO_FROM_NUMBER")
-
-        # Support BOTH explicit list + env var
-        numbers = to_numbers or os.getenv("ALERT_PHONE_NUMBERS", "")
-
-        # Normalize into clean list
-        if isinstance(numbers, str):
-            self.to_numbers = [n.strip() for n in numbers.split(",") if n.strip()]
-        else:
-            self.to_numbers = [n.strip() for n in numbers if n.strip()]
-
-        # Backward compatibility
-        self.recipients = self.to_numbers
-
-        self.max_retries = max_retries
-
-        if not self.to_numbers:
+        if not self.recipients or not self.recipients[0]:
             raise ValueError("SMS recipients must be configured")
 
     def send(self, payload: AlertPayload) -> Dict[str, Any]:
@@ -82,7 +58,7 @@ class SMSAlertProvider(BaseAlertProvider):
         results = []
 
         for recipient in self.recipients:
-            for attempt in range(self.max_retries):
+            for attempt in range(3):
                 try:
                     if TWILIO_AVAILABLE and self.account_sid:
                         client = Client(self.account_sid, self.auth_token)
@@ -111,21 +87,14 @@ class SMSAlertProvider(BaseAlertProvider):
                         "Attempt %d failed for %s: %s", attempt + 1, recipient, str(e)
                     )
                     if attempt == 2:
-                        logger.error(
-                            "SMS failed after %d attempts for %s",
-                            self.max_retries,
-                            recipient,
-                        )
+                        logger.error("SMS failed after 3 attempts for %s", recipient)
                         results.append({"recipient": recipient, "error": str(e)})
 
         success = any("sid" in r for r in results)
 
-        sent_count = len([r for r in results if "sid" in r])
-
         return {
             "success": success,
             "provider": self.name,
-            "sent": sent_count,
             "results": results,
         }
 

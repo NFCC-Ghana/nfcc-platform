@@ -24,7 +24,7 @@ class TestAPIEndpoints:
         }
         response = api_client.post("/score", json=payload)
         assert response.status_code == 200
-        assert "score" in response.json()
+        assert "risk_score" in response.json()
 
     def test_score_endpoint_negative_rainfall(self, api_client):
         payload = {

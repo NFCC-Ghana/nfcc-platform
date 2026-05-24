@@ -1,6 +1,6 @@
+import json
 import logging
-from typing import Any, List, Optional
-
+from typing import Any, Dict, List, Optional
 from src.alerts.models import AlertPayload
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class AlertEngine:
             if score >= 80
             else "HIGH" if score >= 60 else "MODERATE" if score >= 40 else "LOW"
         )
-        alert_payload = AlertPayload(
+        payload = AlertPayload(
             location=location,
             score=score,
             risk_tier=tier,
@@ -69,7 +69,7 @@ class AlertEngine:
         sent, failed = 0, 0
         for provider in self.providers:
             try:
-                provider.send(alert_payload)
+                provider.send(payload)
                 sent += 1
                 logger.info(
                     "✅ [%s] Alert sent to %s",
@@ -91,8 +91,5 @@ class AlertEngine:
         }
 
     def send_alert(self, location: str = None, risk_score: float = None, **kwargs):
-        """Legacy method for backward compatibility."""
         score = risk_score or kwargs.get("score")
-        if isinstance(location, dict) and score is None:
-            return self.process(location, **kwargs)
         return self.process(location=location, score=score, **kwargs)

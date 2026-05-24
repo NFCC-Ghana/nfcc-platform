@@ -1,6 +1,6 @@
 """Integration tests — Full data pipeline from raw rainfall to alert dispatch."""
 
-# import numpy as np
+import numpy as np
 import pandas as pd
 
 

@@ -82,3 +82,6 @@ Thumbs.db
 # Deployment
 # ==========================================
 railway.toml
+alerts.log
+
+

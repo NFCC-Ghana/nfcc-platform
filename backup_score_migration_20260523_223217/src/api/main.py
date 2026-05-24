@@ -91,7 +91,7 @@ class RainfallInput(BaseModel):
 
 
 class RiskResponse(BaseModel):
-    score: float
+    risk_score: float
     risk_tier: str
     alert: bool
     location: str
@@ -147,7 +147,7 @@ def log_alert(payload: dict):
         f.write(json.dumps(payload) + "\n")
     logger.warning(
         f"🚨 ALERT | {payload['location']} | "
-        f"Score: {payload['score']:.1f} | "
+        f"Score: {payload['risk_score']:.1f} | "
         f"Tier: {payload['risk_tier']}"
     )
 
@@ -189,12 +189,12 @@ def score_single(
     Returns flood-risk score (0–100), risk tier, and alert flag.
     """
     try:
-        score = score_record(payload)
-        tier = compute_risk_tier(score)
-        alert = score >= ALERT_THRESHOLD
+        risk_score = score_record(payload)
+        tier = compute_risk_tier(risk_score)
+        alert = risk_score >= ALERT_THRESHOLD
 
         response = {
-            "score": round(score, 2),
+            "risk_score": round(risk_score, 2),
             "risk_tier": tier,
             "alert": alert,
             "location": payload.location,
@@ -211,7 +211,8 @@ def score_single(
             background_tasks.add_task(log_alert, response)
 
         logger.info(
-            f"Scored | {payload.location} | " f"{score:.1f} | {tier} | alert={alert}"
+            f"Scored | {payload.location} | "
+            f"{risk_score:.1f} | {tier} | alert={alert}"
         )
         return response
 
@@ -242,14 +243,14 @@ def score_batch(
 
     for record in payload.records:
         try:
-            score = score_record(record)
-            tier = compute_risk_tier(score)
-            alert = score >= ALERT_THRESHOLD
+            risk_score = score_record(record)
+            tier = compute_risk_tier(risk_score)
+            alert = risk_score >= ALERT_THRESHOLD
 
             row = {
                 "location": record.location,
                 "timestamp": record.timestamp,
-                "score": round(score, 2),
+                "risk_score": round(risk_score, 2),
                 "risk_tier": tier,
                 "alert": alert,
             }
@@ -270,7 +271,7 @@ def score_batch(
     for alert_row in alerts:
         background_tasks.add_task(log_alert, alert_row)
 
-    scores = [r["score"] for r in results if "score" in r]
+    scores = [r["risk_score"] for r in results if "risk_score" in r]
 
     return {
         "total_records": len(results),

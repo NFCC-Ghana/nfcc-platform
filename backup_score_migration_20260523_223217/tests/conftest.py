@@ -1,5 +1,3 @@
-import pytest
-
 """
 NFCC Test Configuration & Shared Fixtures
 All pytest fixtures available across all test modules.
@@ -11,7 +9,7 @@ from unittest.mock import MagicMock
 import joblib
 import numpy as np
 import pandas as pd
-
+import pytest
 from fastapi.testclient import TestClient
 
 # ── Paths ─────────────────────────────────────────────────────────────
@@ -195,27 +193,3 @@ def alert_engine(trained_model, mock_provider):
     # CRITICAL FIX: Set the model on the engine
     engine.model = trained_model
     return engine
-
-
-# Skip email/sms/whatsapp provider tests that are failing due to implementation details
-# These tests can be fixed later - core functionality is working
-
-
-# Collect all tests that are known to fail
-skip_tests = [
-    "TestEmailAlertProvider",
-    "TestSMSAlertProvider",
-    "TestWhatsAppAlertProvider",
-]
-
-
-# Auto-skip these classes
-def pytest_collection_modifyitems(config, items):
-    for item in items:
-        for skip_class in skip_tests:
-            if skip_class in str(item.nodeid):
-                item.add_marker(
-                    pytest.mark.skip(
-                        reason="Temporarily skipped - will fix provider tests later"
-                    )
-                )

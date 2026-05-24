@@ -18,54 +18,28 @@ class EmailAlertProvider(BaseAlertProvider):
 
     name = "email"
 
-    def __init__(
-        self,
-        smtp_host=None,
-        smtp_port=587,
-        username=None,
-        password=None,
-        to_emails=None,
-        max_retries=3,
-        **kwargs,
-    ):
+    def __init__(self, recipients: List[str] = None, **kwargs):
         """
         Initialize email provider.
 
         Args:
-            smtp_host: SMTP server host
-            smtp_port: SMTP server port
-            username: SMTP username
-            password: SMTP password
-            to_emails: List OR comma-separated email recipients
-            max_retries: Retry attempts
+            recipients: List of email addresses
+            smtp_host: SMTP server host (default from env)
+            smtp_port: SMTP server port (default from env)
+            smtp_user: SMTP username (default from env)
+            smtp_password: SMTP password (default from env)
         """
+        self.recipients = recipients or os.getenv("ALERT_EMAIL_RECIPIENTS", "").split(
+            ","
+        )
+        self.smtp_host = kwargs.get(
+            "smtp_host", os.getenv("SMTP_HOST", "smtp.gmail.com")
+        )
+        self.smtp_port = kwargs.get("smtp_port", int(os.getenv("SMTP_PORT", "587")))
+        self.smtp_user = kwargs.get("smtp_user", os.getenv("SMTP_USER"))
+        self.smtp_password = kwargs.get("smtp_password", os.getenv("SMTP_PASSWORD"))
 
-        # SMTP configuration
-        self.smtp_host = smtp_host or os.getenv("SMTP_HOST", "smtp.gmail.com")
-
-        self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
-
-        self.username = username or os.getenv("SMTP_USERNAME")
-
-        self.password = password or os.getenv("SMTP_PASSWORD")
-
-        # Normalize recipients
-        emails = to_emails or os.getenv("ALERT_EMAILS", "")
-
-        # Support both list and comma-separated string
-        if isinstance(emails, list):
-            self.to_emails = [e.strip() for e in emails if e.strip()]
-        else:
-            self.to_emails = [e.strip() for e in emails.split(",") if e.strip()]
-
-        self.max_retries = max_retries
-
-        # Backward compatibility
-        self.recipients = self.to_emails
-        self.smtp_user = self.username
-        self.smtp_password = self.password
-
-        if not self.to_emails:
+        if not self.recipients or not self.recipients[0]:
             raise ValueError("Email recipients must be configured")
 
     def send(self, payload: AlertPayload) -> Dict[str, Any]:
@@ -82,7 +56,7 @@ class EmailAlertProvider(BaseAlertProvider):
 
         html_body = self._build_html_email(payload)
 
-        for attempt in range(self.max_retries):  # Retry up to 3 times
+        for attempt in range(3):  # Retry up to 3 times
             try:
                 with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                     server.starttls()
@@ -91,7 +65,7 @@ class EmailAlertProvider(BaseAlertProvider):
 
                     msg = MIMEMultipart()
                     msg["From"] = self.smtp_user
-                    msg["To"] = ", ".join(self.to_emails)
+                    msg["To"] = ", ".join(self.recipients)
                     msg["Subject"] = (
                         f"[NFCC] {payload.risk_tier} Flood Alert — {payload.location}"
                     )
@@ -102,7 +76,7 @@ class EmailAlertProvider(BaseAlertProvider):
 
                     logger.info(
                         "Email sent to %s | [NFCC] %s Flood Alert — %s — Score: %.1f/100",
-                        self.to_emails,
+                        self.recipients,
                         payload.risk_tier,
                         payload.location,
                         payload.score,
@@ -111,27 +85,23 @@ class EmailAlertProvider(BaseAlertProvider):
                     return {
                         "success": True,
                         "provider": self.name,
-                        "recipients": self.to_emails,
-                        "sent": len(self.to_emails),
+                        "recipients": self.recipients,
                     }
 
             except Exception as e:
                 logger.warning("Attempt %d failed: %s", attempt + 1, str(e))
                 if attempt == 2:
                     logger.error("Email failed after 3 attempts")
-
                     return {
                         "success": False,
                         "provider": self.name,
                         "error": str(e),
-                        "sent": 0,
                     }
 
         return {
             "success": False,
             "provider": self.name,
             "error": "Max retries exceeded",
-            "sent": 0,
         }
 
     def _build_html_email(self, payload: AlertPayload) -> str:
