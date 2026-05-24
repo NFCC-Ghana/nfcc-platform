@@ -1,7 +1,7 @@
 """Complete elite resilience test suite."""
 
 import pytest
-import time
+# import time
 from tests.framework.chaos import ChaosEngine, LatencyInjector, StateCorruptor
 from tests.framework.observability import (
     LogValidator,
@@ -112,8 +112,8 @@ class TestEliteComprehensive:
     def test_observability_complete(self, api_client, caplog):
         """Complete observability test."""
         log_validator = LogValidator(caplog)
-        metrics_validator = MetricsValidator()
-        tracing_validator = TracingValidator()
+        # metrics_validator = MetricsValidator()
+        # tracing_validator = TracingValidator()
 
         payload = PayloadFixtures.valid_payload()
 

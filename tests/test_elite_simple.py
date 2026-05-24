@@ -171,5 +171,5 @@ class TestEliteResilience:
 
         # Rate limiting may or may not kick in
         print(
-            f"Status distribution: {dict((s, statuses.count(s)) for s in set(statuses))}"
+        print(f"Status distribution: {dict((s, statuses.count(s)) for s in set(statuses))}")
         )
