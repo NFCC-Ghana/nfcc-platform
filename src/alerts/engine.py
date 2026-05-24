@@ -96,3 +96,10 @@ class AlertEngine:
         if isinstance(location, dict) and score is None:
             return self.process(location, **kwargs)
         return self.process(location=location, score=score, **kwargs)
+
+
+# In the _dispatch_to_providers method or send loop, change:
+# Old: just counting sent/failed based on exceptions
+# New: also check result["success"] flag
+
+# Find the provider loop in engine.py and update it
