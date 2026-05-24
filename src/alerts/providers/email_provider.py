@@ -101,7 +101,7 @@ class EmailAlertProvider(BaseAlertProvider):
                     server.send_message(msg)
 
                     logger.info(
-                        "Email sent to %s | [NFCC] %s Flood Alert — %s — Score: %.1f/100",
+                        "Email sent to %s | [NFCC] %s Flood Alert — %s — Score: %.1f/100
                         self.to_emails,
                         payload.risk_tier,
                         payload.location,
@@ -161,7 +161,7 @@ class EmailAlertProvider(BaseAlertProvider):
             </div>
             <div class="content">
                 <p><strong>Location:</strong> {payload.location}</p>
-                <p><strong>Risk Score:</strong> <span class="score">{payload.score:.1f}/100</span></p>
+                <p><strong>Risk Score:</strong> <span class="score">{payload.score:.1f}/
                 <p><strong>Current Rainfall:</strong> {payload.precipitation:.1f} mm</p>
                 <p><strong>3-Day Total:</strong> {payload.roll_3d:.1f} mm</p>
                 <p><strong>Message:</strong> {payload.message}</p>

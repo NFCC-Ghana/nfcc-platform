@@ -4,8 +4,6 @@ import pytest
 import numpy as np
 import pandas as pd
 
-
-
 # ============================================================
 # RANDOM SEED
 # ============================================================
@@ -37,13 +35,11 @@ def sample_dataframe():
     )
     df.set_index("date", inplace=True)
 
-    # Add rolling features
     df["roll_3d"] = df["precipitation"].rolling(window=3, min_periods=1).sum()
     df["roll_7d"] = df["precipitation"].rolling(window=7, min_periods=1).mean()
     df["roll_30d"] = df["precipitation"].rolling(window=30, min_periods=1).mean()
     df["cumulative"] = df["precipitation"].cumsum()
 
-    # Add z-score
     mean_30d = df["precipitation"].rolling(window=30, min_periods=1).mean()
     std_30d = df["precipitation"].rolling(window=30, min_periods=1).std()
     df["z_score"] = (df["precipitation"] - mean_30d) / std_30d
@@ -64,7 +60,6 @@ def trained_model(sample_dataframe):
 
     df = sample_dataframe.copy()
 
-    # Create features
     feature_cols = [
         "precipitation",
         "roll_3d",
