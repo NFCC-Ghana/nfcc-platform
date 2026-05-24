@@ -1,179 +1,147 @@
+"""Pytest configuration and shared fixtures."""
+
 import pytest
-
-"""
-NFCC Test Configuration & Shared Fixtures
-All pytest fixtures available across all test modules.
-"""
-
-from pathlib import Path
-from unittest.mock import MagicMock
-
-import joblib
 import numpy as np
 import pandas as pd
 
-from fastapi.testclient import TestClient
-
-# ── Paths ─────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = BASE_DIR / "models" / "xgboost_flood_risk.pkl"
 
 
-# ══════════════════════════════════════════════════════════════════════
-# GLOBAL RANDOM SEED (reproducibility)
-# ══════════════════════════════════════════════════════════════════════
+# ============================================================
+# RANDOM SEED
+# ============================================================
 
 
-@pytest.fixture(scope="session", autouse=True)
-def set_random_seed():
+def pytest_configure():
     np.random.seed(42)
     print("\n🔧 Global random seed set to 42 for test reproducibility")
 
 
-# ══════════════════════════════════════════════════════════════════════
-# SAMPLE DATA FIXTURES
-# ══════════════════════════════════════════════════════════════════════
+# ============================================================
+# SAMPLE DATA
+# ============================================================
+
+
+@pytest.fixture
+def sample_dataframe():
+    """Generate a sample dataframe with 365 days of rainfall data."""
+    dates = pd.date_range(start="2020-01-01", periods=365, freq="D")
+    np.random.seed(42)
+    precipitation = np.random.gamma(shape=2, scale=5, size=365)
+    precipitation = np.maximum(precipitation, 0)
+
+    df = pd.DataFrame(
+        {
+            "precipitation": precipitation,
+            "date": dates,
+        }
+    )
+    df.set_index("date", inplace=True)
+
+    # Add rolling features
+    df["roll_3d"] = df["precipitation"].rolling(window=3, min_periods=1).sum()
+    df["roll_7d"] = df["precipitation"].rolling(window=7, min_periods=1).mean()
+    df["roll_30d"] = df["precipitation"].rolling(window=30, min_periods=1).mean()
+    df["cumulative"] = df["precipitation"].cumsum()
+
+    # Add z-score
+    mean_30d = df["precipitation"].rolling(window=30, min_periods=1).mean()
+    std_30d = df["precipitation"].rolling(window=30, min_periods=1).std()
+    df["z_score"] = (df["precipitation"] - mean_30d) / std_30d
+    df["z_score"] = df["z_score"].fillna(0)
+
+    return df
+
+
+# ============================================================
+# TRAINED MODEL FIXTURE
+# ============================================================
+
+
+@pytest.fixture
+def trained_model(sample_dataframe):
+    """Train a simple model for testing."""
+    from sklearn.ensemble import RandomForestRegressor
+
+    df = sample_dataframe.copy()
+
+    # Create features
+    feature_cols = [
+        "precipitation",
+        "roll_3d",
+        "roll_7d",
+        "roll_30d",
+        "cumulative",
+        "z_score",
+    ]
+    X = df[feature_cols].fillna(0)
+    y = np.clip(df["precipitation"].shift(-1).fillna(0) * 2, 0, 100)
+
+    model = RandomForestRegressor(n_estimators=10, random_state=42, n_jobs=1)
+    model.fit(X, y)
+
+    return model
+
+
+# ============================================================
+# OBSERVATION FIXTURES
+# ============================================================
 
 
 @pytest.fixture
 def low_risk_observation():
     return {
-        "precipitation": 0.0,
-        "roll_3d": 0.5,
-        "roll_7d": 0.3,
-        "roll_30d": 1.2,
-        "cumulative": 120.0,
-        "z_score": -0.5,
+        "precipitation": 5.0,
+        "roll_3d": 15.0,
+        "roll_7d": 20.0,
+        "roll_30d": 30.0,
+        "cumulative": 100.0,
+        "z_score": 0.5,
+        "location": "Accra",
     }
 
 
 @pytest.fixture
 def moderate_risk_observation():
     return {
-        "precipitation": 8.0,
-        "roll_3d": 18.0,
-        "roll_7d": 6.5,
-        "roll_30d": 4.0,
-        "cumulative": 300.0,
-        "z_score": 0.8,
+        "precipitation": 25.0,
+        "roll_3d": 50.0,
+        "roll_7d": 60.0,
+        "roll_30d": 70.0,
+        "cumulative": 200.0,
+        "z_score": 1.5,
+        "location": "Accra",
     }
 
 
 @pytest.fixture
 def high_risk_observation():
     return {
-        "precipitation": 20.0,
-        "roll_3d": 45.0,
-        "roll_7d": 14.0,
-        "roll_30d": 7.5,
-        "cumulative": 480.0,
-        "z_score": 2.1,
+        "precipitation": 50.0,
+        "roll_3d": 100.0,
+        "roll_7d": 120.0,
+        "roll_30d": 150.0,
+        "cumulative": 500.0,
+        "z_score": 2.5,
+        "location": "Accra",
     }
 
 
 @pytest.fixture
 def critical_risk_observation():
     return {
-        "precipitation": 45.0,
-        "roll_3d": 95.0,
-        "roll_7d": 30.0,
-        "roll_30d": 14.0,
-        "cumulative": 750.0,
-        "z_score": 3.8,
+        "precipitation": 100.0,
+        "roll_3d": 200.0,
+        "roll_7d": 250.0,
+        "roll_30d": 300.0,
+        "cumulative": 1000.0,
+        "z_score": 3.5,
+        "location": "Accra",
     }
 
 
-# ══════════════════════════════════════════════════════════════════════
-# DATAFRAME FIXTURE (NOTE: column is 'score', NOT 'flood_score')
-# ══════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture(scope="session")
-def sample_dataframe():
-    dates = pd.date_range("2024-01-01", periods=365, freq="D")
-    np.random.seed(42)
-    precip = np.random.exponential(scale=5.0, size=365)
-    precip[60:75] = np.random.uniform(20, 50, 15)
-    precip[180:195] = np.random.uniform(25, 60, 15)
-
-    df = pd.DataFrame({"precipitation": precip}, index=dates)
-    df.index.name = "date"
-
-    df["roll_3d"] = df["precipitation"].rolling(3, min_periods=1).sum()
-    df["roll_7d"] = df["precipitation"].rolling(7, min_periods=1).mean()
-    df["roll_30d"] = df["precipitation"].rolling(30, min_periods=1).mean()
-    df["cumulative"] = df["precipitation"].cumsum()
-
-    roll_mean = df["precipitation"].rolling(30, min_periods=1).mean()
-    roll_std = df["precipitation"].rolling(30, min_periods=1).std().fillna(1)
-    df["z_score"] = (df["precipitation"] - roll_mean) / roll_std
-
-    def flood_score(row):
-        score = min(row["precipitation"] / 30 * 40, 40)
-        score += min(row["roll_3d"] / 60 * 35, 35)
-        score += min(max(row["z_score"], 0) / 3 * 25, 25)
-        return round(score, 2)
-
-    df["score"] = df.apply(flood_score, axis=1)
-
-    def classify(val):
-        if val >= 30:
-            return "Extreme"
-        elif val >= 15:
-            return "High"
-        elif val >= 5:
-            return "Moderate"
-        elif val > 0:
-            return "Light"
-        return "Dry"
-
-    df["rainfall_class"] = df["precipitation"].apply(classify)
-
-    return df
-
-
-# ══════════════════════════════════════════════════════════════════════
-# MODEL FIXTURE (REQUIRED for tests)
-# ══════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture(scope="session")
-def trained_model():
-    """Load real trained model if available, else return mock."""
-    if MODEL_PATH.exists():
-        return joblib.load(MODEL_PATH)
-
-    print("\n🔧 Using mock model for tests (real model not found)")
-    mock = MagicMock()
-    mock.predict.return_value = np.array([42.0])
-    mock.feature_importances_ = np.array([0.30, 0.25, 0.20, 0.10, 0.08, 0.07])
-    return mock
-
-
-# ══════════════════════════════════════════════════════════════════════
-# API FIXTURE
-# ══════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture
-def api_client(trained_model):
-    import src.api.main as api_module
-
-    original_model = api_module.model
-    api_module.model = trained_model
-
-    from src.api.main import app
-
-    client = TestClient(app)
-
-    yield client
-
-    api_module.model = original_model
-
-
-# ══════════════════════════════════════════════════════════════════════
-# ALERT ENGINE FIXTURE (FIXED: engine.model is set correctly)
-# ══════════════════════════════════════════════════════════════════════
+# ============================================================
+# ALERT ENGINE FIXTURES
+# ============================================================
 
 
 @pytest.fixture
@@ -188,34 +156,15 @@ def alert_engine(trained_model, mock_provider):
     from src.alerts.engine import AlertEngine
 
     engine = AlertEngine(
-        providers=[mock_provider],
-        alert_threshold=50.0,
-        rate_limit_minutes=60,
+        providers=[mock_provider], alert_threshold=50.0, model=trained_model
     )
-    # CRITICAL FIX: Set the model on the engine
-    engine.model = trained_model
     return engine
 
 
-# Skip email/sms/whatsapp provider tests that are failing due to implementation details
-# These tests can be fixed later - core functionality is working
+@pytest.fixture
+def api_client():
+    """FastAPI test client for API tests."""
+    from fastapi.testclient import TestClient
+    from src.api.main import app
 
-
-# Collect all tests that are known to fail
-skip_tests = [
-    "TestEmailAlertProvider",
-    "TestSMSAlertProvider",
-    "TestWhatsAppAlertProvider",
-]
-
-
-# Auto-skip these classes
-def pytest_collection_modifyitems(config, items):
-    for item in items:
-        for skip_class in skip_tests:
-            if skip_class in str(item.nodeid):
-                item.add_marker(
-                    pytest.mark.skip(
-                        reason="Temporarily skipped - will fix provider tests later"
-                    )
-                )
+    return TestClient(app)
