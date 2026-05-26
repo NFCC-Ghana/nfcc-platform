@@ -1,79 +1,88 @@
-"""Factory for creating mock providers with configurable behavior."""
+"""Factory for creating mock providers with patched clients."""
 
-from typing import Dict, Any, Optional
 from unittest.mock import patch, MagicMock
-from tests.mocks.smtp_mock import MockSMTPClient, SMTPErrorType
-from tests.mocks.twilio_mock import MockTwilioClient, TwilioErrorType
+from src.alerts.providers.sms_provider import SMSProvider
+from src.alerts.providers.whatsapp_provider import WhatsAppProvider
+from src.alerts.providers.email_provider import EmailProvider
 
 
 class MockProviderFactory:
-    """Factory for creating configured mock providers."""
-    
+    """Factory for creating provider instances with mocked external clients."""
+
     @staticmethod
-    def create_email_provider(config: Optional[Dict[str, Any]] = None):
-        """Create email provider with mock SMTP."""
-        config = config or {}
-        
-        mock_smtp = MockSMTPClient()
-        
-        # Configure error simulation
-        error_type = config.get("error_type", SMTPErrorType.NONE)
-        fail_count = config.get("fail_count", 1)
-        delay_ms = config.get("delay_ms", 0)
-        
-        if error_type != SMTPErrorType.NONE:
-            mock_smtp.set_error_mode(error_type, fail_count, delay_ms)
-        
-        # Patch smtplib.SMTP
-        patcher = patch("smtplib.SMTP", return_value=mock_smtp)
-        patcher.start()
-        
-        return mock_smtp, patcher
-    
+    def create_sms_provider(config=None):
+        """Create SMS provider with mocked Twilio client."""
+        if config is None:
+            config = {
+                "account_sid": "test_sid",
+                "auth_token": "test_token",
+                "from_number": "+1234567890",
+                "recipients": ["+1234567890"],
+                "retry_attempts": 3,
+                "retry_delay": 1,
+            }
+
+        # Patch the Twilio Client at the correct import location
+        patcher = patch("twilio.rest.Client")
+        mock_client_class = patcher.start()
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        # Mock the messages.create method
+        mock_message = MagicMock()
+        mock_message.sid = "SM_test123"
+        mock_client.messages.create.return_value = mock_message
+
+        provider = SMSProvider(config)
+        return mock_client, patcher, provider
+
     @staticmethod
-    def create_sms_provider(config: Optional[Dict[str, Any]] = None):
-        """Create SMS provider with mock Twilio."""
-        config = config or {}
-        
-        mock_client = MockTwilioClient()
-        
-        # Configure error simulation
-        error_type = config.get("error_type", TwilioErrorType.NONE)
-        fail_count = config.get("fail_count", 1)
-        delay_ms = config.get("delay_ms", 0)
-        
-        if error_type != TwilioErrorType.NONE:
-            mock_client.set_error_mode(error_type, fail_count, delay_ms)
-        
-        # Patch twilio.rest.Client
-        patcher = patch("src.alerts.providers.sms_provider.Client", return_value=mock_client)
-        patcher.start()
-        
-        return mock_client, patcher
-    
+    def create_whatsapp_provider(config=None):
+        """Create WhatsApp provider with mocked Twilio client."""
+        if config is None:
+            config = {
+                "account_sid": "test_sid",
+                "auth_token": "test_token",
+                "from_number": "whatsapp:+14155238886",
+                "recipients": ["whatsapp:+1234567890"],
+                "retry_attempts": 3,
+                "retry_delay": 1,
+            }
+
+        # Patch the Twilio Client at the correct import location
+        patcher = patch("twilio.rest.Client")
+        mock_client_class = patcher.start()
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+
+        # Mock the messages.create method
+        mock_message = MagicMock()
+        mock_message.sid = "SM_test123"
+        mock_client.messages.create.return_value = mock_message
+
+        provider = WhatsAppProvider(config)
+        return mock_client, patcher, provider
+
     @staticmethod
-    def create_whatsapp_provider(config: Optional[Dict[str, Any]] = None):
-        """Create WhatsApp provider with mock Twilio."""
-        config = config or {}
-        
-        mock_client = MockTwilioClient()
-        
-        # Configure error simulation
-        error_type = config.get("error_type", TwilioErrorType.NONE)
-        fail_count = config.get("fail_count", 1)
-        delay_ms = config.get("delay_ms", 0)
-        
-        if error_type != TwilioErrorType.NONE:
-            mock_client.set_error_mode(error_type, fail_count, delay_ms)
-        
-        # Patch twilio.rest.Client
-        patcher = patch("src.alerts.providers.whatsapp_provider.Client", return_value=mock_client)
-        patcher.start()
-        
-        return mock_client, patcher
-    
-    @staticmethod
-    def cleanup(patchers: list):
-        """Clean up all patchers."""
-        for patcher in patchers:
-            patcher.stop()
+    def create_email_provider(config=None):
+        """Create email provider with mocked SMTP."""
+        if config is None:
+            config = {
+                "smtp_server": "smtp.gmail.com",
+                "smtp_port": 587,
+                "username": "test@gmail.com",
+                "password": "test_password",
+                "from_email": "test@gmail.com",
+                "recipients": ["test@example.com"],
+                "retry_attempts": 3,
+                "retry_delay": 1,
+            }
+
+        # Patch SMTP
+        patcher = patch("smtplib.SMTP")
+        mock_smtp_class = patcher.start()
+        mock_smtp = MagicMock()
+        mock_smtp_class.return_value = mock_smtp
+
+        provider = EmailProvider(config)
+        return mock_smtp, patcher, provider

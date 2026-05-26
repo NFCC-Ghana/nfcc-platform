@@ -1,30 +1,32 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc g++ gdal-bin libgdal-dev libproj-dev libgeos-dev curl \
+    gcc \
+    g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copy requirements and install
 COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install twilio python-dotenv
 
-# Copy application code
-COPY . .
+# Copy application
+COPY src/ ./src/
+COPY models/ ./models/
+COPY scripts/ ./scripts/
 
-# Create runtime directories
-RUN mkdir -p logs data/processed
+# Create non-root user
+RUN useradd -m -u 1000 nfcc && chown -R nfcc:nfcc /app
+USER nfcc
 
-# Verify real production model exists
-RUN test -f models/xgboost_flood_risk.pkl && \
-    echo "✅ Production XGBoost model verified" || \
-    (echo "❌ Production model missing" && exit 1)
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

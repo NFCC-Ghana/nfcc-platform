@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  nfcc-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: nfcc-flood-alert
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.production
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+    networks:
+      - nfcc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nfcc-nginx:
+    image: nginx:alpine
+    container_name: nfcc-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - nfcc-api
+    networks:
+      - nfcc-network
+
+  nfcc-postgres:
+    image: postgres:15-alpine
+    container_name: nfcc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nfcc_alerts
+      POSTGRES_USER: nfcc
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nfcc-network
+
+  nfcc-redis:
+    image: redis:7-alpine
+    container_name: nfcc-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - nfcc-network
+
+  nfcc-prometheus:
+    image: prom/prometheus:latest
+    container_name: nfcc-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - nfcc-network
+
+  nfcc-grafana:
+    image: grafana/grafana:latest
+    container_name: nfcc-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - nfcc-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  nfcc-network:
+    driver: bridge

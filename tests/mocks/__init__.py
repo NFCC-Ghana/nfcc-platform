@@ -1,7 +1,5 @@
-"""Mock providers for testing - no external dependencies."""
+"""Mock factories and helpers for testing."""
 
-from .smtp_mock import MockSMTPClient
-from .twilio_mock import MockTwilioClient
-from .provider_factory import MockProviderFactory
+from tests.mocks.provider_factory import MockProviderFactory
 
-__all__ = ["MockSMTPClient", "MockTwilioClient", "MockProviderFactory"]
+__all__ = ["MockProviderFactory"]
