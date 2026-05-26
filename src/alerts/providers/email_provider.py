@@ -1,151 +1,125 @@
-"""Email alert provider via SMTP."""
+"""Email alert provider using SMTP."""
 
 import logging
-import os
 import smtplib
-import time
-from email.mime.multipart import MIMEMultipart
+import os
 from email.mime.text import MIMEText
-from src.alerts.providers.base import BaseAlertProvider, AlertPayload
+from email.mime.multipart import MIMEMultipart
+from typing import Dict, Any
+
+from src.alerts.providers.base import BaseAlertProvider
+from src.alerts.models import AlertPayload
 
 logger = logging.getLogger("nfcc.alert.email")
 
 
 class EmailAlertProvider(BaseAlertProvider):
-    """Send email alerts via SMTP with retry logic."""
+    """Email provider that sends alerts via SMTP."""
 
     name = "email"
 
-    def __init__(
-        self,
-        smtp_host: str = None,
-        smtp_port: int = None,
-        smtp_user: str = None,
-        smtp_pass: str = None,
-        from_email: str = None,
-        to_emails: list[str] = None,
-        max_retries: int = 3,
-        retry_delay: float = 2.0,
-    ):
-        self.smtp_host = smtp_host or os.getenv("SMTP_HOST", "smtp.gmail.com")
-        self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
-        self.smtp_user = smtp_user or os.getenv("SMTP_USER")
-        self.smtp_pass = smtp_pass or os.getenv("SMTP_PASS")
-        self.from_email = from_email or os.getenv("ALERT_EMAIL_FROM")
-        self.to_emails = to_emails or [
-            e.strip()
-            for e in os.getenv("ALERT_EMAIL_RECIPIENTS", "").split(",")
-            if e.strip()
-        ]
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-
-        if not all([self.smtp_user, self.smtp_pass, self.from_email, self.to_emails]):
-            raise EnvironmentError(
-                "Email provider requires SMTP_USER, SMTP_PASS, "
-                "ALERT_EMAIL_FROM, and ALERT_EMAIL_RECIPIENTS."
-            )
-
-    def _build_html(self, payload: AlertPayload) -> str:
-        tier_color = {
-            "CRITICAL": "#c0392b",
-            "HIGH": "#e67e22",
-            "MODERATE": "#f1c40f",
-            "LOW": "#27ae60",
-        }.get(payload.risk_tier, "#2980b9")
-
-        return f"""
-        <html><body style="font-family:Arial,sans-serif;
-                           background:#f4f4f4; padding:20px;">
-          <div style="max-width:600px; margin:auto;
-                      background:white; border-radius:10px;
-                      overflow:hidden; box-shadow:0 2px 8px #ccc;">
-            <div style="background:{tier_color};
-                        padding:20px; text-align:center;">
-              <h1 style="color:white; margin:0;">
-                🌧️ NFCC FLOOD ALERT
-              </h1>
-              <h2 style="color:white; margin:5px 0;">
-                {payload.risk_tier}
-              </h2>
-            </div>
-            <div style="padding:24px;">
-              <table width="100%" cellpadding="8"
-                     style="border-collapse:collapse;">
-                <tr style="background:#f9f9f9;">
-                  <td><b>Location</b></td>
-                  <td>{payload.location}</td>
-                </table>
-                <tr>
-                  <td><b>Risk Score</b></td>
-                  <td style="color:{tier_color};font-weight:bold;">
-                    {payload.risk_score:.1f} / 100
-                  </td>
-                </tr>
-                <tr style="background:#f9f9f9;">
-                  <td><b>Today's Rainfall</b></td>
-                  <td>{payload.precipitation:.1f} mm</td>
-                </tr>
-                <tr>
-                  <td><b>3-Day Total</b></td>
-                  <td>{payload.roll_3d:.1f} mm</td>
-                </tr>
-                <tr style="background:#f9f9f9;">
-                  <td><b>Z-Score</b></td>
-                  <td>{payload.z_score:.2f}</td>
-                </tr>
-                <tr>
-                  <td><b>Timestamp</b></td>
-                  <td>{payload.timestamp[:19].replace('T', ' ')} UTC</td>
-                </tr>
-              </table>
-            </div>
-            <div style="background:#0f1923; padding:14px;
-                        text-align:center; color:#aaa; font-size:12px;">
-              National Flood Control Centre · Accra, Ghana ·
-              NFCC Intelligence Platform
-            </div>
-          </div>
-        </body></html>
-        """
-
-    def send(self, payload: AlertPayload) -> dict:
-        subject = (
-            f"[NFCC] {payload.risk_tier} Flood Alert — "
-            f"{payload.location} — Score: {payload.risk_score:.0f}/100"
+    def __init__(self, recipients: list = None, **kwargs):
+        """Initialize email provider."""
+        self.recipients = recipients or os.getenv("ALERT_EMAIL_RECIPIENTS", "").split(
+            ","
         )
+        self.smtp_host = kwargs.get(
+            "smtp_host", os.getenv("SMTP_HOST", "smtp.gmail.com")
+        )
+        self.smtp_port = kwargs.get("smtp_port", int(os.getenv("SMTP_PORT", "587")))
+        self.smtp_user = kwargs.get("smtp_user", os.getenv("SMTP_USER"))
+        self.smtp_password = kwargs.get("smtp_password", os.getenv("SMTP_PASSWORD"))
 
-        for attempt in range(self.max_retries):
+        if not self.recipients or not self.recipients[0]:
+            raise ValueError("Email recipients must be configured")
+
+    def send(self, payload: AlertPayload) -> Dict[str, Any]:
+        """Send email alert."""
+        self.validate_payload(payload)
+
+        html_body = self._build_html_email(payload)
+
+        for attempt in range(3):
             try:
-                msg = MIMEMultipart("alternative")
-                msg["Subject"] = subject
-                msg["From"] = self.from_email
-                msg["To"] = ", ".join(self.to_emails)
-                msg.attach(MIMEText(payload.message, "plain"))
-                msg.attach(MIMEText(self._build_html(payload), "html"))
-
                 with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                     server.starttls()
-                    server.login(self.smtp_user, self.smtp_pass)
-                    server.sendmail(self.from_email, self.to_emails, msg.as_string())
+                    if self.smtp_user and self.smtp_password:
+                        server.login(self.smtp_user, self.smtp_password)
 
-                logger.info(f"Email sent to {self.to_emails} | {subject}")
-                return {
-                    "success": True,
-                    "provider": self.name,
-                    "message_id": subject,
-                    "error": None,
-                }
+                    msg = MIMEMultipart()
+                    msg["From"] = self.smtp_user
+                    msg["To"] = ", ".join(self.recipients)
+                    msg["Subject"] = (
+                        f"[NFCC] {payload.risk_tier} Flood Alert — {payload.location}"
+                    )
+
+                    msg.attach(MIMEText(html_body, "html"))
+                    server.send_message(msg)
+
+                    logger.info(
+                        "Email sent to %s | Alert: %s - Score: %.1f/100",
+                        self.recipients,
+                        payload.location,
+                        payload.score,
+                    )
+
+                    return {
+                        "success": True,
+                        "provider": self.name,
+                        "recipients": self.recipients,
+                    }
 
             except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed: {e}")
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay)
-                else:
-                    logger.error(f"Email failed after {self.max_retries} attempts")
+                logger.warning("Attempt %d failed: %s", attempt + 1, str(e))
+                if attempt == 2:
+                    logger.error("Email failed after 3 attempts")
                     return {
                         "success": False,
                         "provider": self.name,
-                        "message_id": None,
                         "error": str(e),
                     }
+
+        return {
+            "success": False,
+            "provider": self.name,
+            "error": "Max retries exceeded",
+        }
+
+    def _build_html_email(self, payload: AlertPayload) -> str:
+        """Build HTML email body."""
+        color_map = {
+            "EXTREME": "#dc3545",
+            "CRITICAL": "#dc3545",
+            "HIGH": "#fd7e14",
+            "MODERATE": "#ffc107",
+            "LOW": "#28a745",
+        }
+        color = color_map.get(payload.risk_tier, "#6c757d")
+
+        return f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; }}
+                .header {{ background-color: {color}; color: white; padding: 10px; }}
+                .content {{ padding: 20px; }}
+                .score {{ font-size: 24px; font-weight: bold; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>NFCC Flood Alert - {payload.risk_tier}</h2>
+            </div>
+            <div class="content">
+                <p><strong>Location:</strong> {payload.location}</p>
+                <p><strong>Risk Score:</strong> <span class="score">{payload.score:.1f}/
+                <p><strong>Current Rainfall:</strong> {payload.precipitation:.1f} mm</p>
+                <p><strong>3-Day Total:</strong> {payload.roll_3d:.1f} mm</p>
+                <p><strong>Message:</strong> {payload.message}</p>
+                <p><strong>Time:</strong> {payload.timestamp}</p>
+                <hr>
+                <p><em>National Flood Control Centre, Accra, Ghana</em></p>
+            </div>
+        </body>
+        </html>
+        """

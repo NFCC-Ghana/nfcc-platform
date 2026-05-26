@@ -1,4 +1,4 @@
-"""Core alert engine — receives risk_score, does NOT load model."""
+"""Core alert engine — receives score, does NOT load model."""
 
 import json
 import logging
@@ -23,7 +23,7 @@ LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 class AlertEngine:
     """
     Alert engine — orchestrates alert sending.
-    Does NOT load the ML model. Receives risk_score from API.
+    Does NOT load the ML model. Receives score from API.
     """
 
     def __init__(
@@ -66,9 +66,9 @@ class AlertEngine:
             f"Alert engine initialized | Providers: {[p.name for p in self.providers]}"
         )
 
-    def should_alert(self, risk_score: float) -> bool:
+    def should_alert(self, score: float) -> bool:
         """Determine if an alert should be triggered."""
-        return risk_score >= self.alert_threshold
+        return score >= self.alert_threshold
 
     def _log_event(self, event: dict):
         """Log event to JSONL file."""
@@ -77,7 +77,7 @@ class AlertEngine:
 
     def process(
         self,
-        risk_score: float,
+        score: float,
         location: str = "Accra",
         observation: Optional[dict] = None,
         force: bool = False,
@@ -86,7 +86,7 @@ class AlertEngine:
         Process a risk score and send alerts if needed.
 
         Args:
-            risk_score: Calculated flood risk score (0-100)
+            score: Calculated flood risk score (0-100)
             location: District or location name
             observation: Optional raw observation for context
             force: Bypass rate limiting for testing
@@ -96,17 +96,17 @@ class AlertEngine:
         """
         # Backward compatibility:
         # integration tests may pass a dict instead of raw float
-        if isinstance(risk_score, dict):
-            risk_score = risk_score.get("risk_score", 0)
+        if isinstance(score, dict):
+            score = score.get("score", 0)
 
-        risk_tier = get_risk_tier(risk_score)
-        alert = self.should_alert(risk_score)
+        risk_tier = get_risk_tier(score)
+        alert = self.should_alert(score)
         timestamp = datetime.now().isoformat()
 
         event = {
             "timestamp": timestamp,
             "location": location,
-            "risk_score": round(risk_score, 2),
+            "score": round(score, 2),
             "risk_tier": risk_tier,
             "alert": alert,
             "observation": observation or {},
@@ -116,7 +116,7 @@ class AlertEngine:
 
         if not alert:
             logger.info(
-                f"[{location}] Score: {risk_score:.1f} | {risk_tier} — no alert"
+                f"[{location}] Score: {score:.1f} | {risk_tier} — no alert"
             )
             self._log_event(event)
             return event
@@ -132,7 +132,7 @@ class AlertEngine:
         # Build payload
         payload = AlertPayload(
             location=location,
-            risk_score=risk_score,
+            score=score,
             risk_tier=risk_tier,
             precipitation=observation.get("precipitation", 0.0) if observation else 0.0,
             roll_3d=observation.get("roll_3d", 0.0) if observation else 0.0,
@@ -160,6 +160,6 @@ class AlertEngine:
         event["results"] = results
         self._log_event(event)
 
-        logger.warning(f"🚨 ALERT | {location} | Score: {risk_score:.1f} | {risk_tier}")
+        logger.warning(f"🚨 ALERT | {location} | Score: {score:.1f} | {risk_tier}")
 
         return event
