@@ -2,13 +2,14 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional, Dict, Any
+import json
 
 
 @dataclass(frozen=True)
 class AlertPayload:
     """
     SINGLE CONTRACT for all alert payloads.
-
     This is the ONLY definition. All providers and the engine MUST use this.
     Fields are immutable (frozen=True) to prevent accidental mutations.
     """
@@ -39,7 +40,7 @@ class AlertPayload:
                 f"Invalid risk_tier: {self.risk_tier}. Must be one of {valid_tiers}"
             )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "location": self.location,
@@ -54,6 +55,4 @@ class AlertPayload:
 
     def to_json(self) -> str:
         """Convert to JSON string."""
-        import json
-
         return json.dumps(self.to_dict())

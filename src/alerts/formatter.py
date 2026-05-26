@@ -1,57 +1,43 @@
-"""Alert message formatting."""
+"""Alert formatting utilities."""
 
-from datetime import datetime
+from typing import Dict, Any
 
 
-def get_risk_tier(risk_score: float) -> str:
-    """Convert risk score to tier."""
-    if risk_score >= 80:
-        return "EXTREME"
-    elif risk_score >= 60:
-        return "HIGH"
-    elif risk_score >= 40:
-        return "MODERATE"
-    else:
+def get_risk_tier(score: float) -> str:
+    """Get risk tier from score."""
+    if score < 30:
         return "LOW"
+    elif score < 50:
+        return "MODERATE"
+    elif score < 70:
+        return "HIGH"
+    elif score < 85:
+        return "CRITICAL"
+    else:
+        return "EXTREME"
 
 
-def get_instruction(tier: str) -> str:
-    """Get action instruction based on risk tier."""
+def get_instruction(risk_tier: str) -> str:
+    """Get safety instructions based on risk tier."""
     instructions = {
-        "EXTREME": "Immediate evacuation advised. Seek higher ground.",
-        "HIGH": "Prepare for flooding. Move valuables to safe areas.",
-        "MODERATE": "Stay alert. Monitor water levels.",
-        "LOW": "No action needed at this time.",
+        "LOW": "No immediate action required. Stay informed.",
+        "MODERATE": "Monitor local conditions. Stay aware.",
+        "HIGH": "Take precautions. Avoid low-lying areas.",
+        "CRITICAL": "Prepare for flooding. Follow evacuation orders.",
+        "EXTREME": "EMERGENCY! Seek higher ground immediately.",
     }
-    return instructions.get(tier, "Monitor local conditions.")
+    return instructions.get(risk_tier, "Stay alert. Monitor conditions.")
 
 
-def format_alert(
-    location: str,
-    risk_score: float,
-    risk_tier: str = None,
-    timestamp: datetime = None,
-    include_instruction: bool = True,
-) -> str:
-    """Format alert message for sending."""
+def format_alert(location: str, score: float, risk_tier: str = None) -> Dict[str, Any]:
+    """Format alert for display."""
     if risk_tier is None:
-        risk_tier = get_risk_tier(risk_score)
-    if timestamp is None:
-        timestamp = datetime.now()
+        risk_tier = get_risk_tier(score)
 
-    emoji = {"EXTREME": "🔴", "HIGH": "🟠", "MODERATE": "🟡", "LOW": "🟢"}.get(
-        risk_tier, "⚠️"
-    )
-
-    message = (
-        f"{emoji} NFCC FLOOD ALERT {emoji}\n\n"
-        f"📍 Location: {location}\n"
-        f"📊 Risk Score: {risk_score:.1f} / 100\n"
-        f"⚠️ Risk Tier: {risk_tier}\n"
-        f"🕐 Time: {timestamp.strftime('%Y-%m-%d %H:%M')} UTC"
-    )
-
-    if include_instruction:
-        message += f"\n\n{get_instruction(risk_tier)}"
-
-    return message
+    return {
+        "location": location,
+        "score": round(score, 1),
+        "risk_tier": risk_tier,
+        "instruction": get_instruction(risk_tier),
+        "timestamp": None,  # Will be set by caller
+    }
