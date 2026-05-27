@@ -1,6 +1,6 @@
 """Alert formatting utilities."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 def get_risk_tier(score: float) -> str:
@@ -29,15 +29,14 @@ def get_instruction(risk_tier: str) -> str:
     return instructions.get(risk_tier, "Stay alert. Monitor conditions.")
 
 
-def format_alert(location: str, score: float, risk_tier: str = None) -> Dict[str, Any]:
+def format_alert(location: str, score: float, risk_tier: Optional[str] = None) -> Dict[str, Any]:
     """Format alert for display."""
     if risk_tier is None:
         risk_tier = get_risk_tier(score)
-
+    
     return {
         "location": location,
         "score": round(score, 1),
         "risk_tier": risk_tier,
         "instruction": get_instruction(risk_tier),
-        "timestamp": None,  # Will be set by caller
     }
