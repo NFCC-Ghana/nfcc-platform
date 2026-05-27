@@ -33,10 +33,12 @@ class EmailAlertProvider(BaseAlertProvider):
         # CRITICAL: Only use environment if recipients is None (not empty list)
         if recipients is None:
             env_recipients = os.getenv("ALERT_EMAIL_RECIPIENTS", "")
-            self.recipients = [r.strip() for r in env_recipients.split(",") if r.strip()]
+            self.recipients = [
+                r.strip() for r in env_recipients.split(",") if r.strip()
+            ]
         else:
             self.recipients = recipients
-        
+
         self.smtp_host = smtp_host or os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
         self.smtp_user = smtp_user or os.getenv("SMTP_USER")
@@ -44,15 +46,18 @@ class EmailAlertProvider(BaseAlertProvider):
         self.from_email = from_email or os.getenv("SMTP_USER", "alerts@nfcc.com")
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        
-        self._mock_mode = not (self.smtp_user and self.smtp_password and 
-                               self.smtp_user != "test@gmail.com")
-        
+
+        self._mock_mode = not (
+            self.smtp_user and self.smtp_password and self.smtp_user != "test@gmail.com"
+        )
+
         if self._mock_mode:
             logger.warning("Email provider: MOCK MODE (no valid credentials)")
         elif self.recipients:
-            logger.info(f"Email provider initialized for {len(self.recipients)} recipients")
-    
+            logger.info(
+                f"Email provider initialized for {len(self.recipients)} recipients"
+            )
+
     def _format_html_message(self, alert: AlertPayload) -> str:
         return f"""
         <!DOCTYPE html>
@@ -77,7 +82,7 @@ class EmailAlertProvider(BaseAlertProvider):
         </body>
         </html>
         """
-    
+
     def _format_text_message(self, alert: AlertPayload) -> str:
         return f"""
 🚨 FLOOD ALERT: {alert.location}
@@ -89,10 +94,10 @@ Time: {alert.timestamp}
 
 NFCC Flood Alert System
 """
-    
+
     def _format_message(self, alert: AlertPayload) -> str:
         return self._format_text_message(alert)
-    
+
     def send(self, alert: AlertPayload) -> Dict[str, Any]:
         """Send email alert with retry logic."""
         # Check empty recipients FIRST
@@ -101,9 +106,9 @@ NFCC Flood Alert System
                 "success": False,
                 "message": "No email recipients configured",
                 "provider": self.name,
-                "recipient_count": 0
+                "recipient_count": 0,
             }
-        
+
         if self._mock_mode:
             logger.info(f"[MOCK Email] Would send to {self.recipients}")
             return {
@@ -111,35 +116,35 @@ NFCC Flood Alert System
                 "message": f"MOCK: Email sent to {len(self.recipients)} recipient(s)",
                 "provider": self.name,
                 "recipient_count": len(self.recipients),
-                "mock": True
+                "mock": True,
             }
-        
+
         # Real email sending
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"🚨 FLOOD ALERT: {alert.location} - {alert.risk_tier} Risk"
         msg["From"] = self.from_email
         msg["To"] = ", ".join(self.recipients)
-        
+
         text_part = MIMEText(self._format_text_message(alert), "plain")
         html_part = MIMEText(self._format_html_message(alert), "html")
         msg.attach(text_part)
         msg.attach(html_part)
-        
+
         for attempt in range(1, self.max_retries + 1):
             try:
                 with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                     server.starttls()
                     server.login(self.smtp_user, self.smtp_password)
                     server.send_message(msg)
-                
+
                 logger.info(f"Email sent to {self.recipients}")
                 return {
                     "success": True,
                     "message": f"Email sent to {len(self.recipients)} recipient(s)",
                     "provider": self.name,
-                    "recipient_count": len(self.recipients)
+                    "recipient_count": len(self.recipients),
                 }
-                
+
             except Exception as e:
                 logger.warning(f"Attempt {attempt} failed: {e}")
                 if attempt == self.max_retries:
@@ -147,13 +152,13 @@ NFCC Flood Alert System
                         "success": False,
                         "message": f"Email failed: {str(e)}",
                         "provider": self.name,
-                        "recipient_count": 0
+                        "recipient_count": 0,
                     }
                 time.sleep(self.retry_delay * attempt)
-        
+
         return {
             "success": False,
             "message": "Email sending failed",
             "provider": self.name,
-            "recipient_count": 0
+            "recipient_count": 0,
         }

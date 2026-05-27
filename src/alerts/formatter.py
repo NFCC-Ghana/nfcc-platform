@@ -29,11 +29,13 @@ def get_instruction(risk_tier: str) -> str:
     return instructions.get(risk_tier, "Stay alert. Monitor conditions.")
 
 
-def format_alert(location: str, score: float, risk_tier: Optional[str] = None) -> Dict[str, Any]:
+def format_alert(
+    location: str, score: float, risk_tier: Optional[str] = None
+) -> Dict[str, Any]:
     """Format alert for display."""
     if risk_tier is None:
         risk_tier = get_risk_tier(score)
-    
+
     return {
         "location": location,
         "score": round(score, 1),
