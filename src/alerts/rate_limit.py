@@ -1,37 +1,59 @@
-"""Rate limiting for alerts to prevent spam."""
+"""Thread-safe rate limiter for alerts."""
 
+import time
 from collections import defaultdict
-from datetime import datetime, timedelta
-import threading
+from threading import Lock
+from typing import Dict, Tuple
 
 
 class RateLimiter:
-    """Rate limiter for alerts per location."""
+    """Thread-safe rate limiter for per-location alert throttling."""
 
-    def __init__(self, max_alerts_per_hour: int = 3):
-        self.max_alerts_per_hour = max_alerts_per_hour
-        self._history = defaultdict(list)
-        self._lock = threading.Lock()
+    def __init__(
+        self,
+        limit: int = 3,
+        window_seconds: int = 3600,
+        max_alerts_per_hour: int = None,
+    ):
+        """
+        Initialize rate limiter.
 
-    def can_send(self, location: str) -> bool:
-        """Check if an alert can be sent to this location."""
+        Args:
+            limit: Maximum number of alerts per time window
+            window_seconds: Time window in seconds (default 1 hour)
+            max_alerts_per_hour: Legacy parameter for backward compatibility
+        """
+        self.limit = limit if max_alerts_per_hour is None else max_alerts_per_hour
+        self.max_alerts_per_hour = self.limit  # For backward compatibility
+        self.window_seconds = window_seconds
+        self._sends: Dict[str, list] = defaultdict(list)
+        self._lock = Lock()
+
+    def can_send(self, location: str) -> Tuple[bool, int]:
+        """Check if an alert can be sent to a location."""
         with self._lock:
-            now = datetime.now()
-            cutoff = now - timedelta(hours=1)
-            self._history[location] = [
-                ts for ts in self._history[location] if ts > cutoff
+            now = time.time()
+            window_start = now - self.window_seconds
+            self._sends[location] = [
+                t for t in self._sends[location] if t > window_start
             ]
-            return len(self._history[location]) < self.max_alerts_per_hour
+            remaining = self.limit - len(self._sends[location])
+            return remaining > 0, max(0, remaining)
 
-    def record_send(self, location: str):
-        """Record that an alert was sent."""
+    def record_send(self, location: str) -> None:
+        """Record that an alert was sent to a location."""
         with self._lock:
-            self._history[location].append(datetime.now())
+            self._sends[location].append(time.time())
 
     def get_remaining(self, location: str) -> int:
-        """Get remaining alerts allowed for this hour."""
+        """Get remaining alerts available for a location."""
+        _, remaining = self.can_send(location)
+        return remaining
+
+    def reset(self, location: str = None) -> None:
+        """Reset rate limit for a specific location or all locations."""
         with self._lock:
-            now = datetime.now()
-            cutoff = now - timedelta(hours=1)
-            recent = [ts for ts in self._history[location] if ts > cutoff]
-            return max(0, self.max_alerts_per_hour - len(recent))
+            if location:
+                self._sends[location] = []
+            else:
+                self._sends.clear()

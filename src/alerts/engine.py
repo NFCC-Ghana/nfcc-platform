@@ -1,165 +1,167 @@
-"""Core alert engine — receives score, does NOT load model."""
+"""Alert engine for processing and sending alerts."""
 
-import json
 import logging
-from datetime import datetime
-from pathlib import Path
-from typing import List, Optional
-
-from src.alerts.providers.base import BaseAlertProvider, AlertPayload
-from src.alerts.providers.mock_provider import MockAlertProvider
+from typing import Dict, Any, List, Optional, Union
+from src.alerts.models import AlertPayload
 from src.alerts.rate_limit import RateLimiter
-from src.alerts.formatter import get_risk_tier
-from src.alerts.logger_config import setup_logging
+from src.alerts.provider_factory import ProviderFactory
+from src.alerts.cooldown import should_send_alert
+from src.alerts.providers.base import BaseAlertProvider
+from src.config.settings import settings
 
-# Setup logging
-setup_logging()
 logger = logging.getLogger("nfcc.alert.engine")
-
-LOG_PATH = Path("logs/alert_engine.jsonl")
-LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 class AlertEngine:
-    """
-    Alert engine — orchestrates alert sending.
-    Does NOT load the ML model. Receives score from API.
-    """
+    """Core alert processing engine with singleton providers."""
+
+    THRESHOLDS = {
+        "LOW": (0, 30),
+        "MODERATE": (30, 50),
+        "HIGH": (50, 70),
+        "CRITICAL": (70, 85),
+        "EXTREME": (85, 101),
+    }
 
     def __init__(
         self,
-        providers: Optional[List[BaseAlertProvider]] = None,
-        alert_threshold: float = 50.0,
-        critical_threshold: float = 70.0,
-        rate_limit_minutes: int = 20,
-        logger_instance=None,
+        providers: List[Union[str, BaseAlertProvider]] = None,
+        alerts_per_hour: int = None,
     ):
-        """
-        Initialize AlertEngine.
+        """Initialize alert engine with providers (accepts both names and instances)."""
+        self.alerts_per_hour = alerts_per_hour or settings.ALERTS_PER_HOUR
+        self.rate_limiter = RateLimiter(limit=self.alerts_per_hour)
 
-        Parameters
-        ----------
-        providers : list
-            Alert provider instances.
-        alert_threshold : float
-            Minimum score to trigger alerts.
-        critical_threshold : float
-            Backward compatibility for older tests.
-        rate_limit_minutes : int
-            Backward compatibility for older tests.
-        logger_instance : optional
-            Optional injected logger.
-        """
+        # Handle providers that are instances vs names
+        self.providers = self._resolve_providers(providers)
+        self.cooldown_minutes = getattr(settings, "ALERT_COOLDOWN_MINUTES", 30)
 
-        self.providers = providers or [MockAlertProvider()]
-        self.alert_threshold = alert_threshold
-
-        # Backward compatibility attributes
-        self.critical_threshold = critical_threshold
-        self.rate_limit_minutes = rate_limit_minutes
-
-        self.rate_limiter = RateLimiter(max_alerts_per_hour=3)
-
-        self.logger = logger_instance or logger
-
-        self.logger.info(
+        logger.info(
             f"Alert engine initialized | Providers: {[p.name for p in self.providers]}"
         )
 
-    def should_alert(self, score: float) -> bool:
-        """Determine if an alert should be triggered."""
-        return score >= self.alert_threshold
+    def _resolve_providers(
+        self, providers: List[Union[str, BaseAlertProvider]] = None
+    ) -> List[BaseAlertProvider]:
+        """Resolve providers from names or instances."""
+        if providers is None:
+            # Use default from factory
+            return ProviderFactory.get_providers(None)
 
-    def _log_event(self, event: dict):
-        """Log event to JSONL file."""
-        with open(LOG_PATH, "a") as f:
-            f.write(json.dumps(event) + "\n")
+        result = []
+        for p in providers:
+            if isinstance(p, str):
+                # It's a name - use factory
+                factory_result = ProviderFactory.get_providers([p])
+                result.extend(factory_result)
+            elif isinstance(p, BaseAlertProvider):
+                # It's already a provider instance
+                result.append(p)
+            else:
+                logger.warning(f"Unknown provider type: {p}")
+
+        # Ensure we have at least one provider
+        if not result:
+            result = ProviderFactory.get_providers(["mock"])
+
+        return result
+
+    def _get_risk_tier(self, score: float) -> str:
+        """Determine risk tier from score."""
+        for tier, (low, high) in self.THRESHOLDS.items():
+            if low <= score < high:
+                return tier
+        return "EXTREME"
 
     def process(
         self,
+        location: str,
         score: float,
-        location: str = "Accra",
-        observation: Optional[dict] = None,
         force: bool = False,
-    ) -> dict:
-        """
-        Process a risk score and send alerts if needed.
+        precipitation: float = 0.0,
+        roll_3d: float = 0.0,
+        z_score: float = 0.0,
+        message: str = "",
+    ) -> Dict[str, Any]:
+        """Process a score and send alerts if needed."""
 
-        Args:
-            score: Calculated flood risk score (0-100)
-            location: District or location name
-            observation: Optional raw observation for context
-            force: Bypass rate limiting for testing
+        risk_tier = self._get_risk_tier(score)
 
-        Returns:
-            Event record with dispatch results
-        """
-        # Backward compatibility:
-        # integration tests may pass a dict instead of raw float
-        if isinstance(score, dict):
-            score = score.get("score", 0)
-
-        risk_tier = get_risk_tier(score)
-        alert = self.should_alert(score)
-        timestamp = datetime.now().isoformat()
-
-        event = {
-            "timestamp": timestamp,
-            "location": location,
-            "score": round(score, 2),
-            "risk_tier": risk_tier,
-            "alert": alert,
-            "observation": observation or {},
-            "dispatched": False,
-            "results": [],
-        }
-
-        if not alert:
-            logger.info(
-                f"[{location}] Score: {score:.1f} | {risk_tier} — no alert"
-            )
-            self._log_event(event)
-            return event
-
-        # Rate limit check
-        if not force and not self.rate_limiter.can_send(location):
-            remaining = self.rate_limiter.get_remaining(location)
-            logger.info(f"[{location}] Rate limited. {remaining} alerts remaining")
-            event["rate_limited"] = True
-            self._log_event(event)
-            return event
-
-        # Build payload
-        payload = AlertPayload(
+        alert = AlertPayload(
             location=location,
             score=score,
             risk_tier=risk_tier,
-            precipitation=observation.get("precipitation", 0.0) if observation else 0.0,
-            roll_3d=observation.get("roll_3d", 0.0) if observation else 0.0,
-            z_score=observation.get("z_score", 0.0) if observation else 0.0,
-            timestamp=timestamp,
+            message=message or self._get_default_message(risk_tier),
+            precipitation=precipitation,
+            roll_3d=roll_3d,
+            z_score=z_score,
         )
 
-        # Dispatch to all providers
+        # Check cooldown
+        threshold = self.THRESHOLDS["MODERATE"][0]
+        if not force and not should_send_alert(
+            location, score, threshold, self.cooldown_minutes
+        ):
+            return {
+                "alert_sent": False,
+                "risk_tier": risk_tier,
+                "score": score,
+                "reason": f"Cooldown active ({self.cooldown_minutes} minutes)",
+            }
+
+        if score < threshold:
+            return {
+                "alert_sent": False,
+                "risk_tier": risk_tier,
+                "score": score,
+                "reason": f"Score {score} below moderate threshold",
+            }
+
+        can_send, remaining = self.rate_limiter.can_send(location)
+        if not can_send and not force:
+            return {
+                "alert_sent": False,
+                "risk_tier": risk_tier,
+                "score": score,
+                "reason": f"Rate limited. {remaining} alerts remaining",
+            }
+
         results = []
         for provider in self.providers:
             try:
-                result = provider.send(payload)
+                result = provider.send(alert)
                 results.append(result)
-                status = "✅" if result["success"] else "❌"
-                logger.info(f"{status} [{provider.name}] Alert sent to {location}")
+                if result.get("success"):
+                    logger.info(f"✅ [{provider.name}] Alert sent to {location}")
+                else:
+                    logger.error(
+                        f"❌ [{provider.name}] Failed: {result.get('message')}"
+                    )
             except Exception as e:
                 logger.error(f"Provider {provider.name} crashed: {e}")
                 results.append(
-                    {"success": False, "provider": provider.name, "error": str(e)}
+                    {"success": False, "message": str(e), "provider": provider.name}
                 )
 
-        self.rate_limiter.record_send(location)
+        any_success = any(r.get("success") for r in results)
+        if any_success:
+            self.rate_limiter.record_send(location)
 
-        event["dispatched"] = True
-        event["results"] = results
-        self._log_event(event)
+        logger.warning(f"🚨 ALERT | {location} | Score: {score} | {risk_tier}")
 
-        logger.warning(f"🚨 ALERT | {location} | Score: {score:.1f} | {risk_tier}")
+        return {
+            "alert_sent": any_success,
+            "risk_tier": risk_tier,
+            "score": score,
+            "providers": results,
+            "cooldown_minutes": self.cooldown_minutes,
+        }
 
-        return event
+    def _get_default_message(self, risk_tier: str) -> str:
+        messages = {
+            "MODERATE": "Moderate flood risk. Monitor conditions.",
+            "HIGH": "High flood risk. Take precautions.",
+            "CRITICAL": "CRITICAL flood risk. Immediate action required.",
+            "EXTREME": "EXTREME flood risk. Emergency response needed.",
+        }
+        return messages.get(risk_tier, "Flood alert issued.")

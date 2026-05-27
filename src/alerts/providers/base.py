@@ -1,9 +1,7 @@
-"""Base alert provider interface - imports AlertPayload from models."""
+"""Base alert provider interface."""
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any
-
-# Import from models - SINGLE SOURCE OF TRUTH
 from src.alerts.models import AlertPayload
 
 
@@ -13,19 +11,21 @@ class BaseAlertProvider(ABC):
     name: str = "base"
 
     @abstractmethod
-    def send(self, payload: AlertPayload) -> Dict[str, Any]:
-        """Send an alert payload.
+    def send(self, alert: AlertPayload) -> Dict[str, Any]:
+        """Send an alert using this provider.
 
         Args:
-            payload: AlertPayload object (from models.py)
+            alert: The alert payload to send
 
         Returns:
-            Dict with at minimum: {"success": bool, "provider": str}
+            Dict with at minimum:
+                - success: bool
+                - message: str
+                - provider: str
         """
         pass
 
-    def validate_payload(self, payload: AlertPayload) -> bool:
-        """Validate payload before sending."""
-        if not isinstance(payload, AlertPayload):
-            raise TypeError(f"Expected AlertPayload, got {type(payload)}")
-        return True
+    @abstractmethod
+    def _format_message(self, alert: AlertPayload) -> str:
+        """Format alert message for this provider."""
+        pass
