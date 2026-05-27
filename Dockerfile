@@ -1,40 +1,32 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
-
-ENV PYTHONUNBUFFERED=1
-ENV GDAL_CONFIG=/usr/bin/gdal-config
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    gdal-bin \
-    libgdal-dev \
-    libproj-dev \
-    libgeos-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first
+# Copy requirements and install
 COPY requirements.txt .
-
-# Upgrade pip
 RUN pip install --upgrade pip
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install twilio python-dotenv joblib
 
-# Copy project
+# Copy application code
 COPY . .
 
-# Expose API port
-EXPOSE 8000
+# Create necessary directories
+RUN mkdir -p logs models data/processed
 
-# Healthcheck
-HEALTHCHECK CMD curl --fail http://localhost:8000/health || exit 1
+# Expose port
+EXPOSE 8080
 
-# Start API
-CMD ["uvicorn", "src.api.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run with multiple workers for production
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]

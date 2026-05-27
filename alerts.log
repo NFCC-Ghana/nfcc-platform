@@ -1,0 +1,122 @@
+{"timestamp": "2026-05-23T02:12:49.590328", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1, "blocked": false}
+{"timestamp": "2026-05-23T02:12:49.600771", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1, "blocked": false}
+{"timestamp": "2026-05-23T02:12:49.606860", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:12:49.617617", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:12:49.800458", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:24:19.935971", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1, "blocked": false}
+{"timestamp": "2026-05-23T02:24:19.946951", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1, "blocked": false}
+{"timestamp": "2026-05-23T02:24:19.953706", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:24:19.961032", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:24:19.966835", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:25:43.049810", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1, "blocked": false}
+{"timestamp": "2026-05-23T02:25:43.059732", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1, "blocked": false}
+{"timestamp": "2026-05-23T02:25:43.067630", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:25:43.076040", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:25:43.082035", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0, "blocked": false}
+{"timestamp": "2026-05-23T02:30:33.622073", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T02:30:33.641301", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T02:30:33.650855", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:30:33.666723", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:30:33.862134", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:47:37.767260", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T02:47:37.780978", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T02:47:37.788346", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:47:37.799760", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:47:37.981261", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:53:08.259073", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T02:53:08.269815", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T02:53:08.276666", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:53:08.286541", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:53:08.293143", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:57:37.479876", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T02:57:37.491330", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T02:57:37.497127", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:57:37.505371", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T02:57:37.509218", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T03:04:33.045651", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T03:04:33.056362", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T03:04:33.061803", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T03:04:33.070799", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T03:04:33.075137", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T03:26:41.529052", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T03:26:41.540798", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T03:26:41.547302", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T03:26:41.560732", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T03:26:41.567668", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:25:51.917624", "location": "Integration Test", "score": 85.0, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T04:25:52.394976", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T04:25:52.413854", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T04:25:52.425683", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:25:52.434987", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:25:52.439712", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:47:27.388984", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T04:47:27.401940", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T04:47:27.406866", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:47:27.417048", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:47:27.421203", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:49:46.455159", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T04:49:46.468096", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T04:49:46.473701", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:49:46.485285", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T04:49:46.489098", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T05:05:01.413324", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T05:05:01.425755", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T05:05:01.431470", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T05:05:01.440638", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T05:05:01.444752", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T05:08:20.826490", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T05:08:20.846144", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T05:08:20.855849", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T05:08:20.866160", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T05:08:20.870476", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:29:13.863855", "location": "Integration Test", "score": 85.0, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:29:40.694556", "location": "Integration Test", "score": 85.0, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:29:41.274324", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:29:41.293955", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T19:29:41.301792", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:29:41.313353", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:29:41.320395", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:30:58.662878", "location": "Integration Test", "score": 85.0, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:31:12.229597", "location": "Integration Test", "score": 85.0, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:31:12.683768", "location": "Accra", "score": 80, "tier": null, "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:31:12.692551", "location": "Accra", "score": 78, "tier": null, "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T19:31:12.699219", "location": "Accra", "score": 95, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:31:12.706936", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:31:12.710951", "location": "Accra", "score": 88, "tier": null, "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:35:50.113502", "location": "Integration Test", "score": 85.0, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:36:05.671805", "location": "Integration Test", "score": 85.0, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:36:06.223013", "location": "Accra", "score": 80, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:36:06.233080", "location": "Accra", "score": 78, "tier": "HIGH", "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T19:36:06.238318", "location": "Accra", "score": 95, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:36:06.248686", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:36:06.253122", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:38:03.862584", "location": "Integration Test", "score": 85.0, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:38:04.376180", "location": "Accra", "score": 80, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T19:38:04.390281", "location": "Accra", "score": 78, "tier": "HIGH", "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T19:38:04.398384", "location": "Accra", "score": 95, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:38:04.409509", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T19:38:04.413921", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:06:46.837790", "location": "Integration Test", "score": 85.0, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:07:21.814584", "location": "Integration Test", "score": 85.0, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:07:22.385506", "location": "Accra", "score": 80, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:07:22.397260", "location": "Accra", "score": 78, "tier": "HIGH", "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T20:07:22.402504", "location": "Accra", "score": 95, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:07:22.410285", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:07:22.420874", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:12:45.850223", "location": "Integration Test", "score": 85.0, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:13:07.971852", "location": "Integration Test", "score": 85.0, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:13:08.461437", "location": "Accra", "score": 80, "tier": "CRITICAL", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:13:08.472876", "location": "Accra", "score": 78, "tier": "HIGH", "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T20:13:08.478113", "location": "Accra", "score": 95, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:13:08.487446", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:13:08.575165", "location": "Accra", "score": 88, "tier": "CRITICAL", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:59:29.980852", "location": "Accra", "score": 80, "tier": "EXTREME", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:59:29.995074", "location": "Accra", "score": 78, "tier": "HIGH", "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T20:59:30.000673", "location": "Accra", "score": 95, "tier": "EXTREME", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:59:30.010336", "location": "Accra", "score": 88, "tier": "EXTREME", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:59:30.096200", "location": "Accra", "score": 88, "tier": "EXTREME", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:59:53.140483", "location": "Accra", "score": 80, "tier": "EXTREME", "sent": 0, "failed": 1}
+{"timestamp": "2026-05-23T20:59:53.152436", "location": "Accra", "score": 78, "tier": "HIGH", "sent": 1, "failed": 1}
+{"timestamp": "2026-05-23T20:59:53.158754", "location": "Accra", "score": 95, "tier": "EXTREME", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:59:53.170685", "location": "Accra", "score": 88, "tier": "EXTREME", "sent": 1, "failed": 0}
+{"timestamp": "2026-05-23T20:59:53.253662", "location": "Accra", "score": 88, "tier": "EXTREME", "sent": 1, "failed": 0}

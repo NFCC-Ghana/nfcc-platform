@@ -1,29 +1,34 @@
-"""Mock alert provider for testing — no real messages sent."""
+"""Mock alert provider for testing."""
 
 import logging
-from src.alerts.providers.base import BaseAlertProvider, AlertPayload
+from typing import Dict, Any
+from src.alerts.providers.base import BaseAlertProvider
+from src.alerts.models import AlertPayload
 
 logger = logging.getLogger("nfcc.alert.mock")
 
 
 class MockAlertProvider(BaseAlertProvider):
-    """Mock provider that prints alerts to console."""
+    """Mock provider for testing without external dependencies."""
 
     name = "mock"
 
-    def send(self, payload: AlertPayload) -> dict:
-        logger.info(
-            f"[MOCK ALERT] {payload.risk_tier} | "
-            f"{payload.location} | Score: {payload.risk_score:.1f}"
-        )
-        print("\n" + "=" * 60)
-        print(f"  [MOCK] ALERT WOULD BE SENT TO: {payload.location}")
-        print("=" * 60)
-        print(payload.message)
-        print("=" * 60 + "\n")
+    def __init__(self, fail_on_next: bool = False):
+        self.fail_on_next = fail_on_next
+
+    def _format_message(self, alert: AlertPayload) -> str:
+        return f"[MOCK] {alert.risk_tier} | {alert.location} | Score: {alert.score}"
+
+    def send(self, alert: AlertPayload) -> Dict[str, Any]:
+        """Mock send - just logs."""
+        if self.fail_on_next:
+            self.fail_on_next = False
+            raise Exception("Provider crashed")
+
+        logger.info(self._format_message(alert))
         return {
             "success": True,
+            "message": f"Mock alert sent to {alert.location}",
             "provider": self.name,
-            "message_id": f"mock-{payload.timestamp}",
-            "error": None,
+            "mock": True,
         }

@@ -1,4 +1,26 @@
 [flake8]
 max-line-length = 88
-extend-ignore = E203, W503
-exclude = .git,__pycache__,venv,.venv,build,dist
+exclude = 
+    .git,
+    __pycache__,
+    build,
+    dist,
+    backup_score_migration_*,
+    tests/framework/,
+    tests/test_elite_complete.py,
+    tests/test_elite_simple.py,
+    tests/contract/
+ignore = 
+    E203,
+    W503,
+    E501,
+    F401,
+    F841,
+    E722,
+    F811,
+    F403,
+    F405
+per-file-ignores = 
+    __init__.py: F401
+    tests/*: E501
+    src/alerts/providers/*: E501

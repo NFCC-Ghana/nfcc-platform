@@ -1,0 +1,41 @@
+name: Daily CHIRPS Rainfall Ingestion
+
+on:
+  schedule:
+    # Runs daily at 8:00am GMT/UTC
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-chirps-ingestion:
+    runs-on: ubuntu-latest
+
+    env:
+      GEE_PROJECT_ID: nfcc-earth-engine-2026
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: nfcc
+          environment-file: environment.yml
+          auto-activate-base: false
+
+      - name: Run daily CHIRPS ingestion
+        shell: bash -l {0}
+        run: |
+          conda activate nfcc
+          python scripts/daily_chirps_pull.py
+
+      - name: Upload CHIRPS ingestion outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chirps-ingestion-output
+          path: |
+            data/raw/chirps/
+            reports/data_quality/
+            logs/

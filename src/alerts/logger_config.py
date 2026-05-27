@@ -1,30 +1,32 @@
-"""Centralized logging configuration for NFCC alerts."""
+"""Logging configuration for the NFCC platform."""
 
 import logging
 import sys
+from typing import Optional
 
 
-def setup_logging(level=logging.INFO):
-    """Configure logging for all alert modules."""
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+def setup_logging(level: Optional[str] = None) -> None:
+    """Configure logging for the application."""
+    if level is None:
+        import os
 
-    # Set up root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(level)
-    root_logger.addHandler(handler)
+        level = os.getenv("LOG_LEVEL", "INFO")
 
-    # Set up specific loggers
-    for name in [
-        "nfcc.alert.engine",
-        "nfcc.alert.mock",
-        "nfcc.alert.whatsapp",
-        "nfcc.alert.sms",
-        "nfcc.alert.email",
-        "nfcc.scheduler",
-    ]:
-        logger = logging.getLogger(name)
-        logger.setLevel(level)
-        logger.addHandler(handler)
+    log_format = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
 
-    return root_logger
+    logging.basicConfig(
+        level=getattr(logging, level.upper(), logging.INFO),
+        format=log_format,
+        datefmt=date_format,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+        ],
+    )
+
+    # Set third-party loggers to WARNING
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    logger = logging.getLogger("nfcc")
+    logger.info(f"Logging initialized at level: {level}")

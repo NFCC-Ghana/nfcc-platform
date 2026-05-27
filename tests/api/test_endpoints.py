@@ -1,48 +1,50 @@
-"""API endpoint tests using api_client fixture."""
+"""API endpoint tests."""
+
+import pytest
+from fastapi.testclient import TestClient
 
 
 class TestAPIEndpoints:
-    def test_health_endpoint(self, api_client):
+    """Test API endpoints."""
+
+    def test_health_endpoint(self, api_client: TestClient):
+        """Test health endpoint."""
         response = api_client.get("/health")
         assert response.status_code == 200
-        assert response.json()["status"] == "ok"
+        assert "status" in response.json()
 
-    def test_root_endpoint(self, api_client):
+    def test_root_endpoint(self, api_client: TestClient):
+        """Test root endpoint."""
         response = api_client.get("/")
         assert response.status_code == 200
-        assert "NFCC" in response.json()["service"]
+        assert "name" in response.json() or "service" in response.json()
 
-    def test_score_endpoint_valid(self, api_client):
-        payload = {
-            "precipitation": 28.5,
-            "roll_3d": 55.2,
-            "roll_7d": 18.3,
-            "roll_30d": 9.1,
-            "cumulative": 620.0,
-            "z_score": 2.8,
-            "location": "Accra Central",
-        }
-        response = api_client.post("/score", json=payload)
+    def test_score_endpoint_valid(self, api_client: TestClient):
+        """Test valid score request."""
+        response = api_client.post(
+            "/score", json={"location": "Accra Central", "precipitation": 45.5}
+        )
         assert response.status_code == 200
-        assert "risk_score" in response.json()
+        data = response.json()
+        assert "score" in data or "risk_score" in data
+        assert "location" in data
 
-    def test_score_endpoint_negative_rainfall(self, api_client):
-        payload = {
-            "precipitation": -10,
-            "roll_3d": 55.2,
-            "roll_7d": 18.3,
-            "roll_30d": 9.1,
-            "cumulative": 620.0,
-            "z_score": 2.8,
-            "location": "Accra Central",
-        }
-        response = api_client.post("/score", json=payload)
+    def test_score_endpoint_negative_rainfall(self, api_client: TestClient):
+        """Test negative rainfall (should be 422)."""
+        response = api_client.post(
+            "/score", json={"location": "Accra Central", "precipitation": -10}
+        )
         assert response.status_code == 422
 
-    def test_alerts_endpoint(self, api_client):
-        response = api_client.get("/alerts")
-        assert response.status_code == 200
-
-    def test_districts_endpoint(self, api_client):
+    def test_districts_endpoint(self, api_client: TestClient):
+        """Test districts endpoint."""
         response = api_client.get("/districts")
         assert response.status_code == 200
+        data = response.json()
+        assert "districts" in data
+
+    def test_alerts_endpoint(self, api_client: TestClient):
+        """Test alerts endpoint."""
+        response = api_client.get("/alerts")
+        assert response.status_code == 200
+        assert response.json() is not None

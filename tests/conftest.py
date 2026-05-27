@@ -1,195 +1,95 @@
-"""
-NFCC Test Configuration & Shared Fixtures
-All pytest fixtures available across all test modules.
-"""
+"""Pytest configuration and fixtures."""
 
+import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
-import joblib
-import numpy as np
-import pandas as pd
+# Add src to path - MUST be before imports from src
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+import os
 import pytest
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 
-# ── Paths ─────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_PATH = BASE_DIR / "models" / "xgboost_flood_risk.pkl"
+from src.config.settings import settings
+from src.alerts.engine import AlertEngine
+from src.alerts.providers.mock_provider import MockAlertProvider
+from src.alerts.provider_factory import ProviderFactory
 
 
-# ══════════════════════════════════════════════════════════════════════
-# GLOBAL RANDOM SEED (reproducibility)
-# ══════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture(scope="session", autouse=True)
-def set_random_seed():
-    np.random.seed(42)
-    print("\n🔧 Global random seed set to 42 for test reproducibility")
-
-
-# ══════════════════════════════════════════════════════════════════════
-# SAMPLE DATA FIXTURES
-# ══════════════════════════════════════════════════════════════════════
+@pytest.fixture(autouse=True)
+def reset_provider_factory():
+    """Reset provider factory before each test to ensure isolation."""
+    ProviderFactory.reset()
+    yield
+    ProviderFactory.reset()
 
 
 @pytest.fixture
-def low_risk_observation():
-    return {
-        "precipitation": 0.0,
-        "roll_3d": 0.5,
-        "roll_7d": 0.3,
-        "roll_30d": 1.2,
-        "cumulative": 120.0,
-        "z_score": -0.5,
-    }
+def api_client():
+    """Create a test client for the FastAPI app."""
+    from src.api.main import app
+    return TestClient(app)
 
 
 @pytest.fixture
-def moderate_risk_observation():
-    return {
-        "precipitation": 8.0,
-        "roll_3d": 18.0,
-        "roll_7d": 6.5,
-        "roll_30d": 4.0,
-        "cumulative": 300.0,
-        "z_score": 0.8,
-    }
+def alert_engine():
+    """Create an alert engine for testing."""
+    return AlertEngine(providers=[MockAlertProvider()])
 
 
 @pytest.fixture
-def high_risk_observation():
-    return {
-        "precipitation": 20.0,
-        "roll_3d": 45.0,
-        "roll_7d": 14.0,
-        "roll_30d": 7.5,
-        "cumulative": 480.0,
-        "z_score": 2.1,
-    }
+def trained_model():
+    """Return a mock trained model."""
+    class MockModel:
+        def predict(self, X):
+            return np.array([50.0] * len(X))
+    return MockModel()
 
 
 @pytest.fixture
-def critical_risk_observation():
-    return {
-        "precipitation": 45.0,
-        "roll_3d": 95.0,
-        "roll_7d": 30.0,
-        "roll_30d": 14.0,
-        "cumulative": 750.0,
-        "z_score": 3.8,
-    }
-
-
-# ══════════════════════════════════════════════════════════════════════
-# DATAFRAME FIXTURE (NOTE: column is 'risk_score', NOT 'flood_risk_score')
-# ══════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture(scope="session")
 def sample_dataframe():
-    dates = pd.date_range("2024-01-01", periods=365, freq="D")
+    """Create a sample dataframe for feature engineering tests."""
+    dates = [datetime(2024, 1, 1) + timedelta(days=i) for i in range(365)]
     np.random.seed(42)
-    precip = np.random.exponential(scale=5.0, size=365)
-    precip[60:75] = np.random.uniform(20, 50, 15)
-    precip[180:195] = np.random.uniform(25, 60, 15)
-
-    df = pd.DataFrame({"precipitation": precip}, index=dates)
-    df.index.name = "date"
-
-    df["roll_3d"] = df["precipitation"].rolling(3, min_periods=1).sum()
-    df["roll_7d"] = df["precipitation"].rolling(7, min_periods=1).mean()
-    df["roll_30d"] = df["precipitation"].rolling(30, min_periods=1).mean()
-    df["cumulative"] = df["precipitation"].cumsum()
-
-    roll_mean = df["precipitation"].rolling(30, min_periods=1).mean()
-    roll_std = df["precipitation"].rolling(30, min_periods=1).std().fillna(1)
-    df["z_score"] = (df["precipitation"] - roll_mean) / roll_std
-
-    def flood_risk_score(row):
-        score = min(row["precipitation"] / 30 * 40, 40)
-        score += min(row["roll_3d"] / 60 * 35, 35)
-        score += min(max(row["z_score"], 0) / 3 * 25, 25)
-        return round(score, 2)
-
-    df["risk_score"] = df.apply(flood_risk_score, axis=1)
-
-    def classify(val):
-        if val >= 30:
-            return "Extreme"
-        elif val >= 15:
-            return "High"
-        elif val >= 5:
-            return "Moderate"
-        elif val > 0:
-            return "Light"
-        return "Dry"
-
-    df["rainfall_class"] = df["precipitation"].apply(classify)
-
+    rainfall = np.random.gamma(2, 5, 365)
+    
+    df = pd.DataFrame({
+        'time': dates,
+        'precipitation': rainfall,
+        'roll_7d': np.convolve(rainfall, np.ones(7)/7, mode='same'),
+        'roll_30d': np.convolve(rainfall, np.ones(30)/30, mode='same'),
+        'cumulative': np.cumsum(rainfall),
+        'z_score': (rainfall - np.mean(rainfall)) / np.std(rainfall)
+    })
+    df.set_index('time', inplace=True)
     return df
 
 
-# ══════════════════════════════════════════════════════════════════════
-# MODEL FIXTURE (REQUIRED for tests)
-# ══════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture(scope="session")
-def trained_model():
-    """Load real trained model if available, else return mock."""
-    if MODEL_PATH.exists():
-        return joblib.load(MODEL_PATH)
-
-    print("\n🔧 Using mock model for tests (real model not found)")
-    mock = MagicMock()
-    mock.predict.return_value = np.array([42.0])
-    mock.feature_importances_ = np.array([0.30, 0.25, 0.20, 0.10, 0.08, 0.07])
-    return mock
-
-
-# ══════════════════════════════════════════════════════════════════════
-# API FIXTURE
-# ══════════════════════════════════════════════════════════════════════
+@pytest.fixture
+def sample_dataframe_with_features(sample_dataframe):
+    """Enhanced dataframe with all required ML features."""
+    df = sample_dataframe.copy()
+    df['roll_3d'] = df['precipitation'].rolling(3, min_periods=1).mean()
+    df['roll_7d'] = df['precipitation'].rolling(7, min_periods=1).mean()
+    df['roll_30d'] = df['precipitation'].rolling(30, min_periods=1).mean()
+    df['cumulative'] = df['precipitation'].cumsum()
+    mean_rain = df['precipitation'].mean()
+    std_rain = df['precipitation'].std()
+    df['z_score'] = (df['precipitation'] - mean_rain) / (std_rain + 0.001)
+    return df
 
 
 @pytest.fixture
-def api_client(trained_model):
-    import src.api.main as api_module
-
-    original_model = api_module.model
-    api_module.model = trained_model
-
-    from src.api.main import app
-
-    client = TestClient(app)
-
-    yield client
-
-    api_module.model = original_model
-
-
-# ══════════════════════════════════════════════════════════════════════
-# ALERT ENGINE FIXTURE (FIXED: engine.model is set correctly)
-# ══════════════════════════════════════════════════════════════════════
-
-
-@pytest.fixture
-def mock_provider():
-    from src.alerts.providers.mock_provider import MockAlertProvider
-
-    return MockAlertProvider()
-
-
-@pytest.fixture
-def alert_engine(trained_model, mock_provider):
-    from src.alerts.engine import AlertEngine
-
-    engine = AlertEngine(
-        providers=[mock_provider],
-        alert_threshold=50.0,
-        rate_limit_minutes=60,
-    )
-    # CRITICAL FIX: Set the model on the engine
-    engine.model = trained_model
-    return engine
+def mock_env_vars(monkeypatch):
+    """Set mock environment variables for testing."""
+    monkeypatch.setenv("ENVIRONMENT", "testing")
+    monkeypatch.setenv("NFCC_ENV", "testing")
+    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "test_sid")
+    monkeypatch.setenv("TWILIO_AUTH_TOKEN", "test_token")
+    monkeypatch.setenv("TWILIO_WHATSAPP_FROM", "whatsapp:+1234567890")
+    monkeypatch.setenv("ALERT_WHATSAPP_RECIPIENTS", "whatsapp:+1234567890")
+    monkeypatch.setenv("ALERT_DRY_RUN", "true")
+    return monkeypatch
