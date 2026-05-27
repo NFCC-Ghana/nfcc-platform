@@ -3,18 +3,20 @@
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional, Dict, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.alerts.engine import AlertEngine
 from src.alerts.formatter import get_risk_tier
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
+
+# Import routers (SHAP explainability from PR #13)
+from src.api import explain
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -22,6 +24,48 @@ logger = logging.getLogger("nfcc-api")
 
 # Global engine instance
 alert_engine = None
+
+# ── Load Model (optional at import so pytest/CI can patch before scoring) ──
+model: Optional[Any] = None
+MODEL_PATH = Path(settings.MODEL_PATH)
+if MODEL_PATH.exists():
+    import joblib
+
+    model = joblib.load(MODEL_PATH)
+    logger.info("✅ Model loaded from %s", MODEL_PATH)
+else:
+    logger.warning(
+        "No model file at %s — scoring routes return 503 until it exists or tests inject a mock.",
+        MODEL_PATH,
+    )
+
+
+# ============================================================
+# SCHEMAS
+# ============================================================
+
+
+class RainfallInput(BaseModel):
+    """Rainfall input for scoring."""
+
+    location: str
+    precipitation: float = Field(..., ge=0, description="Rainfall in mm")
+
+    @field_validator("precipitation")
+    def validate_precipitation(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("Precipitation cannot be negative")
+        return v
+
+
+class RiskResponse(BaseModel):
+    """Risk scoring response."""
+
+    location: str
+    risk_score: float
+    risk_tier: str
+    alert_triggered: bool
+    timestamp: str
 
 
 class ScoreRequest(BaseModel):
@@ -74,26 +118,26 @@ def calculate_score(precipitation: float, temperature: float = None) -> float:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    # global alert_engine
+    global alert_engine
 
-    # Startup
     logger.info(f"Starting NFCC Flood Alert Platform v{settings.API_VERSION}...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
 
-    # Verify model loads
+    # Use the already-loaded model if available, otherwise settings.model
     try:
-        model = settings.model
-        logger.info("✅ Model loaded successfully")
+        if model is not None:
+            logger.info("✅ Model already loaded at import")
+        else:
+            _ = settings.model
+            logger.info("✅ Model loaded via settings")
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
 
-    # Initialize alert engine (only once - shared across workers)
     alert_engine = AlertEngine()
     logger.info("✅ Alert engine initialized")
 
     yield
 
-    # Shutdown
     logger.info("Shutting down...")
 
 
@@ -113,6 +157,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers (SHAP explainability from PR #13)
+app.include_router(explain.router)
+
+
+# ============================================================
+# ENDPOINTS
+# ============================================================
 
 
 @app.get("/")
@@ -162,42 +214,39 @@ async def get_alerts() -> Dict[str, Any]:
     }
 
 
-@app.post("/score")
-async def score_endpoint(request: ScoreRequest) -> ScoreResponse:
+@app.post("/score", response_model=RiskResponse, tags=["Scoring"])
+async def score_single(
+    payload: RainfallInput,
+    background_tasks: BackgroundTasks,
+) -> RiskResponse:
     """Calculate flood risk score and trigger alerts."""
-    # global alert_engine
+    from datetime import datetime
 
-    # Calculate score
-    score = calculate_score(request.precipitation, request.temperature)
+    score = calculate_score(payload.precipitation)
     risk_tier = get_risk_tier(score)
 
-    # Determine if alert should be sent (MODERATE or higher)
     send_alert = score >= 30
 
-    # Process through alert engine
     alert_sent = False
     if alert_engine and send_alert:
         result = alert_engine.process(
-            location=request.location,
+            location=payload.location,
             score=score,
-            precipitation=request.precipitation,
-            message=f"Flood risk detected with {request.precipitation:.1f}mm rainfall",
+            precipitation=payload.precipitation,
+            message=f"Flood risk detected with {payload.precipitation:.1f}mm rainfall",
         )
         alert_sent = result.get("alert_sent", False)
 
     logger.info(
-        f"Scored | {request.location} | {score:.1f} | {risk_tier} | alert={alert_sent}"
+        f"Scored | {payload.location} | {score:.1f} | {risk_tier} | alert={alert_sent}"
     )
 
-    # Generate ISO timestamp
-    current_timestamp = datetime.utcnow().isoformat() + "Z"
-
-    return ScoreResponse(
-        location=request.location,
-        score=round(score, 1),
+    return RiskResponse(
+        location=payload.location,
+        risk_score=round(score, 1),
         risk_tier=risk_tier,
-        alert_sent=alert_sent,
-        timestamp=current_timestamp,
+        alert_triggered=alert_sent,
+        timestamp=datetime.utcnow().isoformat() + "Z",
     )
 
 
@@ -230,12 +279,3 @@ async def batch_score_endpoint(request: BatchScoreRequest) -> Dict[str, Any]:
         )
 
     return {"status": "success", "results": results, "count": len(results)}
-
-
-@app.get("/version")
-async def version():
-    return {
-        "version": "2.1.0",
-        "environment": "production",
-        "build": "production-hardening",
-    }
