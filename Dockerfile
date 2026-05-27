@@ -11,22 +11,22 @@ RUN apt-get update && apt-get install -y \
 
 # Copy requirements and install
 COPY requirements.txt .
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install twilio python-dotenv
+RUN pip install twilio python-dotenv joblib
 
-# Copy application
-COPY src/ ./src/
-COPY models/ ./models/
-COPY scripts/ ./scripts/
+# Copy application code
+COPY . .
 
-# Create non-root user
-RUN useradd -m -u 1000 nfcc && chown -R nfcc:nfcc /app
-USER nfcc
+# Create necessary directories
+RUN mkdir -p logs models data/processed
+
+# Expose port
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-EXPOSE 8000
-
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run with multiple workers for production
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]

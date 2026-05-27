@@ -1,0 +1,64 @@
+# ============================================================
+# NFCC PLATFORM - PRODUCTION DOCKERFILE
+# ============================================================
+# Multi-stage build for smaller production image
+
+# ============================================================
+# STAGE 1: Builder
+# ============================================================
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies to a temporary location
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --user -r requirements.txt && \
+    pip install --no-cache-dir --user twilio python-dotenv joblib
+
+# ============================================================
+# STAGE 2: Runtime
+# ============================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python packages from builder
+COPY --from=builder /root/.local /root/.local
+
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy application code
+COPY . .
+
+# Copy model files (ensure they exist)
+COPY models/ ./models/
+
+# Create necessary directories
+RUN mkdir -p logs data/processed reports/coverage
+
+# Expose port
+EXPOSE 8080
+
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Run with production settings
+# Use multiple workers for better throughput
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "4"]
