@@ -82,3 +82,4 @@ Thumbs.db
 # Deployment
 # ==========================================
 railway.toml.env.production.backup
+.streamlit/
