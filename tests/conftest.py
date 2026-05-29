@@ -94,3 +94,14 @@ def suppress_logging():
     # Restore after tests (optional)
     for logger_name in ["nfcc", "nfcc-api", "nfcc.alert.engine", "nfcc-api.health"]:
         logging.getLogger(logger_name).setLevel(logging.INFO)
+
+
+@pytest.fixture
+def disable_dry_run_for_providers():
+    """Disable dry run mode for provider tests that need real SDK calls."""
+    import os
+
+    original = os.environ.get("ALERT_DRY_RUN", "true")
+    os.environ["ALERT_DRY_RUN"] = "false"
+    yield
+    os.environ["ALERT_DRY_RUN"] = original

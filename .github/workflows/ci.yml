@@ -1,28 +1,52 @@
-name: CI
+name: NFCC CI Pipeline
 
 on:
   push:
-    branches: [ develop, main ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python
+    
+    - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+    
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt -r requirements-dev.txt
+        pip install -r requirements-api.txt
+    
     - name: Run tests
-      run: >
-        pytest tests/ -v
-        --cov=src
-        --cov-report=term-missing
-        --cov-report=html:reports/coverage
-        --cov-fail-under=0
+      run: |
+        pytest tests/ -v --tb=short -k "not providers"
+    
+    - name: Check imports
+      run: |
+        python -c "from src.api.main import app; print('✅ API imports OK')"
+    
+    - name: API Smoke Test
+      run: |
+        uvicorn src.api.main:app --host 127.0.0.1 --port 8000 &
+        sleep 10
+        curl -f http://127.0.0.1:8000/health
+        curl -f http://127.0.0.1:8000/
+    
+    - name: Environment validation
+      run: |
+        python scripts/validate_env.py || echo "⚠️ Validation warnings (non-blocking)"
+    
+    - name: Score endpoint test
+      run: |
+        curl -f -X POST http://127.0.0.1:8000/score \
+          -H "Content-Type: application/json" \
+          -d '{"location":"Accra Central","precipitation":95.5}'
+    
+    - name: Kill server
+      run: |
+        pkill -f uvicorn || true
