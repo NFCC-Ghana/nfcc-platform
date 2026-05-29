@@ -1,110 +1,215 @@
-"""Edge case tests for alert engine."""
+"""Edge case tests for AlertEngine - provider failures, rate limiting, force bypass."""
 
 import pytest
+from unittest.mock import MagicMock
 from src.alerts.engine import AlertEngine
 from src.alerts.providers.mock_provider import MockAlertProvider
-from src.alerts.providers.base import BaseAlertProvider
-from src.alerts.provider_factory import ProviderFactory
-from src.alerts.models import AlertPayload
-
-
-class FailingProvider(BaseAlertProvider):
-    """Provider that fails on send."""
-
-    name = "failing"
-
-    def __init__(self):
-        self.call_count = 0
-        self.last_alert = None
-
-    def _format_message(self, alert: AlertPayload) -> str:
-        return "Failing message"
-
-    def send(self, alert: AlertPayload):
-        self.call_count += 1
-        self.last_alert = alert
-        raise Exception("Provider crashed")
-
-
-@pytest.fixture(autouse=True)
-def reset_provider_factory():
-    """Reset provider factory before each test to ensure isolation."""
-    ProviderFactory.reset()
-    yield
-    ProviderFactory.reset()
-
-
-class TestEngineProviderFailures:
-    """Test provider failure scenarios."""
-
-    def test_provider_crash_handled_gracefully(self):
-        """Test that provider crash doesn't stop the engine."""
-        failing = FailingProvider()
-        engine = AlertEngine(providers=[failing])
-
-        result = engine.process(location="Accra", score=85.0)
-
-        assert failing.call_count == 1
-        assert "alert_sent" in result
-        assert result["alert_sent"] is False
-
-    def test_multiple_providers_partial_failure(self):
-        """Test that one provider failing doesn't stop others."""
-        failing = FailingProvider()
-        mock = MockAlertProvider()
-        engine = AlertEngine(providers=[failing, mock])
-        result = engine.process(location="Accra", score=85.0)
-
-        assert "alert_sent" in result
-        assert failing.call_count >= 1
-
-    def test_no_providers_configured(self):
-        """Test engine adds mock provider when none specified."""
-        engine = AlertEngine(providers=[])
-        assert len(engine.providers) > 0
 
 
 class TestEngineThreshold:
-    """Test alert threshold behavior."""
+    """Test threshold-based alert suppression."""
 
-    def test_score_below_threshold_no_alert(self):
-        engine = AlertEngine(providers=[MockAlertProvider()])
-        result = engine.process(location="Accra", score=20.0)
+    def test_no_alert_below_threshold(self, alert_engine_no_cooldown):
+        """Score below 30 should NOT trigger alert."""
+        result = alert_engine_no_cooldown.process(
+            location="Accra",
+            score=10.0,
+            precipitation=0,
+            force=True,
+        )
         assert result["alert_sent"] is False
+        assert "below moderate threshold" in result.get("reason", "")
 
-    def test_score_at_threshold_triggers_alert(self):
-        engine = AlertEngine(providers=[MockAlertProvider()])
-        result = engine.process(location="Accra", score=30.0)
-        assert "alert_sent" in result
+    def test_alert_at_threshold(self, alert_engine_no_cooldown):
+        """Score at 30 should trigger alert."""
+        result = alert_engine_no_cooldown.process(
+            location="Accra",
+            score=30.0,
+            precipitation=30,
+            force=True,
+        )
+        assert result["alert_sent"] is True
 
-    def test_score_above_critical_threshold(self):
-        engine = AlertEngine(providers=[MockAlertProvider()])
-        result = engine.process(location="Accra", score=90.0)
-        assert "alert_sent" in result
+    def test_alert_above_critical(self, alert_engine_no_cooldown):
+        """Score above 85 should trigger alert."""
+        result = alert_engine_no_cooldown.process(
+            location="Accra",
+            score=90.0,
+            precipitation=100,
+            force=True,
+        )
+        assert result["alert_sent"] is True
 
 
 class TestEngineRateLimiting:
     """Test rate limiting behavior."""
 
     def test_rate_limit_blocks_alert(self):
-        engine = AlertEngine(providers=[MockAlertProvider()], alerts_per_hour=1)
-        engine.process(location="Accra", score=85.0)
-        result = engine.process(location="Accra", score=85.0)
+        """After rate limit exhausted, alerts should be blocked."""
+        # Create engine with EXPLICIT limit of 3 (not relying on env config)
+        engine = AlertEngine(
+            providers=[MockAlertProvider()],
+            alerts_per_hour=3,
+        )
+        engine.cooldown_minutes = 0
+
+        location = "Accra"
+
+        # First 3 alerts should be allowed
+        for i in range(3):
+            result = engine.process(
+                location=location,
+                score=90.0,
+                precipitation=50,
+                force=False,
+            )
+            assert result["alert_sent"] is True, f"Alert {i+1} should be allowed"
+
+        # 4th alert should be blocked
+        result = engine.process(
+            location=location,
+            score=90.0,
+            precipitation=50,
+            force=False,
+        )
+
         assert result["alert_sent"] is False
+        assert "rate limited" in result.get("reason", "").lower()
 
     def test_force_bypasses_rate_limit(self):
-        engine = AlertEngine(providers=[MockAlertProvider()], alerts_per_hour=1)
-        engine.process(location="Accra", score=85.0)
-        result = engine.process(location="Accra", score=85.0, force=True)
-        assert "alert_sent" in result
+        """Force flag should bypass rate limit."""
+        # Create engine with EXPLICIT limit
+        engine = AlertEngine(
+            providers=[MockAlertProvider()],
+            alerts_per_hour=3,
+        )
+        engine.cooldown_minutes = 0
+
+        location = "Accra"
+
+        # Manually record 5 sends (exceeding limit)
+        for i in range(5):
+            engine.rate_limiter.record_send(location)
+
+        # Force should bypass rate limit
+        result = engine.process(
+            location=location,
+            score=90.0,
+            precipitation=50,
+            force=True,
+        )
+
+        assert result["alert_sent"] is True
+
+
+class TestEngineProviderFailures:
+    """Test provider failure handling with duck-typed mocks."""
+
+    def test_provider_crash_handled_gracefully(self):
+        """A crashing provider should not stop other providers."""
+        # Create mock providers with duck-typed 'send' method
+        failing_provider = MagicMock()
+        failing_provider.send.side_effect = Exception("Provider crashed")
+        failing_provider.name = "failing"
+
+        working_provider = MagicMock()
+        working_provider.send.return_value = {
+            "success": True,
+            "message": "Sent",
+            "provider": "working",
+        }
+        working_provider.name = "working"
+
+        engine = AlertEngine(providers=[failing_provider, working_provider])
+
+        result = engine.process(
+            location="Accra",
+            score=90.0,
+            precipitation=50,
+            force=True,
+        )
+
+        assert len(result["providers"]) == 2
+        assert result["providers"][0]["success"] is False
+        assert result["providers"][1]["success"] is True
+        assert result["alert_sent"] is True
+
+        # Verify both providers were called
+        failing_provider.send.assert_called_once()
+        working_provider.send.assert_called_once()
+
+    def test_multiple_providers_partial_failure(self):
+        """Partial failure should not stop successful providers."""
+        failing_provider = MagicMock()
+        failing_provider.send.side_effect = Exception("Send failed")
+        failing_provider.name = "failing"
+
+        working_provider = MagicMock()
+        working_provider.send.return_value = {
+            "success": True,
+            "message": "Sent",
+            "provider": "working",
+        }
+        working_provider.name = "working"
+
+        engine = AlertEngine(providers=[failing_provider, working_provider])
+
+        result = engine.process(
+            location="Accra",
+            score=90.0,
+            precipitation=50,
+            force=True,
+        )
+
+        assert len(result["providers"]) == 2
+        assert result["providers"][0]["success"] is False
+        assert result["providers"][1]["success"] is True
+        assert result["alert_sent"] is True
+
+    def test_no_providers_uses_mock(self):
+        """With no providers, engine should use mock provider."""
+        engine = AlertEngine(providers=[])
+
+        result = engine.process(
+            location="Accra",
+            score=90.0,
+            precipitation=50,
+            force=True,
+        )
+
+        assert result["alert_sent"] is True
+        assert len(result["providers"]) == 1
+        assert result["providers"][0]["provider"] == "mock"
+
+    def test_string_provider_names_work(self):
+        """String provider names should be resolved via factory."""
+        engine = AlertEngine(providers=["mock"])
+
+        result = engine.process(
+            location="Accra",
+            score=90.0,
+            precipitation=50,
+            force=True,
+        )
+
+        assert result["alert_sent"] is True
+        assert len(result["providers"]) == 1
 
 
 class TestEngineLogging:
-    """Test engine logging behavior."""
+    """Test logging and result structure."""
 
-    def test_process_returns_result_structure(self):
-        engine = AlertEngine(providers=[MockAlertProvider()])
-        result = engine.process(location="Accra", score=85.0)
+    def test_process_returns_result_structure(self, alert_engine):
+        """Result should contain expected fields."""
+        alert_engine.cooldown_minutes = 0
+        result = alert_engine.process(
+            location="Accra",
+            score=30.0,
+            precipitation=30,
+            force=True,
+        )
+
         assert "alert_sent" in result
         assert "risk_tier" in result
         assert "score" in result
+        assert isinstance(result["score"], float)

@@ -146,24 +146,24 @@ class FailureAnalyzer:
         </head>
         <body>
             <h1>Resilience Test Dashboard</h1>
-            
+
             <div class="summary">
                 <h2>Summary</h2>
                 <p>Total Events: {report['summary']['total_events']}</p>
                 <p>Time Range: {report['summary'].get('time_range', {}).get('first', 'N/A')} to {report['summary'].get('time_range', {}).get('last', 'N/A')}</p>
             </div>
-            
+
             <h2>Failure Heatmap</h2>
             <div class="heatmap">
                 {''.join(f'<div class="bar" style="width: {min(100, count * 10)}%">{endpoint}: {count}</div>' for endpoint, count in report['heatmap'].items())}
             </div>
-            
+
             <h2>Top Failures</h2>
             <table>
                 <tr><th>Pattern</th><th>Count</th></tr>
                 {''.join(f'<tr><td>{f["pattern"]}</td><td>{f["count"]}</td></tr>' for f in report['top_failures'])}
             </table>
-            
+
             <h2>Root Causes</h2>
             <table>
                 <tr><th>Cause</th><th>Count</th></tr>
