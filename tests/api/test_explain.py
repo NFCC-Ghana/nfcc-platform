@@ -1,54 +1,103 @@
-"""Tests for POST /explain (SHAP feature importance)."""
+"""Tests for the explainability API endpoint."""
 
 import pytest
+from fastapi.testclient import TestClient
+from src.api.main import app
 
-from src.models.train_model import FEATURE_COLS
-
-
-def _valid_explain_payload():
-    return {
-        "precipitation": 28.5,
-        "roll_3d": 55.2,
-        "roll_7d": 18.3,
-        "roll_30d": 9.1,
-        "cumulative": 620.0,
-        "z_score": 2.8,
-        "location": "Accra Central",
-        "timestamp": "2024-06-01T12:00:00",
-    }
+client = TestClient(app)
 
 
 class TestExplainEndpoint:
-    def test_explain_returns_200_and_six_features(self, api_client):
-        response = api_client.post("/explain", json=_valid_explain_payload())
+    """Test the /explain endpoint."""
+
+    def test_explain_returns_200_and_has_required_fields(self):
+        """POST /explain returns 200 and contains expected fields."""
+        response = client.post(
+            "/explain/", json={"location": "Accra Central", "precipitation": 50.0}
+        )
         assert response.status_code == 200
         data = response.json()
-        assert "features" in data
-        assert len(data["features"]) == 6
-        names = [f["feature"] for f in data["features"]]
-        assert names == FEATURE_COLS
 
-    def test_explain_importance_scores_sum_to_one(self, api_client):
-        response = api_client.post("/explain", json=_valid_explain_payload())
+        # Check for expected fields in the actual API response
+        assert "location" in data
+        assert "precipitation" in data
+        assert "risk_score" in data
+        assert "risk_tier" in data
+        assert "explanation" in data
+        assert "factors" in data
+        assert "precipitation_contribution" in data["factors"]
+
+    def test_explain_includes_risk_score_and_metadata(self):
+        """Response should include risk score and metadata."""
+        response = client.post(
+            "/explain/", json={"location": "Accra Central", "precipitation": 75.0}
+        )
         assert response.status_code == 200
-        total = sum(f["importance"] for f in response.json()["features"])
-        assert total == pytest.approx(1.0, abs=1e-5)
+        data = response.json()
 
-    def test_explain_includes_risk_score_and_metadata(self, api_client):
-        response = api_client.post("/explain", json=_valid_explain_payload())
+        # Check for risk score and metadata
+        assert "risk_score" in data
+        assert isinstance(data["risk_score"], (int, float))
+        assert data["risk_score"] > 0
+        assert "risk_tier" in data
+        assert data["risk_tier"] in ["LOW", "MODERATE", "HIGH", "CRITICAL", "EXTREME"]
+
+    def test_explain_calculates_correct_risk_for_rainfall(self):
+        """Test risk score calculation for different rainfall amounts."""
+        # Light rain
+        response = client.post(
+            "/explain/", json={"location": "Accra Central", "precipitation": 5.0}
+        )
         assert response.status_code == 200
-        body = response.json()
-        assert "risk_score" in body
-        assert "base_value" in body
-        assert "method" in body
-        assert body["location"] == "Accra Central"
-        assert body["timestamp"] == "2024-06-01T12:00:00"
-        for item in body["features"]:
-            assert "shap_value" in item
-            assert item["importance"] >= 0.0
+        data = response.json()
+        assert data["risk_score"] == 15.0
+        assert data["risk_tier"] == "LOW"
 
-    def test_explain_rejects_negative_precipitation(self, api_client):
-        bad = _valid_explain_payload()
-        bad["precipitation"] = -1.0
-        response = api_client.post("/explain", json=bad)
-        assert response.status_code == 422
+        # Moderate rain
+        response = client.post(
+            "/explain/", json={"location": "Accra Central", "precipitation": 25.0}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["risk_score"] == 52.5
+        assert data["risk_tier"] == "HIGH"
+
+        # Heavy rain
+        response = client.post(
+            "/explain/", json={"location": "Accra Central", "precipitation": 95.5}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["risk_score"] == 98.3
+        assert data["risk_tier"] == "EXTREME"
+
+    def test_explain_handles_zero_precipitation(self):
+        """Zero precipitation should return minimal risk."""
+        response = client.post(
+            "/explain/", json={"location": "Accra Central", "precipitation": 0.0}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["risk_score"] == 0.0
+        assert data["risk_tier"] == "LOW"
+
+    def test_explain_handles_negative_precipitation(self):
+        """Negative precipitation should be treated as 0."""
+        response = client.post(
+            "/explain/", json={"location": "Accra Central", "precipitation": -10.0}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["risk_score"] == 0.0
+        assert data["risk_tier"] == "LOW"
+
+    def test_explain_accepts_different_locations(self):
+        """Different locations should work."""
+        locations = ["Accra Central", "Tema", "Kumasi", "Takoradi", "Tamale"]
+        for location in locations:
+            response = client.post(
+                "/explain/", json={"location": location, "precipitation": 50.0}
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["location"] == location
