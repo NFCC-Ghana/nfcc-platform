@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from src.alerts.engine import AlertEngine
 from src.api.explain import router as explain_router
 from src.api.health import router as health_router
+from src.api.routes.alerts import router as alerts_router
 from src.alerts.formatter import get_risk_tier
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
@@ -96,6 +97,7 @@ app = FastAPI(
 # Register routers
 app.include_router(explain_router)
 app.include_router(health_router)
+app.include_router(alerts_router)
 
 # Add CORS middleware
 app.add_middleware(
