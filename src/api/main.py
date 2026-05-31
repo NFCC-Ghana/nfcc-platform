@@ -13,9 +13,11 @@ from src.alerts.engine import AlertEngine
 from src.api.explain import router as explain_router
 from src.api.health import router as health_router
 from src.api.routes.alerts import router as alerts_router
+from src.api.routes.subscriptions import router as subscriptions_router
 from src.alerts.formatter import get_risk_tier
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
+from src.database.alert_db import init_subscriptions_table
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -77,6 +79,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
 
+    # Initialize subscription storage
+    try:
+        init_subscriptions_table()
+        logger.info("✅ Subscriptions table initialized")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize subscriptions table: {e}")
+
     # Initialize alert engine
     alert_engine = AlertEngine()
     logger.info("✅ Alert engine initialized")
@@ -98,6 +107,7 @@ app = FastAPI(
 app.include_router(explain_router)
 app.include_router(health_router)
 app.include_router(alerts_router)
+app.include_router(subscriptions_router)
 
 # Add CORS middleware
 app.add_middleware(
