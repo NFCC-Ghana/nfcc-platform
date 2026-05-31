@@ -18,6 +18,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pytest
+        pip install -r requirements.txt -r requirements-dev.txt
     - name: Run tests
-      run: pytest tests/ -v || true
+      run: >
+        pytest tests/ -v
+        --cov=src
+        --cov-report=term-missing
+        --cov-report=html:reports/coverage
+        --cov-fail-under=0

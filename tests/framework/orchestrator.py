@@ -1,3 +1,5 @@
+from tests.fixtures.payloads import PayloadFixtures
+
 """Full Resilience Testing Platform Orchestrator."""
 
 import json
@@ -12,6 +14,7 @@ from tests.framework.plugin import (
 )
 from tests.framework.analytics import FailureAnalyzer, DashboardGenerator
 from tests.framework.ci.enforcer import CIEnforcer
+from tests.fixtures.payloads import PayloadFixtures
 
 
 class ResiliencePlatform:

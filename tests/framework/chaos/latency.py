@@ -1,5 +1,6 @@
 """Latency injection for timeout testing."""
 
+import random
 import time
 import threading
 from typing import Callable, Any
