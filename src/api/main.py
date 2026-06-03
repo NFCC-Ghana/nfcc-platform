@@ -15,6 +15,9 @@ from src.alerts.engine import AlertEngine
 from src.alerts.formatter import get_risk_tier
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
+from src.api.dam_spillage import router as dam_spillage_router
+
+
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -105,6 +108,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(
+    dam_spillage_router,
+    prefix="/forecast"
+)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
