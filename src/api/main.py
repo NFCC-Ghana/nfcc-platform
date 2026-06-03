@@ -1,17 +1,17 @@
 """FastAPI main application for NFCC flood alert platform."""
 
 import logging
-from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.alerts.engine import AlertEngine
+from src.api.explain import router as explain_router
+from src.api.health import router as health_router
 from src.alerts.formatter import get_risk_tier
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
@@ -30,15 +30,6 @@ class ScoreRequest(BaseModel):
     location: str = Field(..., description="District location")
     precipitation: float = Field(..., description="Precipitation in mm", ge=0)
     temperature: Optional[float] = Field(None, description="Temperature in Celsius")
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "location": "Accra Central",
-                "precipitation": 45.5,
-                "temperature": 28.0,
-            }
-        }
 
 
 class BatchScoreRequest(BaseModel):
@@ -74,9 +65,7 @@ def calculate_score(precipitation: float, temperature: float = None) -> float:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    # global alert_engine
 
-    # Startup
     logger.info(f"Starting NFCC Flood Alert Platform v{settings.API_VERSION}...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
 
@@ -87,13 +76,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
 
-    # Initialize alert engine (only once - shared across workers)
+    # Initialize alert engine
     alert_engine = AlertEngine()
     logger.info("✅ Alert engine initialized")
 
     yield
 
-    # Shutdown
     logger.info("Shutting down...")
 
 
@@ -104,6 +92,10 @@ app = FastAPI(
     version=settings.API_VERSION,
     lifespan=lifespan,
 )
+
+# Register routers
+app.include_router(explain_router)
+app.include_router(health_router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -155,26 +147,17 @@ async def get_districts() -> Dict[str, Any]:
 @app.get("/alerts")
 async def get_alerts() -> Dict[str, Any]:
     """Get recent alerts."""
-    return {
-        "status": "success",
-        "alerts": [],
-        "message": "Alert history endpoint - implement with database for production",
-    }
+    return {"status": "success", "alerts": [], "message": "Alert history endpoint"}
 
 
 @app.post("/score")
 async def score_endpoint(request: ScoreRequest) -> ScoreResponse:
     """Calculate flood risk score and trigger alerts."""
-    # global alert_engine
 
-    # Calculate score
     score = calculate_score(request.precipitation, request.temperature)
     risk_tier = get_risk_tier(score)
-
-    # Determine if alert should be sent (MODERATE or higher)
     send_alert = score >= 30
 
-    # Process through alert engine
     alert_sent = False
     if alert_engine and send_alert:
         result = alert_engine.process(
@@ -189,7 +172,6 @@ async def score_endpoint(request: ScoreRequest) -> ScoreResponse:
         f"Scored | {request.location} | {score:.1f} | {risk_tier} | alert={alert_sent}"
     )
 
-    # Generate ISO timestamp
     current_timestamp = datetime.utcnow().isoformat() + "Z"
 
     return ScoreResponse(
@@ -232,10 +214,9 @@ async def batch_score_endpoint(request: BatchScoreRequest) -> Dict[str, Any]:
     return {"status": "success", "results": results, "count": len(results)}
 
 
-@app.get("/version")
-async def version():
-    return {
-        "version": "2.1.0",
-        "environment": "production",
-        "build": "production-hardening",
-    }
+# --- Forecast fusion extension routers (additive; /score unchanged above) ---
+from src.api.routes.explain_fusion import router as _explain_fusion_router  # noqa: E402
+from src.api.routes.forecast import router as _forecast_fusion_router  # noqa: E402
+
+app.include_router(_forecast_fusion_router)
+app.include_router(_explain_fusion_router)
