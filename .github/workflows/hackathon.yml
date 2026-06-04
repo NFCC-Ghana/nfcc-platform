@@ -1,0 +1,36 @@
+name: Hackathon CI
+
+on:
+  push:
+    paths:
+      - 'hackathon/**'
+  pull_request:
+    paths:
+      - 'hackathon/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-cov
+          pip install -r requirements.txt 2>/dev/null || true
+      
+      - name: Run hackathon tests
+        run: |
+          pytest hackathon/tests/ -v --cov=hackathon --cov-report=xml
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: hackathon
