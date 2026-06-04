@@ -83,3 +83,4 @@ Thumbs.db
 # ==========================================
 railway.toml.env.production.backup
 .streamlit/
+data/alerts.db

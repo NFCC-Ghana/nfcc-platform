@@ -6,7 +6,11 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
-from src.database.alert_db import get_alert_history, get_alert_stats
+from src.database.alert_db import (
+    get_alert_history,
+    get_alert_stats,
+    get_total_alerts_count,
+)
 
 logger = logging.getLogger("nfcc-alerts-router")
 
@@ -17,6 +21,7 @@ router = APIRouter(prefix="/alerts", tags=["Alerts"])
 # ============================================================
 # Response Models
 # ============================================================
+
 
 class AlertRecord(BaseModel):
     """Model representing a single alert record from the database."""
@@ -37,17 +42,23 @@ class AlertHistoryResponse(BaseModel):
 
     status: str = Field(default="success", description="Response status")
     count: int = Field(..., description="Number of alerts returned")
-    total_available: int = Field(default=None, description="Total alerts matching criteria (if known)")
+    total_available: int = Field(
+        default=None, description="Total alerts matching criteria (if known)"
+    )
     limit: int = Field(..., description="Pagination limit used")
     offset: int = Field(..., description="Pagination offset used")
-    location_filter: Optional[str] = Field(default=None, description="Location filter applied")
+    location_filter: Optional[str] = Field(
+        default=None, description="Location filter applied"
+    )
     data: List[AlertRecord] = Field(..., description="List of alert records")
 
 
 class RiskTierStats(BaseModel):
     """Model for risk tier statistics."""
 
-    tier: str = Field(..., description="Risk tier name (e.g., LOW, MEDIUM, HIGH, CRITICAL)")
+    tier: str = Field(
+        ..., description="Risk tier name (e.g., LOW, MEDIUM, HIGH, CRITICAL)"
+    )
     count: int = Field(..., description="Number of alerts at this tier")
 
 
@@ -62,17 +73,24 @@ class AlertStatsResponse(BaseModel):
     """Response model for alert statistics endpoint."""
 
     status: str = Field(default="success", description="Response status")
-    by_risk_tier: List[RiskTierStats] = Field(..., description="Alert counts grouped by risk tier")
-    top_locations: List[TopLocation] = Field(..., description="Top 5 locations with most alerts")
+    by_risk_tier: List[RiskTierStats] = Field(
+        ..., description="Alert counts grouped by risk tier"
+    )
+    top_locations: List[TopLocation] = Field(
+        ..., description="Top 5 locations with most alerts"
+    )
 
 
 # ============================================================
 # Endpoints
 # ============================================================
 
+
 @router.get("/history", response_model=AlertHistoryResponse)
 async def get_history(
-    limit: int = Query(50, ge=1, le=1000, description="Maximum number of alerts to return"),
+    limit: int = Query(
+        50, ge=1, le=1000, description="Maximum number of alerts to return"
+    ),
     offset: int = Query(0, ge=0, description="Number of alerts to skip for pagination"),
     location: Optional[str] = Query(None, description="Optional location filter"),
 ) -> AlertHistoryResponse:
@@ -95,6 +113,7 @@ async def get_history(
     ```
     """
     try:
+        total_available = get_total_alerts_count(location_filter=location_filter)
         # Fetch alerts from database
         alerts_data = get_alert_history(
             limit=limit,
@@ -103,13 +122,14 @@ async def get_history(
         )
 
         logger.info(
-            f"Retrieved {len(alerts_data)} alerts | "
+            f"Retrieved {len(alerts_data)} alerts | total_available={total_available} | "
             f"limit={limit} | offset={offset} | location={location}"
         )
 
         return AlertHistoryResponse(
             status="success",
             count=len(alerts_data),
+            total_available=total_available,
             limit=limit,
             offset=offset,
             location_filter=location,
@@ -152,6 +172,7 @@ async def get_stats() -> AlertStatsResponse:
     ```
     """
     try:
+        total_available = get_total_alerts_count(location_filter=location)
         # Fetch statistics from database
         stats_data = get_alert_stats()
 
@@ -182,3 +203,7 @@ async def get_stats() -> AlertStatsResponse:
     except Exception as e:
         logger.error(f"Error retrieving alert statistics: {str(e)}")
         raise
+
+
+# Add import at top (if not already there)
+# from src.database.alert_db import get_total_alerts_count
