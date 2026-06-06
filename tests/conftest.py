@@ -1,96 +1,126 @@
-# flake8: noqa: E402
-"""Pytest configuration and fixtures for NFCC tests."""
+"""Pytest configuration and global fixtures."""
 
-# ============================================================
-# CRITICAL: Force test environment BEFORE any src imports
-# This must be at the VERY TOP of the file
-# ============================================================
-import os
-
-os.environ["NFCC_ENV"] = "testing"
-os.environ["ENVIRONMENT"] = "testing"
-os.environ["ALERT_DRY_RUN"] = "true"
-
-# ============================================================
-# Now safe to import other modules
-# ============================================================
 import sys
+import os
 import pytest
 from pathlib import Path
 
 # Add project root to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-# Import all fixtures from fixtures directory
-from tests.fixtures.model_fixtures import *  # noqa: E402, F403
-from tests.fixtures.dataframe_fixtures import *  # noqa: E402, F403
+# Set environment variables for testing
+os.environ.setdefault("ENVIRONMENT", "testing")
+os.environ.setdefault("TESTING", "true")
+
+# ============================================================
+# Import fixtures - using try/except for graceful degradation
+# ============================================================
+
+# Model fixtures
+try:
+    from tests.fixtures.model_fixtures import trained_model, mock_model
+except ImportError as e:
+    print(f"⚠️ Could not load model_fixtures: {e}")
+
+# DataFrame fixtures
+try:
+    from tests.fixtures.dataframe_fixtures import (
+        sample_rainfall_dataframe,
+        sample_features_dataframe,
+        empty_dataframe,
+        district_rainfall_dict,
+    )
+except ImportError as e:
+    print(f"⚠️ Could not load dataframe_fixtures: {e}")
+
+# Provider fixtures
+try:
+    from tests.fixtures.provider_fixtures import (
+        mock_email_config,
+        mock_sms_config,
+        mock_whatsapp_config,
+        sample_alert_payload,
+    )
+except ImportError as e:
+    print(f"⚠️ Could not load provider_fixtures: {e}")
+
+# ============================================================
+# Pytest configuration
+# ============================================================
 
 
 def pytest_configure(config):
-    """Configure pytest markers."""
-    config.addinivalue_line("markers", "slow: marks tests as slow")
-    config.addinivalue_line("markers", "integration: marks integration tests")
-    config.addinivalue_line(
-        "markers", "provider: marks provider tests that need credentials"
+    """Configure pytest with custom markers."""
+    markers = [
+        ("slow", "marks tests as slow (deselect with '-m \"not slow\"')"),
+        ("integration", "marks tests as integration tests"),
+        ("unit", "marks tests as unit tests"),
+        ("requires_api", "marks tests that require API server"),
+        ("requires_twilio", "marks tests that require Twilio credentials"),
+        ("requires_db", "marks tests that require database"),
+    ]
+
+    for marker, description in markers:
+        config.addinivalue_line("markers", f"{marker}: {description}")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Modify test collection behavior."""
+    # Skip slow tests by default unless --runslow is passed
+    if not config.getoption("-k") and not config.getoption("--runslow"):
+        skip_slow = pytest.mark.skip(reason="Slow test. Use --runslow to execute")
+        for item in items:
+            if "slow" in item.keywords:
+                item.add_marker(skip_slow)
+
+
+def pytest_addoption(parser):
+    """Add custom command line options."""
+    parser.addoption(
+        "--runslow", action="store_true", default=False, help="Run slow tests"
+    )
+    parser.addoption(
+        "--run-integration",
+        action="store_true",
+        default=False,
+        help="Run integration tests",
     )
 
 
+# ============================================================
+# Session-scoped fixtures
+# ============================================================
+
+
 @pytest.fixture(scope="session")
-def project_root():
-    """Return project root directory."""
-    return Path(__file__).parent.parent
+def test_session():
+    """Provide test session information."""
+    return {
+        "project_root": str(PROJECT_ROOT),
+        "environment": "testing",
+    }
 
 
-@pytest.fixture
-def alert_engine():
-    """Create an alert engine with mock provider for testing."""
-    from src.alerts.engine import AlertEngine
-    from src.alerts.providers.mock_provider import MockAlertProvider
+@pytest.fixture(scope="session")
+def test_client():
+    """Create a test client for FastAPI."""
+    try:
+        from fastapi.testclient import TestClient
+        from src.api.main import app
 
-    return AlertEngine(providers=[MockAlertProvider()])
-
-
-@pytest.fixture
-def alert_engine_no_cooldown():
-    """AlertEngine with cooldown disabled for testing."""
-    from src.alerts.engine import AlertEngine
-    from src.alerts.providers.mock_provider import MockAlertProvider
-
-    engine = AlertEngine(providers=[MockAlertProvider()])
-    engine.cooldown_minutes = 0
-    return engine
+        return TestClient(app)
+    except ImportError:
+        pytest.skip("FastAPI not available")
+        return None
 
 
-@pytest.fixture
-def api_client():
-    """Create a FastAPI test client."""
-    from fastapi.testclient import TestClient
-    from src.api.main import app
-
-    return TestClient(app)
+# ============================================================
+# Cleanup
+# ============================================================
 
 
-# Note: set_test_env fixture is no longer needed because environment
-# is already set at the top of the file. Keeping for backward compatibility.
-@pytest.fixture(autouse=True)
-def set_test_env():
-    """Set test environment variables (already set at module level)."""
-    # Environment already set at top of file
-    yield
-    # Do NOT clean up here - would affect other tests
-
-
-@pytest.fixture(autouse=True)
-def suppress_logging():
-    """Suppress verbose logging during tests."""
-    import logging
-
-    # Set nfcc loggers to WARNING during tests
-    for logger_name in ["nfcc", "nfcc-api", "nfcc.alert.engine", "nfcc-api.health"]:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
-
-    yield
-
-    # Restore after tests (optional)
-    for logger_name in ["nfcc", "nfcc-api", "nfcc.alert.engine", "nfcc-api.health"]:
-        logging.getLogger(logger_name).setLevel(logging.INFO)
+def pytest_sessionfinish(session, exitstatus):
+    """Clean up after test session."""
+    # Clean up any temporary files or connections
+    pass

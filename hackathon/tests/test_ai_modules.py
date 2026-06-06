@@ -1,6 +1,5 @@
 """Tests for hackathon AI modules."""
 
-import pytest
 from hackathon.ai.flood_explainer import explainer
 from hackathon.ai.community_classifier import classifier
 from hackathon.ai.impact_estimator import impact_estimator
