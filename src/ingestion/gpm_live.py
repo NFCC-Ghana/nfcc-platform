@@ -13,8 +13,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-import ee
-
 logger = logging.getLogger("nfcc.ingestion.gpm")
 
 PROJECT_ID = os.getenv("GEE_PROJECT_ID", "nfcc-earth-engine-2026")
@@ -28,6 +26,13 @@ RAW_DIR = BASE_DIR / "data" / "raw" / "gpm"
 REPORT_DIR = BASE_DIR / "reports" / "data_quality"
 
 ACCRA_BBOX = [-0.35, 5.45, 0.05, 5.75]
+
+
+def _ee():
+    """Lazy import so tests and CI can load the module without earthengine-api."""
+    import ee
+
+    return ee
 
 
 class GpmLiveIngester:
@@ -49,16 +54,15 @@ class GpmLiveIngester:
     def initialize(self) -> None:
         if self._initialized:
             return
-        ee.Initialize(project=self.project_id)
+        _ee().Initialize(project=self.project_id)
         self._initialized = True
         logger.info("Earth Engine initialized for GPM (project=%s)", self.project_id)
 
-    def _region(self) -> ee.Geometry:
-        return ee.Geometry.Rectangle(ACCRA_BBOX)
+    def _region(self) -> Any:
+        return _ee().Geometry.Rectangle(ACCRA_BBOX)
 
-    def _collection_for_window(
-        self, start: datetime, end: datetime
-    ) -> ee.ImageCollection:
+    def _collection_for_window(self, start: datetime, end: datetime) -> Any:
+        ee = _ee()
         self.initialize()
         start_str = start.strftime("%Y-%m-%dT%H:%M:%S")
         end_str = end.strftime("%Y-%m-%dT%H:%M:%S")
@@ -119,6 +123,7 @@ class GpmLiveIngester:
 
         try:
             collection = self._collection_for_window(start, end)
+            ee = _ee()
             count = collection.size().getInfo()
             if count == 0:
                 report = self._write_missing_report(target_date)
@@ -184,8 +189,9 @@ class GpmLiveIngester:
             }
 
     def _extract_halfhourly(
-        self, image: ee.Image, reference_time: datetime
+        self, image: Any, reference_time: datetime
     ) -> dict[str, Any]:
+        ee = _ee()
         stats = image.reduceRegion(
             reducer=ee.Reducer.mean()
             .combine(ee.Reducer.max(), sharedInputs=True)

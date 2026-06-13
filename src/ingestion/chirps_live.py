@@ -14,8 +14,6 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-import ee
-
 logger = logging.getLogger("nfcc.ingestion.chirps")
 
 PROJECT_ID = os.getenv("GEE_PROJECT_ID", "nfcc-earth-engine-2026")
@@ -27,6 +25,13 @@ REPORT_DIR = BASE_DIR / "reports" / "data_quality"
 
 # Accra bounding box: west, south, east, north
 ACCRA_BBOX = [-0.35, 5.45, 0.05, 5.75]
+
+
+def _ee():
+    """Lazy import so tests and CI can load the module without earthengine-api."""
+    import ee
+
+    return ee
 
 
 class ChirpsLiveIngester:
@@ -47,7 +52,7 @@ class ChirpsLiveIngester:
         """Initialize Google Earth Engine (idempotent)."""
         if self._initialized:
             return
-        ee.Initialize(project=self.project_id)
+        _ee().Initialize(project=self.project_id)
         self._initialized = True
         logger.info("Earth Engine initialized (project=%s)", self.project_id)
 
@@ -55,8 +60,9 @@ class ChirpsLiveIngester:
         """Yesterday UTC — CHIRPS final daily product latency."""
         return (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
 
-    def get_image(self, target_date: str) -> Optional[ee.Image]:
+    def get_image(self, target_date: str) -> Optional[Any]:
         """Return CHIRPS daily image for a date, or None if unavailable."""
+        ee = _ee()
         self.initialize()
         start = ee.Date(target_date)
         end = start.advance(1, "day")
@@ -69,8 +75,9 @@ class ChirpsLiveIngester:
             return None
         return collection.first()
 
-    def extract_stats(self, image: ee.Image, target_date: str) -> dict[str, Any]:
+    def extract_stats(self, image: Any, target_date: str) -> dict[str, Any]:
         """Extract regional rainfall statistics from a CHIRPS image."""
+        ee = _ee()
         region = ee.Geometry.Rectangle(ACCRA_BBOX)
         stats = image.reduceRegion(
             reducer=ee.Reducer.mean()
