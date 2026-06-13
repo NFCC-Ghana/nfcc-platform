@@ -9,16 +9,21 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
-
 from src.ingestion.chirps_live import ChirpsLiveIngester
 from src.ingestion.gpm_live import GpmLiveIngester
 from src.ingestion.river_gauges import RiverGaugeClient
 from src.monitoring.data_health import DataHealthMonitor
 
 logger = logging.getLogger("nfcc.ingestion.scheduler")
+
+
+def _apscheduler():
+    """Lazy import so pytest can collect tests without APScheduler loaded upfront."""
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
+
+    return BackgroundScheduler, CronTrigger, IntervalTrigger
 
 
 class IngestionScheduler:
@@ -35,6 +40,7 @@ class IngestionScheduler:
         self.gpm = gpm or GpmLiveIngester()
         self.gauges = gauges or RiverGaugeClient()
         self.health = health or DataHealthMonitor()
+        BackgroundScheduler, _, _ = _apscheduler()
         self._scheduler = BackgroundScheduler(timezone="UTC")
         self._running = False
 
@@ -55,6 +61,7 @@ class IngestionScheduler:
 
     def register_jobs(self) -> None:
         """Register default ingestion schedules."""
+        _, CronTrigger, IntervalTrigger = _apscheduler()
         self._scheduler.add_job(
             self._wrap_job("chirps", self.chirps.fetch_daily),
             CronTrigger(hour=8, minute=0),

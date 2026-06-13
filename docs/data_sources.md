@@ -203,4 +203,9 @@ The scheduler can run alongside or instead of the GitHub Actions cron for local/
 pytest tests/unit/test_ingestion.py -v
 ```
 
-Tests mock Earth Engine and HTTP calls — no live credentials required.
+Tests mock Earth Engine and HTTP calls — no live credentials required. The ingestion
+modules use lazy imports for `ee` and APScheduler so CI can collect tests without
+`earthengine-api` installed (it is only needed for live GEE fetches at runtime).
+
+**Note:** Other CI failures (for example `/health` model path, alert API typos) live
+outside the ingestion modules and must be fixed separately on `develop`.

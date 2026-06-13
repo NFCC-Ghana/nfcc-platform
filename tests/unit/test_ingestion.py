@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+# CI installs app deps but not earthengine-api; avoid collection errors if ee is
+# imported before lazy-loading paths run.
+if "ee" not in sys.modules:
+    sys.modules["ee"] = MagicMock(name="ee")
 
 import pytest
 import requests

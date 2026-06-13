@@ -30,8 +30,13 @@ ACCRA_BBOX = [-0.35, 5.45, 0.05, 5.75]
 
 def _ee():
     """Lazy import so tests and CI can load the module without earthengine-api."""
-    import ee
-
+    try:
+        import ee
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "earthengine-api is required for live GEE ingestion. "
+            "Install with: pip install earthengine-api"
+        ) from exc
     return ee
 
 
