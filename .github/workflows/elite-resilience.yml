@@ -41,6 +41,9 @@ jobs:
         pip install pytest-cov pytest-xdist pytest-timeout pytest-randomly
     
     - name: Run ${{ matrix.test-type }} tests
+      env:
+        MODEL_PATH: models/xgboost_flood_risk.pkl
+        NFCC_ENV: testing
       run: |
         if [ "${{ matrix.test-type }}" = "deterministic" ]; then
           pytest tests/test_elite_complete.py::TestEliteComprehensive::test_determinism_idempotent -v --cov=src --cov-report=xml
