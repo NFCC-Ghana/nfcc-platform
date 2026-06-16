@@ -1,278 +1,86 @@
-"""
-Persistence layer for flood alerts using SQLite.
-
-This module provides database operations for storing and retrieving flood alert data,
-including initialization, insertion, history queries, and statistical analysis.
-"""
+"""Database operations for alerts and subscriptions."""
 
 import sqlite3
+import json
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
+from datetime import datetime
+import secrets
 
-
-# Database file location
 DB_PATH = Path(__file__).parent.parent.parent / "data" / "alerts.db"
-
 
 @contextmanager
 def get_db():
-    """
-    Context manager for database connections.
-    
-    Ensures proper connection handling and cleanup.
-    Uses row factory to return rows as dictionaries for easier access.
-    """
-    conn = sqlite3.connect(str(DB_PATH))
+    """Get a thread-safe database connection."""
+    # Use check_same_thread=False to allow multi-threaded access
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
     finally:
         conn.close()
 
+# Rest of the file remains the same...
 
 def init_db() -> None:
     """
-    Initialize the alerts database with table and indexes.
-    
-    Creates the alerts table with the following columns:
-    - id: Unique identifier (primary key)
-    - timestamp: When the alert was generated (ISO format string)
-    - location: Geographic location of the alert
-    - risk_score: Numerical risk assessment (0-100 or similar scale)
-    - risk_tier: Categorical risk level (e.g., 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL')
-    - alert_sent: Whether the alert was successfully sent (boolean)
-    - provider: Alert delivery provider (e.g., 'email', 'sms', 'push')
-    - message_id: External identifier from the delivery provider
-    - error: Any error message if alert delivery failed
-    
-    Creates indexes on frequently queried columns for performance optimization.
+    Initialize the database with all tables.
+    Creates alerts and subscriptions tables.
+    """
+    init_alerts_table()
+    init_subscriptions_table()
+
+def init_alerts_table() -> None:
+    """
+    Initialize the alerts table for storing alert history.
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        
-        # Create alerts table with comprehensive schema
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            location TEXT NOT NULL,
-            risk_score REAL NOT NULL,
-            risk_tier TEXT NOT NULL,
-            alert_sent BOOLEAN NOT NULL,
-            provider TEXT,
-            message_id TEXT,
-            error TEXT
-        )
-        """
-        cursor.execute(create_table_sql)
-        
-        # Create indexes for optimized query performance
-        # Index on location for geographic filtering
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_location ON alerts(location)")
-        
-        # Index on timestamp for time-based queries and sorting
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON alerts(timestamp)")
-        
-        # Index on risk_tier for risk-level filtering
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_risk_tier ON alerts(risk_tier)")
-        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                location TEXT NOT NULL,
+                score REAL NOT NULL,
+                risk_tier TEXT NOT NULL,
+                precipitation REAL NOT NULL,
+                alert_sent BOOLEAN DEFAULT 0,
+                timestamp TEXT NOT NULL,
+                provider TEXT,
+                recipient TEXT
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_location ON alerts(location)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp)")
         conn.commit()
-
-
-def save_alert(data_dict: Dict[str, Any]) -> int:
-    """
-    Save a new alert to the database.
-    
-    Args:
-        data_dict: Dictionary containing alert data with expected keys:
-            - timestamp (str): ISO format timestamp when alert was created
-            - location (str): Geographic location identifier
-            - risk_score (float): Numerical risk score
-            - risk_tier (str): Risk level category
-            - alert_sent (bool): Whether alert was sent successfully
-            - provider (str, optional): Delivery provider name
-            - message_id (str, optional): External message identifier
-            - error (str, optional): Error message if alert failed
-    
-    Returns:
-        int: The ID of the inserted alert record
-    
-    Raises:
-        sqlite3.IntegrityError: If required fields are missing or invalid
-        ValueError: If data_dict is missing required fields
-    """
-    # Validate required fields
-    required_fields = ["timestamp", "location", "risk_score", "risk_tier", "alert_sent"]
-    missing_fields = [field for field in required_fields if field not in data_dict]
-    if missing_fields:
-        raise ValueError(f"Missing required fields: {missing_fields}")
-    
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        insert_sql = """
-        INSERT INTO alerts 
-        (timestamp, location, risk_score, risk_tier, alert_sent, provider, message_id, error)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        
-        cursor.execute(
-            insert_sql,
-            (
-                data_dict["timestamp"],
-                data_dict["location"],
-                data_dict["risk_score"],
-                data_dict["risk_tier"],
-                data_dict["alert_sent"],
-                data_dict.get("provider"),
-                data_dict.get("message_id"),
-                data_dict.get("error"),
-            ),
-        )
-        
-        conn.commit()
-        
-        # Return the ID of the inserted record
-        return cursor.lastrowid
-
-
-def get_alert_history(
-    limit: int = 100,
-    offset: int = 0,
-    location_filter: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    """
-    Retrieve alert history with pagination and optional location filtering.
-    
-    Fetches alerts ordered by timestamp in descending order (most recent first),
-    supporting pagination for efficient data retrieval and optional geographic filtering.
-    
-    Args:
-        limit (int): Maximum number of alerts to return (default: 100)
-        offset (int): Number of alerts to skip for pagination (default: 0)
-        location_filter (str, optional): If provided, only return alerts from this location
-    
-    Returns:
-        List[Dict[str, Any]]: List of alert records as dictionaries with keys:
-            - id, timestamp, location, risk_score, risk_tier, alert_sent, 
-              provider, message_id, error
-    """
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        # Build query with optional location filter
-        if location_filter:
-            query_sql = """
-            SELECT * FROM alerts
-            WHERE location = ?
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-            """
-            cursor.execute(query_sql, (location_filter, limit, offset))
-        else:
-            query_sql = """
-            SELECT * FROM alerts
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-            """
-            cursor.execute(query_sql, (limit, offset))
-        
-        # Convert Row objects to dictionaries for consistent return type
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-
-
-def get_alert_stats() -> Dict[str, Any]:
-    """
-    Calculate comprehensive alert statistics.
-    
-    Returns aggregated alert data including:
-    - Count of alerts grouped by risk tier
-    - Top 5 locations with the most alerts
-    
-    Returns:
-        Dict[str, Any]: Statistics dictionary with keys:
-            - 'by_risk_tier': Dict mapping risk tier to alert count
-            - 'top_locations': List of tuples (location, count) for top 5 locations
-    
-    Example return value:
-        {
-            'by_risk_tier': {'LOW': 45, 'MEDIUM': 32, 'HIGH': 8, 'CRITICAL': 2},
-            'top_locations': [('Accra', 25), ('Kumasi', 18), ('Tema', 14), ...]
-        }
-    """
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        # Query 1: Count alerts grouped by risk_tier
-        risk_tier_query = "SELECT risk_tier, COUNT(*) as count FROM alerts GROUP BY risk_tier"
-        cursor.execute(risk_tier_query)
-        by_risk_tier = {row[0]: row[1] for row in cursor.fetchall()}
-        
-        # Query 2: Get top 5 locations with most alerts
-        top_locations_query = """
-        SELECT location, COUNT(*) as count FROM alerts
-        GROUP BY location
-        ORDER BY count DESC
-        LIMIT 5
-        """
-        cursor.execute(top_locations_query)
-        top_locations = [(row[0], row[1]) for row in cursor.fetchall()]
-        
-        return {
-            "by_risk_tier": by_risk_tier,
-            "top_locations": top_locations,
-        }
-
 
 # ============================================================
-# Subscriptions Functions
+# Subscription Management Functions
 # ============================================================
 
 def init_subscriptions_table() -> None:
     """
-    Initialize subscriptions table for managing user alert subscriptions.
-    
-    Creates subscriptions table with the following columns:
-    - id: Unique identifier (primary key)
-    - email: Email address for subscription (unique)
-    - phone: Phone number for SMS/Whatsapp (optional)
-    - preferred_provider: Preferred alert delivery method (email, sms, whatsapp)
-    - location_filter: Optional location to filter alerts (NULL = all locations)
-    - min_risk_tier: Minimum risk tier to receive alerts (e.g., MODERATE, HIGH)
-    - active: Whether subscription is active (boolean)
-    - created_at: ISO timestamp when subscription was created
-    - updated_at: ISO timestamp when subscription was last updated
-    - unsubscribe_token: Unique token for unsubscribe links (immutable for security)
-    
-    Creates indexes for fast lookups by email and location.
+    Initialize the subscriptions table for managing user alert subscriptions.
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        
-        # Create subscriptions table
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS subscriptions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT NOT NULL UNIQUE,
-            phone TEXT,
-            preferred_provider TEXT NOT NULL DEFAULT 'email',
-            location_filter TEXT,
-            min_risk_tier TEXT NOT NULL DEFAULT 'MODERATE',
-            active BOOLEAN NOT NULL DEFAULT 1,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            unsubscribe_token TEXT UNIQUE
-        )
-        """
-        cursor.execute(create_table_sql)
-        
-        # Create indexes for common queries
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                phone TEXT,
+                preferred_provider TEXT NOT NULL DEFAULT 'email',
+                location_filter TEXT,
+                min_risk_tier TEXT NOT NULL DEFAULT 'MODERATE',
+                active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                unsubscribe_token TEXT UNIQUE
+            )
+        """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_subscription_email ON subscriptions(email)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_subscription_active ON subscriptions(active)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_subscription_location ON subscriptions(location_filter)")
-        
         conn.commit()
 
 
@@ -281,55 +89,32 @@ def subscribe(data_dict: Dict[str, Any]) -> int:
     Create a new subscription.
     
     Args:
-        data_dict: Dictionary containing subscription data with keys:
-            - email (str): Email address (required, must be unique)
-            - phone (str, optional): Phone number for SMS/WhatsApp
-            - preferred_provider (str): Delivery method (email, sms, whatsapp) - default: email
-            - location_filter (str, optional): Specific location or None for all
-            - min_risk_tier (str): Minimum risk tier (LOW, MODERATE, HIGH, CRITICAL) - default: MODERATE
-            - unsubscribe_token (str, optional): Unique token for unsubscribe links
-    
+        data_dict: Dictionary with subscription data
+        
     Returns:
         int: The ID of the created subscription
-    
-    Raises:
-        sqlite3.IntegrityError: If email already exists or other constraint violated
     """
-    from datetime import datetime
-    
-    # Validate required fields
-    required_fields = ["email", "preferred_provider"]
-    missing_fields = [f for f in required_fields if f not in data_dict]
-    if missing_fields:
-        raise ValueError(f"Missing required fields: {missing_fields}")
+    now = datetime.now().isoformat()
+    token = secrets.token_urlsafe(16)
     
     with get_db() as conn:
         cursor = conn.cursor()
-        
-        timestamp = datetime.utcnow().isoformat() + "Z"
-        
-        insert_sql = """
-        INSERT INTO subscriptions 
-        (email, phone, preferred_provider, location_filter, min_risk_tier, 
-         active, created_at, updated_at, unsubscribe_token)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """
-        
-        cursor.execute(
-            insert_sql,
-            (
-                data_dict["email"],
-                data_dict.get("phone"),
-                data_dict.get("preferred_provider", "email"),
-                data_dict.get("location_filter"),
-                data_dict.get("min_risk_tier", "MODERATE"),
-                True,  # active
-                timestamp,
-                timestamp,
-                data_dict.get("unsubscribe_token"),
-            ),
-        )
-        
+        cursor.execute("""
+            INSERT INTO subscriptions (
+                email, phone, preferred_provider, location_filter,
+                min_risk_tier, active, created_at, updated_at, unsubscribe_token
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data_dict.get("email"),
+            data_dict.get("phone"),
+            data_dict.get("preferred_provider", "email"),
+            data_dict.get("location_filter"),
+            data_dict.get("min_risk_tier", "MODERATE"),
+            1,
+            now,
+            now,
+            token
+        ))
         conn.commit()
         return cursor.lastrowid
 
@@ -339,45 +124,19 @@ def unsubscribe(email: str) -> bool:
     Unsubscribe a user by marking their subscription as inactive.
     
     Args:
-        email (str): Email address to unsubscribe
-    
+        email: Email address to unsubscribe
+        
     Returns:
-        bool: True if subscription was found and deactivated, False if not found
+        bool: True if subscription was found and deactivated
     """
-    from datetime import datetime
-    
+    now = datetime.now().isoformat()
     with get_db() as conn:
         cursor = conn.cursor()
-        
-        timestamp = datetime.utcnow().isoformat() + "Z"
-        
-        update_sql = "UPDATE subscriptions SET active = 0, updated_at = ? WHERE email = ?"
-        cursor.execute(update_sql, (timestamp, email))
-        
+        cursor.execute(
+            "UPDATE subscriptions SET active = 0, updated_at = ? WHERE email = ?",
+            (now, email)
+        )
         conn.commit()
-        
-        # Check if any rows were updated
-        return cursor.rowcount > 0
-
-
-def delete_subscription(email: str) -> bool:
-    """
-    Permanently delete a subscription record.
-    
-    Args:
-        email (str): Email address to delete
-    
-    Returns:
-        bool: True if subscription was found and deleted, False if not found
-    """
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        delete_sql = "DELETE FROM subscriptions WHERE email = ?"
-        cursor.execute(delete_sql, (email,))
-        
-        conn.commit()
-        
         return cursor.rowcount > 0
 
 
@@ -386,19 +145,18 @@ def get_subscription(email: str) -> Optional[Dict[str, Any]]:
     Retrieve a subscription by email address.
     
     Args:
-        email (str): Email address to look up
-    
+        email: Email address to look up
+        
     Returns:
-        Dict[str, Any]: Subscription record as dictionary, or None if not found
+        dict or None: Subscription data or None if not found
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        
-        query_sql = "SELECT * FROM subscriptions WHERE email = ?"
-        cursor.execute(query_sql, (email,))
-        
+        cursor.execute("SELECT * FROM subscriptions WHERE email = ?", (email,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        if row:
+            return dict(row)
+        return None
 
 
 def get_all_subscriptions(active_only: bool = True) -> List[Dict[str, Any]]:
@@ -406,57 +164,442 @@ def get_all_subscriptions(active_only: bool = True) -> List[Dict[str, Any]]:
     Retrieve all subscriptions, optionally filtered by active status.
     
     Args:
-        active_only (bool): If True, only return active subscriptions (default: True)
-    
+        active_only: If True, only return active subscriptions
+        
     Returns:
-        List[Dict[str, Any]]: List of subscription records as dictionaries
+        List of subscription records as dictionaries
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        
         if active_only:
-            query_sql = "SELECT * FROM subscriptions WHERE active = 1 ORDER BY created_at DESC"
-            cursor.execute(query_sql)
+            cursor.execute("SELECT * FROM subscriptions WHERE active = 1 ORDER BY created_at DESC")
         else:
-            query_sql = "SELECT * FROM subscriptions ORDER BY created_at DESC"
-            cursor.execute(query_sql)
-        
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+            cursor.execute("SELECT * FROM subscriptions ORDER BY created_at DESC")
+        return [dict(row) for row in cursor.fetchall()]
 
 
 def get_subscriptions_for_location(location: str, active_only: bool = True) -> List[Dict[str, Any]]:
     """
     Retrieve subscriptions for a specific location.
     
-    Returns subscriptions that either have no location filter (receive all) or
-    have location_filter matching the provided location.
-    
     Args:
-        location (str): Location to query
-        active_only (bool): If True, only return active subscriptions (default: True)
-    
+        location: Location to filter by
+        active_only: If True, only return active subscriptions
+        
     Returns:
-        List[Dict[str, Any]]: List of matching subscription records
+        List of matching subscription records
     """
     with get_db() as conn:
         cursor = conn.cursor()
-        
         if active_only:
-            # Get subscriptions with no location filter (all locations) or matching this location
-            query_sql = """
-            SELECT * FROM subscriptions 
-            WHERE active = 1 AND (location_filter IS NULL OR location_filter = ?)
-            ORDER BY created_at DESC
-            """
+            cursor.execute("""
+                SELECT * FROM subscriptions
+                WHERE (location_filter = ? OR location_filter IS NULL)
+                AND active = 1
+                ORDER BY created_at DESC
+            """, (location,))
         else:
-            query_sql = """
-            SELECT * FROM subscriptions 
-            WHERE (location_filter IS NULL OR location_filter = ?)
-            ORDER BY created_at DESC
-            """
+            cursor.execute("""
+                SELECT * FROM subscriptions
+                WHERE location_filter = ? OR location_filter IS NULL
+                ORDER BY created_at DESC
+            """, (location,))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def update_subscription(email: str, updates: Dict[str, Any]) -> bool:
+    """
+    Update a subscription with provided fields.
+    
+    Args:
+        email: Email of the subscription to update
+        updates: Dictionary of fields to update
         
-        cursor.execute(query_sql, (location,))
+    Returns:
+        bool: True if successful, False if not found
+    """
+    if not updates:
+        return True
+    
+    now = datetime.now().isoformat()
+    set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
+    values = list(updates.values())
+    values.append(now)
+    values.append(email)
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE subscriptions SET {set_clause}, updated_at = ? WHERE email = ?",
+            values
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def delete_subscription(email: str) -> bool:
+    """
+    Permanently delete a subscription record.
+    
+    Args:
+        email: Email address to delete
         
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+    Returns:
+        bool: True if found and deleted
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM subscriptions WHERE email = ?", (email,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+def save_alert(location: str, score: float, risk_tier: str, 
+               precipitation: float, alert_sent: bool = False,
+               provider: str = None, recipient: str = None) -> int:
+    """
+    Save an alert to the database.
+    
+    Args:
+        location: District location
+        score: Risk score (0-100)
+        risk_tier: Risk tier (LOW, MODERATE, HIGH, CRITICAL, EXTREME)
+        precipitation: Rainfall in mm
+        alert_sent: Whether an alert was sent
+        provider: Provider used (email, sms, whatsapp)
+        recipient: Recipient address
+        
+    Returns:
+        int: The ID of the saved alert
+    """
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO alerts (
+                location, score, risk_tier, precipitation,
+                alert_sent, timestamp, provider, recipient
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (location, score, risk_tier, precipitation, alert_sent, now, provider, recipient))
+        conn.commit()
+        return cursor.lastrowid
+
+# ============================================================
+# Alert Saving Functions
+# ============================================================
+
+def save_alert(location: str, score: float, risk_tier: str, 
+               precipitation: float, alert_sent: bool = False,
+               provider: str = None, recipient: str = None) -> int:
+    """
+    Save an alert to the database.
+    
+    Args:
+        location: District location
+        score: Risk score (0-100)
+        risk_tier: Risk tier (LOW, MODERATE, HIGH, CRITICAL, EXTREME)
+        precipitation: Rainfall in mm
+        alert_sent: Whether an alert was sent
+        provider: Provider used (email, sms, whatsapp)
+        recipient: Recipient address
+        
+    Returns:
+        int: The ID of the saved alert
+    """
+    from datetime import datetime
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO alerts (
+                location, score, risk_tier, precipitation,
+                alert_sent, timestamp, provider, recipient
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (location, score, risk_tier, precipitation, alert_sent, now, provider, recipient))
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_alerts(location: str = None, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+    """
+    Retrieve alerts with optional filtering.
+    
+    Args:
+        location: Filter by location
+        limit: Maximum number of alerts to return
+        offset: Number of alerts to skip
+        
+    Returns:
+        List of alert records
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if location:
+            cursor.execute(
+                "SELECT * FROM alerts WHERE location = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                (location, limit, offset)
+            )
+        else:
+            cursor.execute(
+                "SELECT * FROM alerts ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                (limit, offset)
+            )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_alert_stats() -> Dict[str, Any]:
+    """
+    Get statistics about alerts.
+    
+    Returns:
+        Dictionary with alert statistics
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Total alerts
+        cursor.execute("SELECT COUNT(*) as total FROM alerts")
+        total = cursor.fetchone()["total"]
+        
+        # By risk tier
+        cursor.execute("""
+            SELECT risk_tier, COUNT(*) as count 
+            FROM alerts 
+            GROUP BY risk_tier
+            ORDER BY count DESC
+        """)
+        by_tier = {row["risk_tier"]: row["count"] for row in cursor.fetchall()}
+        
+        # Top locations
+        cursor.execute("""
+            SELECT location, COUNT(*) as count 
+            FROM alerts 
+            GROUP BY location 
+            ORDER BY count DESC 
+            LIMIT 10
+        """)
+        top_locations = [dict(row) for row in cursor.fetchall()]
+        
+        return {
+            "total_alerts": total,
+            "by_risk_tier": by_tier,
+            "top_locations": top_locations
+        }
+
+
+# ============================================================
+# Subscription Management Functions
+# ============================================================
+
+def init_subscriptions_table() -> None:
+    """
+    Initialize the subscriptions table for managing user alert subscriptions.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                phone TEXT,
+                preferred_provider TEXT NOT NULL DEFAULT 'email',
+                location_filter TEXT,
+                min_risk_tier TEXT NOT NULL DEFAULT 'MODERATE',
+                active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                unsubscribe_token TEXT UNIQUE
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subscription_email ON subscriptions(email)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subscription_active ON subscriptions(active)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subscription_location ON subscriptions(location_filter)")
+        conn.commit()
+
+
+def subscribe(data_dict: Dict[str, Any]) -> int:
+    """
+    Create a new subscription.
+    
+    Args:
+        data_dict: Dictionary with subscription data
+        
+    Returns:
+        int: The ID of the created subscription
+    """
+    from datetime import datetime
+    import secrets
+    
+    now = datetime.now().isoformat()
+    token = secrets.token_urlsafe(16)
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO subscriptions (
+                email, phone, preferred_provider, location_filter,
+                min_risk_tier, active, created_at, updated_at, unsubscribe_token
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data_dict.get("email"),
+            data_dict.get("phone"),
+            data_dict.get("preferred_provider", "email"),
+            data_dict.get("location_filter"),
+            data_dict.get("min_risk_tier", "MODERATE"),
+            1,
+            now,
+            now,
+            token
+        ))
+        conn.commit()
+        return cursor.lastrowid
+
+
+def unsubscribe(email: str) -> bool:
+    """
+    Unsubscribe a user by marking their subscription as inactive.
+    
+    Args:
+        email: Email address to unsubscribe
+        
+    Returns:
+        bool: True if subscription was found and deactivated
+    """
+    from datetime import datetime
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE subscriptions SET active = 0, updated_at = ? WHERE email = ?",
+            (now, email)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def get_subscription(email: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve a subscription by email address.
+    
+    Args:
+        email: Email address to look up
+        
+    Returns:
+        dict or None: Subscription data or None if not found
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM subscriptions WHERE email = ?", (email,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+
+def get_all_subscriptions(active_only: bool = True) -> List[Dict[str, Any]]:
+    """
+    Retrieve all subscriptions, optionally filtered by active status.
+    
+    Args:
+        active_only: If True, only return active subscriptions
+        
+    Returns:
+        List of subscription records as dictionaries
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if active_only:
+            cursor.execute("SELECT * FROM subscriptions WHERE active = 1 ORDER BY created_at DESC")
+        else:
+            cursor.execute("SELECT * FROM subscriptions ORDER BY created_at DESC")
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_subscriptions_for_location(location: str, active_only: bool = True) -> List[Dict[str, Any]]:
+    """
+    Retrieve subscriptions for a specific location.
+    
+    Args:
+        location: Location to filter by
+        active_only: If True, only return active subscriptions
+        
+    Returns:
+        List of matching subscription records
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if active_only:
+            cursor.execute("""
+                SELECT * FROM subscriptions
+                WHERE (location_filter = ? OR location_filter IS NULL)
+                AND active = 1
+                ORDER BY created_at DESC
+            """, (location,))
+        else:
+            cursor.execute("""
+                SELECT * FROM subscriptions
+                WHERE location_filter = ? OR location_filter IS NULL
+                ORDER BY created_at DESC
+            """, (location,))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def update_subscription(email: str, updates: Dict[str, Any]) -> bool:
+    """
+    Update a subscription with provided fields.
+    
+    Args:
+        email: Email of the subscription to update
+        updates: Dictionary of fields to update
+        
+    Returns:
+        bool: True if successful, False if not found
+    """
+    from datetime import datetime
+    if not updates:
+        return True
+    
+    now = datetime.now().isoformat()
+    set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
+    values = list(updates.values())
+    values.append(now)
+    values.append(email)
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE subscriptions SET {set_clause}, updated_at = ? WHERE email = ?",
+            values
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def delete_subscription(email: str) -> bool:
+    """
+    Permanently delete a subscription record.
+    
+    Args:
+        email: Email address to delete
+        
+    Returns:
+        bool: True if found and deleted
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM subscriptions WHERE email = ?", (email,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+def get_alert_history(location: str = None, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+    """
+    Get alert history with optional location filtering.
+    Alias for get_alerts for backward compatibility.
+    
+    Args:
+        location: Filter by location
+        limit: Maximum number of alerts to return
+        offset: Number of alerts to skip
+        
+    Returns:
+        List of alert records
+    """
+    return get_alerts(location=location, limit=limit, offset=offset)
