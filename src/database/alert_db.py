@@ -1,179 +1,138 @@
-"""
-Persistence layer for flood alerts using SQLite.
-
-This module provides database operations for storing and retrieving flood alert data,
-including initialization, insertion, history queries, and statistical analysis.
-"""
+"""Alert database module - stores and retrieves flood alerts."""
 
 import sqlite3
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-from contextlib import contextmanager
+import logging
 
-# Database file location
-DB_PATH = Path(__file__).parent.parent.parent / "data" / "alerts.db"
+logger = logging.getLogger(__name__)
 
-
-@contextmanager
-def get_db():
-    """
-    Context manager for database connections.
-
-    Ensures proper connection handling and cleanup.
-    Uses row factory to return rows as dictionaries for easier access.
-    """
-    conn = sqlite3.connect(str(DB_PATH))
+def get_db_connection() -> sqlite3.Connection:
+    """Get database connection with row factory."""
+    db_path = Path(__file__).parent.parent.parent / "data" / "alerts.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
+    return conn
 
-
-def init_db() -> None:
-    """
-    Initialize the alerts database with table and indexes.
-    """
-    with get_db() as conn:
-        cursor = conn.cursor()
-
-        create_table_sql = """
+def init_db():
+    """Initialize database schema."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            location TEXT NOT NULL,
+            alert_id TEXT UNIQUE NOT NULL,
+            district TEXT NOT NULL,
             risk_score REAL NOT NULL,
             risk_tier TEXT NOT NULL,
-            alert_sent BOOLEAN NOT NULL,
+            message TEXT,
+            timestamp TEXT NOT NULL,
+            sent_to TEXT,
             provider TEXT,
-            message_id TEXT,
-            error TEXT
+            metadata TEXT
         )
-        """
-        cursor.execute(create_table_sql)
+    """)
+    
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_alerts_district ON alerts(district)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp)
+    """)
+    
+    conn.commit()
+    conn.close()
+    logger.info("Database initialized")
 
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_location ON alerts(location)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON alerts(timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_risk_tier ON alerts(risk_tier)")
+def save_alert(alert_data: Dict) -> str:
+    """Save an alert to the database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    alert_id = alert_data.get('alert_id') or f"ALT_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    
+    cursor.execute("""
+        INSERT OR REPLACE INTO alerts (
+            alert_id, district, risk_score, risk_tier, message, timestamp, sent_to, provider, metadata
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        alert_id,
+        alert_data.get('district', 'Unknown'),
+        alert_data.get('risk_score', 0.0),
+        alert_data.get('risk_tier', 'LOW'),
+        alert_data.get('message', ''),
+        alert_data.get('timestamp', datetime.now().isoformat()),
+        json.dumps(alert_data.get('sent_to', [])),
+        alert_data.get('provider', 'unknown'),
+        json.dumps(alert_data.get('metadata', {}))
+    ))
+    
+    conn.commit()
+    conn.close()
+    return alert_id
 
-        conn.commit()
+def get_alerts(district: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict]:
+    """Get alerts from database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    query = "SELECT * FROM alerts"
+    params = []
+    
+    if district:
+        query += " WHERE district = ?"
+        params.append(district)
+    
+    query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    
+    return [dict(row) for row in rows]
 
+def get_alert_stats(district: Optional[str] = None) -> Dict:
+    """Get alert statistics."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    query = "SELECT risk_tier, COUNT(*) as count FROM alerts"
+    params = []
+    
+    if district:
+        query += " WHERE district = ?"
+        params.append(district)
+    
+    query += " GROUP BY risk_tier"
+    
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    
+    stats = {row['risk_tier']: row['count'] for row in rows}
+    
+    # Get top locations
+    cursor = conn.cursor()
+    query = "SELECT district, COUNT(*) as count FROM alerts"
+    if district:
+        query += " WHERE district = ?"
+    query += " GROUP BY district ORDER BY count DESC LIMIT 5"
+    
+    cursor.execute(query, params if district else [])
+    top_locations = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    
+    return {
+        'risk_tiers': stats,
+        'top_locations': top_locations,
+        'total': sum(stats.values())
+    }
 
-def save_alert(data_dict: Dict[str, Any]) -> int:
-    """
-    Save a new alert to the database.
-
-    Args:
-        data_dict: Dictionary containing alert data
-
-    Returns:
-        int: The ID of the inserted alert record
-    """
-    required_fields = ["timestamp", "location", "risk_score", "risk_tier", "alert_sent"]
-    missing_fields = [field for field in required_fields if field not in data_dict]
-    if missing_fields:
-        raise ValueError(f"Missing required fields: {missing_fields}")
-
-    with get_db() as conn:
-        cursor = conn.cursor()
-
-        insert_sql = """
-        INSERT INTO alerts
-        (timestamp, location, risk_score, risk_tier, alert_sent, provider, message_id, error)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """
-
-        cursor.execute(
-            insert_sql,
-            (
-                data_dict["timestamp"],
-                data_dict["location"],
-                data_dict["risk_score"],
-                data_dict["risk_tier"],
-                data_dict["alert_sent"],
-                data_dict.get("provider"),
-                data_dict.get("message_id"),
-                data_dict.get("error"),
-            ),
-        )
-
-        conn.commit()
-        return cursor.lastrowid
-
-
-def get_alert_history(
-    limit: int = 100,
-    offset: int = 0,
-    location_filter: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    """
-    Retrieve alert history with pagination and optional location filtering.
-    """
-    with get_db() as conn:
-        cursor = conn.cursor()
-
-        if location_filter:
-            query_sql = """
-            SELECT * FROM alerts
-            WHERE location = ?
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-            """
-            cursor.execute(query_sql, (location_filter, limit, offset))
-        else:
-            query_sql = """
-            SELECT * FROM alerts
-            ORDER BY timestamp DESC
-            LIMIT ? OFFSET ?
-            """
-            cursor.execute(query_sql, (limit, offset))
-
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-
-
-def get_total_alerts_count(location_filter: Optional[str] = None) -> int:
-    """
-    Get total number of alerts matching the filter.
-
-    This function is used for pagination to provide the total count
-    of available records, enabling frontend to calculate total pages.
-    """
-    with get_db() as conn:
-        cursor = conn.cursor()
-        if location_filter:
-            cursor.execute(
-                "SELECT COUNT(*) FROM alerts WHERE location = ?", (location_filter,)
-            )
-        else:
-            cursor.execute("SELECT COUNT(*) FROM alerts")
-        return cursor.fetchone()[0]
-
-
-def get_alert_stats() -> Dict[str, Any]:
-    """
-    Calculate comprehensive alert statistics.
-    """
-    with get_db() as conn:
-        cursor = conn.cursor()
-
-        # Count alerts grouped by risk_tier
-        cursor.execute(
-            "SELECT risk_tier, COUNT(*) as count FROM alerts GROUP BY risk_tier"
-        )
-        by_risk_tier = {row[0]: row[1] for row in cursor.fetchall()}
-
-        # Get top 5 locations with most alerts
-        top_locations_query = """
-        SELECT location, COUNT(*) as count FROM alerts
-        GROUP BY location
-        ORDER BY count DESC
-        LIMIT 5
-        """
-        cursor.execute(top_locations_query)
-        top_locations = [(row[0], row[1]) for row in cursor.fetchall()]
-
-        return {
-            "by_risk_tier": by_risk_tier,
-            "top_locations": top_locations,
-        }
+# Initialize database on import
+init_db()

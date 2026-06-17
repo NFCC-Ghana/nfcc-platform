@@ -1,0 +1,48 @@
+CIVICFLOOD AI - DASHBOARD BACKUP MANIFEST
+==========================================
+Backup Date: Wed Jun 17 01:12:38 UTC 2026
+Backup Time: 01:12:38
+Backup Directory: hackathon/app/pages/backups/20260617_010823
+
+FILES BACKED UP:
+total 20
+drwxr-xr-x 2 nfcc nfcc 4096 Jun 17 01:12 .
+drwxr-xr-x 3 nfcc nfcc 4096 Jun 17 01:08 ..
+-rw-r--r-- 1 nfcc nfcc 9576 Jun 17 01:08 dashboard_enhanced.py.backup
+-rw-r--r-- 1 nfcc nfcc    0 Jun 17 01:12 manifest.txt
+
+CURRENT GIT STATUS:
+On branch backup/dashboard-20260617-011109
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   hackathon/app/pages/00_home.py
+	new file:   hackathon/app/pages/01_dashboard.py
+	new file:   hackathon/app/pages/04_community_report.py
+	new file:   hackathon/app/pages/backups/20260617_010823/dashboard_enhanced.py.backup
+	new file:   hackathon/app/pages/dashboard_enhanced.py
+	new file:   hackathon/app/pages/dashboard_enhanced.py.bak
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   hackathon/app/pages/00_home.py
+	modified:   hackathon/app/pages/01_dashboard.py
+	modified:   hackathon/app/pages/04_community_report.py
+	modified:   hackathon/app/pages/dashboard_enhanced.py
+	modified:   src/database/alert_db.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	check_imports.py
+	hackathon/ai/
+	hackathon/app/pages/backups/20260617_010823/manifest.txt
+	src/hydrology/
+	tests/test_hydrological_intelligence.py
+	update_system.sh
+
+CURRENT BRANCH: backup/dashboard-20260617-011109
+
+==========================================
+TO RESTORE:
+cp hackathon/app/pages/backups/20260617_010823/dashboard_enhanced.py.backup hackathon/app/pages/dashboard_enhanced.py
+==========================================
