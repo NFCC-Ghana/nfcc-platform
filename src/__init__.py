@@ -1,0 +1,1 @@
+"""NFCC Platform source code."""

@@ -84,3 +84,15 @@ Thumbs.db
 railway.toml.env.production.backup
 .streamlit/
 data/alerts.db
+
+# Backup directories
+backups/
+
+# Runtime data
+data/community_reports.db
+data/*.db
+*.db
+
+# Python cache
+__pycache__/
+*.pyc

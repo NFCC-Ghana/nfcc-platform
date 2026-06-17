@@ -1,0 +1,34 @@
+{
+  "events": [
+    {
+      "id": "2023_akosombo",
+      "date": "2023-10-15",
+      "cause": "dam_spillage",
+      "dam": "Akosombo",
+      "districts": ["North Tongu", "South Tongu", "Keta", "Ada"],
+      "rainfall_mm": 85.0,
+      "river_level_m": 4.2,
+      "area_km2": 450,
+      "population_affected": 30000,
+      "displaced": 12000,
+      "fatalities": 0,
+      "severity": "HIGH",
+      "description": "Akosombo Dam spillage caused widespread flooding"
+    },
+    {
+      "id": "2015_accra",
+      "date": "2015-06-03",
+      "cause": "urban_flooding",
+      "dam": null,
+      "districts": ["Accra Central", "Accra West", "Accra East"],
+      "rainfall_mm": 120.0,
+      "river_level_m": 3.1,
+      "area_km2": 25,
+      "population_affected": 50000,
+      "displaced": 15000,
+      "fatalities": 15,
+      "severity": "CRITICAL",
+      "description": "Heavy rainfall caused severe urban flooding in Accra"
+    }
+  ]
+}
