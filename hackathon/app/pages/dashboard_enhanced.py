@@ -433,3 +433,139 @@ def render_weather_forecast(district: str):
 # render_weather_forecast(district)
 # render_impact_assessment(district, risk_score)
 # render_community_reports(district)
+
+# ================================================================
+# NEW SECTION: WEATHER FORECAST PANEL (Added without removing existing)
+# ================================================================
+
+def render_weather_forecast_panel(district: str):
+    """Render weather forecast panel."""
+    st.markdown("## 🌤️ Weather Forecast")
+    
+    try:
+        from src.hydrology.weather_forecast import weather_forecast
+        
+        with st.spinner("Fetching forecast..."):
+            forecast = weather_forecast.get_forecast_for_district(district)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        for i, key in enumerate(['24h', '48h', '72h']):
+            value = forecast.get(key, 0)
+            with [col1, col2, col3][i]:
+                st.metric(f"{key} Forecast", f"{value} mm")
+        
+        if forecast.get('daily'):
+            with st.expander("📊 Daily Breakdown"):
+                for day in forecast['daily']:
+                    st.caption(f"  Day {day['day']}: {day['rainfall_mm']} mm")
+        
+        st.caption(f"Source: {forecast.get('source', 'Open-Meteo')}")
+        
+        # Risk warning
+        max_forecast = max([forecast.get('24h', 0), forecast.get('48h', 0), forecast.get('72h', 0)])
+        if max_forecast > 30:
+            st.warning("⚠️ Significant rainfall expected in the next 72 hours")
+        elif max_forecast > 15:
+            st.info("ℹ️ Moderate rainfall expected")
+            
+    except Exception as e:
+        st.warning(f"⚠️ Forecast temporarily unavailable: {e}")
+
+# ================================================================
+# NEW SECTION: SUBSCRIPTION PANEL (Added without removing existing)
+# ================================================================
+
+def render_subscription_panel(district: str):
+    """Render subscription panel."""
+    st.markdown("## 🔔 Alert Subscriptions")
+    
+    try:
+        from src.alerts.subscriptions import subscription_manager
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            phone = st.text_input("Phone Number (with country code)", 
+                                 placeholder="+233 XX XXX XXXX",
+                                 key="subscribe_phone")
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("Subscribe", key="subscribe_btn"):
+                    if phone and len(phone) > 8:
+                        result = subscription_manager.subscribe(phone, district)
+                        if result:
+                            st.success(f"✅ Subscribed! You will receive alerts for {district}")
+                        else:
+                            st.error("❌ Failed to subscribe")
+                    else:
+                        st.warning("⚠️ Please enter a valid phone number")
+            
+            with col_b:
+                if st.button("Unsubscribe", key="unsubscribe_btn"):
+                    if phone:
+                        result = subscription_manager.unsubscribe(phone)
+                        if result:
+                            st.success("✅ Unsubscribed")
+        
+        with col2:
+            stats = subscription_manager.get_stats()
+            st.metric("Total Subscribers", stats.get('total_subscribers', 0))
+            st.metric("WhatsApp", stats.get('whatsapp_verified', 0))
+            st.metric("SMS", stats.get('sms_verified', 0))
+            
+    except Exception as e:
+        st.warning(f"⚠️ Subscription service temporarily unavailable: {e}")
+
+# ================================================================
+# NEW SECTION: FLOOD EVENT HISTORY PANEL (Added without removing existing)
+# ================================================================
+
+def render_flood_history_panel(district: str):
+    """Render flood event history panel."""
+    st.markdown("## 📜 Flood Event History")
+    
+    try:
+        import json
+        from pathlib import Path
+        
+        events_path = Path("data/events/flood_events.json")
+        
+        if events_path.exists():
+            with open(events_path) as f:
+                data = json.load(f)
+            
+            events = data.get('events', [])
+            
+            # Filter events for this district
+            district_events = []
+            for event in events:
+                if district in event.get('districts', []):
+                    district_events.append(event)
+            
+            if district_events:
+                for event in district_events[:5]:
+                    with st.container():
+                        severity = event.get('severity', 'MODERATE')
+                        emoji = "🔴" if severity == 'CRITICAL' else "🟠" if severity == 'HIGH' else "🟡"
+                        st.markdown(f"{emoji} **{event['date']}** - {event['cause'].replace('_', ' ').title()}")
+                        st.caption(f"Affected: {event.get('affected_population', 0):,} people")
+                        st.caption(f"Description: {event.get('description', '')[:100]}...")
+                        st.divider()
+            else:
+                st.info("No historical flood events recorded for this district")
+        else:
+            st.info("No flood event database found")
+            
+    except Exception as e:
+        st.warning(f"⚠️ Event history temporarily unavailable: {e}")
+
+# ================================================================
+# MODIFIED MAIN - Add new sections (without removing existing)
+# ================================================================
+
+# To be added in the main() function after the "Actionable Recommendations" section:
+# render_weather_forecast_panel(district)
+# render_subscription_panel(district)
+# render_flood_history_panel(district)

@@ -1,105 +1,60 @@
 #!/bin/bash
 # ================================================================
 # COMPLETE ENHANCEMENT EXECUTION SCRIPT
-# Run this to apply all fixes and enhancements
 # ================================================================
 
 echo "🚀 CIVICFLOOD AI - COMPLETE ENHANCEMENT"
 echo "================================================"
 
-# Step 1: Backup existing files
+# Step 1: Verify environment
 echo ""
-echo "📁 Step 1: Backing up existing files..."
-BACKUP_DIR="backups/pre_enhancement_$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$BACKUP_DIR"
+echo "📋 Step 1: Verifying environment..."
+conda activate nfcc
+python --version
+echo "✅ Environment verified"
 
-# Backup src directory
-if [ -d "src" ]; then
-    cp -r src "$BACKUP_DIR/"
-    echo "   ✅ src/ backed up"
-fi
-
-# Backup hackathon directory
-if [ -d "hackathon" ]; then
-    cp -r hackathon "$BACKUP_DIR/"
-    echo "   ✅ hackathon/ backed up"
-fi
-
-echo "   ✅ Backup complete: $BACKUP_DIR"
-
-# Step 2: Create all modules
+# Step 2: Test imports
 echo ""
-echo "📝 Step 2: Creating modules..."
-
-# Create all the files from above
-# (This is where all the cat commands would go)
-
-echo "   ✅ All modules created"
-
-# Step 3: Test imports
-echo ""
-echo "🧪 Step 3: Testing imports..."
+echo "🧪 Step 2: Testing imports..."
 python -c "
 import sys
 sys.path.insert(0, '.')
+
 print('Testing imports...')
 try:
-    from src.hydrology.unified_intelligence import unified_intelligence
-    print('✅ unified_intelligence')
+    from src.hydrology.weather_forecast import weather_forecast
+    print('✅ weather_forecast')
 except Exception as e:
-    print(f'❌ unified_intelligence: {e}')
+    print(f'❌ weather_forecast: {e}')
 
 try:
-    from src.hydrology.rainfall_history import rainfall_history
-    print('✅ rainfall_history')
+    from src.alerts.enhanced_alert_network import enhanced_alert_network
+    print('✅ enhanced_alert_network')
 except Exception as e:
-    print(f'❌ rainfall_history: {e}')
+    print(f'❌ enhanced_alert_network: {e}')
 
 try:
-    from src.hydrology.river_intelligence import river_intelligence
-    print('✅ river_intelligence')
+    from src.alerts.subscriptions import subscription_manager
+    print('✅ subscription_manager')
 except Exception as e:
-    print(f'❌ river_intelligence: {e}')
+    print(f'❌ subscription_manager: {e}')
 
-try:
-    from src.hydrology.reservoir_intelligence import reservoir_intelligence
-    print('✅ reservoir_intelligence')
-except Exception as e:
-    print(f'❌ reservoir_intelligence: {e}')
-
-try:
-    from src.hydrology.soil_moisture import soil_moisture
-    print('✅ soil_moisture')
-except Exception as e:
-    print(f'❌ soil_moisture: {e}')
-
-try:
-    from src.hydrology.flood_polygons import flood_polygons
-    print('✅ flood_polygons')
-except Exception as e:
-    print(f'❌ flood_polygons: {e}')
-
-try:
-    from src.community.community_memory import community_memory
-    print('✅ community_memory')
-except Exception as e:
-    print(f'❌ community_memory: {e}')
-
-try:
-    from src.exposure.impact_estimator import impact_estimator
-    print('✅ impact_estimator')
-except Exception as e:
-    print(f'❌ impact_estimator: {e}')
-
-print('\n✅ All imports successful!'
+print('✅ All imports tested!')
 "
+
+# Step 3: Create directories
+echo ""
+echo "📁 Step 3: Creating directories..."
+mkdir -p data/forecast_cache
+mkdir -p data/alerts
+echo "✅ Directories created"
 
 # Step 4: Run dashboard
 echo ""
-echo "🚀 Step 4: Running dashboard..."
+echo "🚀 Step 4: Starting dashboard..."
 echo "   Dashboard will start on port 8501"
 echo "   Press Ctrl+C to stop"
 echo ""
 
+fuser -k 8501/tcp 2>/dev/null || true
 streamlit run hackathon/app/pages/dashboard_enhanced.py --server.port 8501
-

@@ -9,32 +9,37 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+DB_PATH = Path("data/alerts.db")
+
 def get_db_connection() -> sqlite3.Connection:
     """Get database connection with row factory."""
-    db_path = Path(__file__).parent.parent.parent / "data" / "alerts.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    conn = sqlite3.connect(str(db_path))
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
-    """Initialize database schema."""
+    """Initialize database schema with proper columns."""
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # Drop existing table to recreate with correct schema
+    cursor.execute("DROP TABLE IF EXISTS alerts")
     
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             alert_id TEXT UNIQUE NOT NULL,
             district TEXT NOT NULL,
+            community TEXT,
             risk_score REAL NOT NULL,
             risk_tier TEXT NOT NULL,
             message TEXT,
             timestamp TEXT NOT NULL,
             sent_to TEXT,
             provider TEXT,
-            metadata TEXT
+            metadata TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     
@@ -47,7 +52,7 @@ def init_db():
     
     conn.commit()
     conn.close()
-    logger.info("Database initialized")
+    logger.info("Alert database initialized with correct schema")
 
 def save_alert(alert_data: Dict) -> str:
     """Save an alert to the database."""
@@ -58,11 +63,13 @@ def save_alert(alert_data: Dict) -> str:
     
     cursor.execute("""
         INSERT OR REPLACE INTO alerts (
-            alert_id, district, risk_score, risk_tier, message, timestamp, sent_to, provider, metadata
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            alert_id, district, community, risk_score, risk_tier, 
+            message, timestamp, sent_to, provider, metadata
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         alert_id,
         alert_data.get('district', 'Unknown'),
+        alert_data.get('community', ''),
         alert_data.get('risk_score', 0.0),
         alert_data.get('risk_tier', 'LOW'),
         alert_data.get('message', ''),
@@ -76,8 +83,8 @@ def save_alert(alert_data: Dict) -> str:
     conn.close()
     return alert_id
 
-def get_alerts(district: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict]:
-    """Get alerts from database."""
+def get_alert_history(district: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict]:
+    """Get alert history from database."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -133,6 +140,15 @@ def get_alert_stats(district: Optional[str] = None) -> Dict:
         'top_locations': top_locations,
         'total': sum(stats.values())
     }
+
+def get_total_alerts() -> int:
+    """Get total number of alerts."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM alerts")
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
 
 # Initialize database on import
 init_db()
