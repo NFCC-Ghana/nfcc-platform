@@ -10,15 +10,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.alerts.engine import AlertEngine
-from src.alerts.formatter import get_risk_tier
-from src.alerts.logger_config import setup_logging
-from src.config.settings import settings
-
-# Import routers
+from src.api.explain import router as explain_router
+from src.api.health import router as health_router
 from src.api.dam_router import router as dam_router
 from src.api.routes.alerts import router as alerts_router
 from src.api.routes.forecast import router as forecast_router
 from src.api.routes.explain_fusion import router as explain_fusion_router
+from src.api.routes.subscriptions import router as subscriptions_router
+from src.alerts.formatter import get_risk_tier
+from src.alerts.logger_config import setup_logging
+from src.config.settings import settings
+from src.database.alert_db import init_subscriptions_table
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -50,13 +52,13 @@ def calculate_score(precipitation: float, temperature: float = None) -> float:
     if precipitation <= 0:
         return 0.0
     elif precipitation < 10:
-        return precipitation * 3
+        return min(100, precipitation * 3)
     elif precipitation < 30:
-        return 30 + (precipitation - 10) * 1.5
-    elif precipitation < 60:
-        return 60 + (precipitation - 30) * 0.83
+        return min(100, 30 + (precipitation - 10) * 2)
+    elif precipitation < 50:
+        return min(100, 70 + (precipitation - 30) * 1.5)
     else:
-        return min(100, 85 + (precipitation - 60) * 0.375)
+        return min(100, 95 + (precipitation - 50) * 0.2)
 
 
 @asynccontextmanager
@@ -65,131 +67,95 @@ async def lifespan(app: FastAPI):
 
     logger.info(f"Starting NFCC Flood Alert Platform v{settings.API_VERSION}...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
+
+    # Verify model loads
     try:
         model = settings.model
         logger.info("✅ Model loaded successfully")
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
 
+    # Initialize subscription storage
+    try:
+        init_subscriptions_table()
+        logger.info("✅ Subscriptions table initialized")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize subscriptions table: {e}")
+
+    # Initialize alert engine
     alert_engine = AlertEngine()
     logger.info("✅ Alert engine initialized")
+
     yield
+
     logger.info("Shutting down...")
 
 
+# Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
-    description=settings.APP_DESCRIPTION,
     version=settings.API_VERSION,
+    description="National Flood Intelligence Platform API",
     lifespan=lifespan,
 )
 
-# Register routers
-app.include_router(dam_router)
-app.include_router(alerts_router)
-app.include_router(forecast_router)
-app.include_router(explain_fusion_router)
-
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.get("/")
-async def root() -> Dict[str, Any]:
-    return {
-        "name": settings.APP_NAME,
-        "version": settings.API_VERSION,
-        "environment": settings.ENVIRONMENT,
-        "status": "operational",
-    }
-
-
+# Health check endpoint
 @app.get("/health")
-async def health() -> Dict[str, Any]:
+async def health_check():
     return {
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
         "version": settings.API_VERSION,
-        "model": "loaded" if settings.model else "loading",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "model": "loaded" if settings.model else "not loaded"
     }
 
+# Root endpoint
+@app.get("/")
+async def root():
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.API_VERSION,
+        "environment": settings.ENVIRONMENT
+    }
 
-@app.get("/districts")
-async def get_districts() -> Dict[str, Any]:
-    districts = [
-        "Accra Central",
-        "Accra East",
-        "Accra West",
-        "Tema",
-        "Kumasi",
-        "Takoradi",
-        "Tamale",
-        "Cape Coast",
-        "Koforidua",
-        "Ho",
-    ]
-    return {"status": "success", "districts": districts, "count": len(districts)}
+# Score endpoint
+@app.post("/score", response_model=ScoreResponse)
+async def score(request: ScoreRequest):
+    score_value = calculate_score(request.precipitation, request.temperature)
+    risk_tier = get_risk_tier(score_value)
 
-
-@app.get("/alerts")
-async def get_alerts() -> Dict[str, Any]:
-    return {"status": "success", "alerts": [], "message": "Alert history endpoint"}
-
-
-@app.post("/score")
-async def score_endpoint(request: ScoreRequest) -> ScoreResponse:
-    score = calculate_score(request.precipitation, request.temperature)
-    risk_tier = get_risk_tier(score)
-    send_alert = score >= 30
+    # Send alert if risk is high enough
     alert_sent = False
-    if alert_engine and send_alert:
-        result = alert_engine.process(
-            location=request.location,
-            score=score,
-            precipitation=request.precipitation,
-            message=f"Flood risk detected with {request.precipitation:.1f}mm rainfall",
-        )
-        alert_sent = result.get("alert_sent", False)
-    logger.info(
-        f"Scored | {request.location} | {score:.1f} | {risk_tier} | alert={alert_sent}"
-    )
+    if alert_engine and score_value > 50:
+        try:
+            alert_engine.process(score_value, request.location, request.precipitation)
+            alert_sent = True
+        except Exception as e:
+            logger.error(f"Alert failed: {e}")
+
     return ScoreResponse(
         location=request.location,
-        score=round(score, 1),
+        score=round(score_value, 1),
         risk_tier=risk_tier,
         alert_sent=alert_sent,
-        timestamp=datetime.utcnow().isoformat() + "Z",
+        timestamp=datetime.now().isoformat()
     )
 
 
-@app.post("/score/batch")
-async def batch_score_endpoint(request: BatchScoreRequest) -> Dict[str, Any]:
-    results = []
-    for req in request.requests:
-        score = calculate_score(req.precipitation, req.temperature)
-        risk_tier = get_risk_tier(score)
-        alert_sent = False
-        if alert_engine and score >= 30:
-            result = alert_engine.process(
-                location=req.location,
-                score=score,
-                precipitation=req.precipitation,
-            )
-            alert_sent = result.get("alert_sent", False)
-        results.append(
-            {
-                "location": req.location,
-                "score": round(score, 1),
-                "risk_tier": risk_tier,
-                "precipitation": req.precipitation,
-                "alert_sent": alert_sent,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-            }
-        )
-    return {"status": "success", "results": results, "count": len(results)}
+# Include all routers
+app.include_router(alerts_router)
+app.include_router(forecast_router)
+app.include_router(explain_fusion_router)
+app.include_router(dam_router)
+app.include_router(subscriptions_router)
+app.include_router(explain_router)
+app.include_router(health_router)
