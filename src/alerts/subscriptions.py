@@ -1,11 +1,9 @@
 """Community subscription management for alerts."""
 
 import sqlite3
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
-
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -13,10 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class SubscriptionManager:
-    """
-    Manage community subscriptions for flood alerts.
-    Supports WhatsApp, SMS, and email notifications.
-    """
+    """Manage community subscriptions for flood alerts."""
     
     def __init__(self, db_path: str = "data/subscriptions.db"):
         self.db_path = Path(db_path)
@@ -29,15 +24,16 @@ class SubscriptionManager:
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
         
-        # Drop existing table if it has wrong schema
+        cursor.execute("DROP TABLE IF EXISTS subscriptions")
+        
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS subscriptions (
+            CREATE TABLE subscriptions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 phone_number VARCHAR(20) UNIQUE NOT NULL,
                 whatsapp_verified BOOLEAN DEFAULT FALSE,
                 sms_verified BOOLEAN DEFAULT FALSE,
                 email VARCHAR(100),
-                district VARCHAR(100),
+                district VARCHAR(100) NOT NULL,
                 alert_level VARCHAR(20) DEFAULT 'MODERATE',
                 active BOOLEAN DEFAULT TRUE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -57,13 +53,13 @@ class SubscriptionManager:
         
         conn.commit()
         conn.close()
+        logger.info("Subscription database initialized")
     
     def subscribe(self, phone: str, district: str, channel: str = 'whatsapp') -> Dict:
         """Subscribe a user to alerts."""
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
         
-        # Check if exists
         cursor.execute(
             "SELECT * FROM subscriptions WHERE phone_number = ?",
             (phone,)
@@ -71,7 +67,6 @@ class SubscriptionManager:
         existing = cursor.fetchone()
         
         if existing:
-            # Update existing
             cursor.execute("""
                 UPDATE subscriptions 
                 SET district = ?,
@@ -80,7 +75,6 @@ class SubscriptionManager:
                 WHERE phone_number = ?
             """, (district, phone))
         else:
-            # Insert new
             cursor.execute("""
                 INSERT INTO subscriptions (phone_number, district)
                 VALUES (?, ?)
@@ -146,7 +140,6 @@ class SubscriptionManager:
         cursor.execute("SELECT COUNT(*) FROM subscriptions WHERE sms_verified = TRUE AND active = TRUE")
         sms = cursor.fetchone()[0]
         
-        # Get districts with most subscribers
         cursor.execute("""
             SELECT district, COUNT(*) as count 
             FROM subscriptions 
@@ -165,6 +158,12 @@ class SubscriptionManager:
             'sms_verified': sms,
             'top_districts': [{'district': d, 'count': c} for d, c in top_districts]
         }
+    
+    def _get_connection(self):
+        """Get database connection (for API endpoints)."""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 subscription_manager = SubscriptionManager()

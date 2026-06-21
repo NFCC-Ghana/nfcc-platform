@@ -1,0 +1,56 @@
+[
+  {
+    "alert_id": "ALT_20260617031541",
+    "district": "Accra Central",
+    "message": "Test alert",
+    "risk_score": 75.0,
+    "risk_tier": "HIGH",
+    "alert_level": "HIGH",
+    "channels": [
+      "whatsapp",
+      "sms"
+    ],
+    "sent_to": [
+      "whatsapp",
+      "sms"
+    ],
+    "timestamp": "2026-06-17T03:15:41.757685",
+    "sent": true
+  },
+  {
+    "alert_id": "ALT_20260617032117",
+    "district": "Accra Central",
+    "message": "Quick test",
+    "risk_score": 50.0,
+    "risk_tier": "MODERATE",
+    "alert_level": "MODERATE",
+    "channels": [
+      "whatsapp",
+      "sms"
+    ],
+    "sent_to": [
+      "whatsapp",
+      "sms"
+    ],
+    "timestamp": "2026-06-17T03:21:17.563292",
+    "sent": true
+  },
+  {
+    "alert_id": "ALT_20260618172954",
+    "district": "Accra Central",
+    "message": "\ud83d\udea8 FLOOD ALERT: Community engagement test",
+    "risk_score": 75.0,
+    "risk_tier": "HIGH",
+    "alert_level": "HIGH",
+    "channels": [
+      "whatsapp",
+      "sms"
+    ],
+    "sent_to": [
+      "whatsapp",
+      "sms"
+    ],
+    "timestamp": "2026-06-18T17:29:54.909965",
+    "sent": true
+  }
+]

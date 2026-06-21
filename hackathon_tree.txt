@@ -1,0 +1,38 @@
+hackathon
+├── README.md
+├── ai
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── hydrological_intelligence.cpython-310.pyc
+│   ├── community_classifier.py
+│   ├── flood_explainer.py
+│   ├── hydrological_intelligence.py
+│   ├── impact_estimator.py
+│   └── timeline_predictor.py
+├── app
+│   └── pages
+│       ├── 00_home.py
+│       ├── 01_dashboard.py
+│       ├── 04_community_report.py
+│       ├── backups
+│       │   └── 20260617_010823
+│       ├── dashboard.py
+│       ├── dashboard_enhanced.py
+│       ├── dashboard_enhanced.py.bak2
+│       ├── dashboard_enhanced_v2.py
+│       └── switch_dashboard.sh
+├── datasets
+│   ├── demo_events.csv
+│   ├── district_population.csv
+│   ├── health_facilities.csv
+│   └── schools.csv
+├── docs
+│   ├── architecture.md
+│   ├── dataset_sources.md
+│   ├── pitch_deck.md
+│   └── poster.md
+└── tests
+    └── test_ai_modules.py
+
+10 directories, 26 files

@@ -78,6 +78,7 @@ def get_env_list(key: str, default: List[str] = None) -> List[str]:
 
 
 class Settings:
+    ALERT_DRY_RUN: bool = os.getenv("ALERT_DRY_RUN", "false").lower() == "true"
     """Production settings with validation."""
 
     # Environment
@@ -253,3 +254,6 @@ ALERT_DRY_RUN: bool = get_env_bool("ALERT_DRY_RUN", False)
 
 if ALERT_DRY_RUN:
     print("⚠️  ALERT_DRY_RUN is ENABLED - No real alerts will be sent")
+
+    # Alert dry run mode
+    ALERT_DRY_RUN: bool = os.getenv("ALERT_DRY_RUN", "false").lower() == "true"
