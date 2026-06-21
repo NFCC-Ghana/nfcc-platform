@@ -6,11 +6,6 @@ import plotly.express as px
 import requests
 
 # Page config
-st.set_page_config(
-    page_title="CivicFlood AI - Ghana Flood Intelligence",
-    page_icon="🌊",
-    layout="wide",
-)
 
 # Custom CSS
 st.markdown(

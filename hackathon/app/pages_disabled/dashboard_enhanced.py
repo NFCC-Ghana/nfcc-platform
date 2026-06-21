@@ -13,12 +13,6 @@ sys.path.insert(0, str(project_root))
 
 from src.hydrology.unified_intelligence import unified_intelligence
 
-st.set_page_config(
-    page_title="CivicFlood AI - National Flood Intelligence",
-    page_icon="🌊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # ============================================================
 # ORIGINAL DATA - PRESERVED
@@ -569,3 +563,97 @@ def render_flood_history_panel(district: str):
 # render_weather_forecast_panel(district)
 # render_subscription_panel(district)
 # render_flood_history_panel(district)
+
+# ================================================================
+# IMPACT METRICS PANEL
+# ================================================================
+
+def render_impact_metrics(district: str, risk_score: float, risk_tier: str = None):
+    """Render complete impact metrics panel."""
+    st.markdown("## 📊 Impact Metrics")
+    
+    try:
+        from src.exposure.impact_estimator import impact_estimator
+        
+        impact = impact_estimator.estimate_impact(district, risk_score, risk_tier)
+        
+        if impact.get('error'):
+            st.warning(impact['error'])
+            return
+        
+        # Row 1: Population Metrics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "Population Exposed",
+                f"{impact['population_exposed']:,}",
+                delta=f"{impact['exposure_percentage']:.1f}% of district"
+            )
+        
+        with col2:
+            st.metric(
+                "Children at Risk",
+                f"{impact['children_exposed']:,}",
+                delta="Under 18"
+            )
+        
+        with col3:
+            st.metric(
+                "Elderly at Risk",
+                f"{impact['elderly_exposed']:,}",
+                delta="Over 60"
+            )
+        
+        with col4:
+            st.metric(
+                "Lead Time",
+                f"{impact['lead_time_hours']} hours",
+                delta=impact['lead_time_action']
+            )
+        
+        # Row 2: Infrastructure Metrics
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                "Schools at Risk",
+                impact['schools_exposed'],
+                delta=f"{impact['hospitals_exposed']} hospitals at risk"
+            )
+        
+        with col2:
+            st.metric(
+                "Hospitals at Risk",
+                impact['hospitals_exposed']
+            )
+        
+        with col3:
+            st.metric(
+                "Markets at Risk",
+                impact['markets_exposed']
+            )
+        
+        # Row 3: Vulnerable Populations
+        with st.expander("👥 Vulnerable Populations Detail"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.metric("Disabled", f"{impact['disabled_exposed']:,}")
+                st.metric("Pregnant Women", f"{impact['pregnant_exposed']:,}")
+            
+            with col2:
+                st.metric(
+                    "Population Protected",
+                    f"{impact['population_total'] - impact['population_exposed']:,}",
+                    delta=f"{100 - impact['exposure_percentage']:.1f}% safe"
+                )
+        
+        return impact
+        
+    except Exception as e:
+        st.warning(f"⚠️ Impact metrics temporarily unavailable: {e}")
+        return None
+
+# Add this to main() after recommendations:
+# impact_data = render_impact_metrics(district, risk_score, risk_category)

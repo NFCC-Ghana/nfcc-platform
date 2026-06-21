@@ -2,13 +2,6 @@
 
 import streamlit as st
 
-st.set_page_config(page_title="CivicFlood AI - Home", page_icon="🌊", layout="wide")
-
-st.markdown(
-    """
-<style>
-    .hero {
-        background: linear-gradient(135deg, #0a1628 0%, #1a3a5c 50%, #0f3460 100%);
         padding: 4rem 2rem;
         border-radius: 12px;
         color: white;

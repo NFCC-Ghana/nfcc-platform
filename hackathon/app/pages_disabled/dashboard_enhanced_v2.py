@@ -48,12 +48,6 @@ from src.hydrology.flood_polygons import flood_polygons
 # PAGE CONFIGURATION
 # ============================================================
 
-st.set_page_config(
-    page_title="CivicFlood AI - Enhanced Dashboard",
-    page_icon="🌊",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 # ============================================================
 # DISTRICT DATA - PRESERVED FROM ORIGINAL

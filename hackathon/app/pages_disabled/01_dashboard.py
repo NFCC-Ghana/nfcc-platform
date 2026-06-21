@@ -10,12 +10,6 @@ import requests
 import json
 
 # Set page config
-st.set_page_config(
-    page_title="CivicFlood AI - Dashboard",
-    page_icon="🌊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # API URL
 API_URL = "https://nfcc-platform-production.up.railway.app"

@@ -36,13 +36,13 @@ os.environ["NFCC_API_URL"] = os.getenv(
 # RUN THE COMPLETE DASHBOARD
 # ============================================================
 try:
-    from hackathon.app.pages.dashboard_enhanced import main
+    from hackathon.app.pages_disabled.dashboard_enhanced import main
     main()
 except ImportError as e:
     st.error(f"Error loading dashboard: {e}")
     st.info("Falling back to simple dashboard...")
     try:
-        from hackathon.app.pages.dashboard import main
+        from hackathon.app.pages_disabled.dashboard import main
         main()
     except ImportError:
         st.title("🌊 CivicFlood AI")

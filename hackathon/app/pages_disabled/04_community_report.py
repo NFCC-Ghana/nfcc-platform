@@ -6,9 +6,6 @@ from datetime import datetime
 import json
 import pandas as pd
 
-st.set_page_config(
-    page_title="Report Flood - CivicFlood AI", page_icon="📢", layout="wide"
-)
 
 # Custom CSS for professional look
 st.markdown(
