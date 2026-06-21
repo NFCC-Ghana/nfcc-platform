@@ -6,35 +6,15 @@ dependencies:
   - numpy
   - pandas
   - scipy
-
-  # Geospatial
-  - gdal
-  - rasterio
-  - geopandas
-  - shapely
-  - fiona
-  - pyproj
-  - xarray
-  - rioxarray
-
-  # ML
   - scikit-learn
   - xgboost
-
-  # Visualization
-  - matplotlib
-  - plotly
+  - shap
+  - joblib
   - streamlit
-  - folium
-
-  # API
   - fastapi
   - uvicorn
-
+  - pydantic
+  - requests
+  - plotly
+  - python-dotenv
   - pip
-  - pip:
-      - shap
-      - python-dotenv
-      - tqdm
-      - click
-      - pyyaml
