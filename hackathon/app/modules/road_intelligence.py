@@ -74,4 +74,5 @@ def render_road_intelligence(district: str, rainfall: float, soil_saturation: fl
     
     # Summary
     total_risk = len(data["high_risk"]) + len(data["moderate_risk"])
+    st.caption("📊 Data Source: Rule-based estimation using CHIRPS rainfall + soil saturation")
     st.info(f"📊 {total_risk} road segments affected • {len(data['safe_routes'])} safe routes available")

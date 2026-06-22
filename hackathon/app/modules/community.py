@@ -4,6 +4,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 
 def render_community_reports(district: str) -> None:
+    st.caption("📝 Demo reports for demonstration purposes")
     """Render community reports panel."""
     
     st.markdown("### 📢 Community Reports")

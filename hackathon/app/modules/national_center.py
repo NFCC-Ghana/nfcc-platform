@@ -39,6 +39,7 @@ def render_national_center() -> None:
     
     with col1:
         st.metric("Districts Monitored", len(df))
+    st.caption("📊 Data Source: Simulated for demonstration - connect to NFCC API for live data")
     with col2:
         high_risk = len(df[df["risk"] >= 60])
         st.metric("High Risk Districts", high_risk, delta="🔴 Critical")
