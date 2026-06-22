@@ -259,3 +259,15 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ============================================================
+# GIS MAP SECTION
+# ============================================================
+st.divider()
+st.markdown("## 🗺️ Flood Risk Map")
+
+try:
+    from hackathon.app.pages_disabled.gis_map import render_gis_panel
+    render_gis_panel(district, risk_tier)
+except ImportError:
+    st.info("📱 GIS map module loading...")

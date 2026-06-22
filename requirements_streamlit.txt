@@ -23,3 +23,5 @@ jinja2>=3.1.0
 
 # Google Earth Engine (REQUIRED for dashboard_enhanced.py)
 earthengine-api>=0.1.0
+folium>=0.14.0
+streamlit-folium>=0.15.0
