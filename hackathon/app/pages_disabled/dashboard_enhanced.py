@@ -1,6 +1,6 @@
 """
 CivicFlood AI - Enhanced Dashboard
-Complete flood intelligence platform with all modules
+Complete flood intelligence platform with REAL Copilot
 """
 
 import streamlit as st
@@ -22,7 +22,7 @@ sys.path.insert(0, str(project_root))
 # MODULE IMPORTS - ALL MODULES INTEGRATED
 # ============================================================
 
-# Original modules (already working)
+# Original modules
 from hackathon.app.modules.explainability import render_explainability
 from hackathon.app.modules.hydrological import render_hydrological_intelligence
 from hackathon.app.modules.forecast import render_forecast
@@ -31,12 +31,13 @@ from hackathon.app.modules.community import render_community_reports
 from hackathon.app.modules.timeline import render_timeline
 from hackathon.app.modules.evacuation import render_evacuation_info
 from hackathon.app.modules.ranking import render_district_ranking
-from hackathon.app.modules.copilot import render_copilot
 
-# NEW MODULES - INTEGRATED NOW
+# NEW: Use ENHANCED COPILOT instead of old one
+from hackathon.app.modules.copilot_enhanced import render_enhanced_copilot
+
+# New intelligence modules
 from hackathon.app.modules.road_intelligence import render_road_intelligence
 from hackathon.app.modules.risk_explainer import render_risk_explainer
-from hackathon.app.modules.copilot_enhanced import render_enhanced_copilot
 from hackathon.app.modules.national_center import render_national_center
 
 # ============================================================
@@ -50,10 +51,6 @@ DISTRICTS = {
     "Tema": {"region": "Greater Accra", "population": 198742, "lat": 5.650, "lon": -0.020},
     "Kumasi": {"region": "Ashanti", "population": 443981, "lat": 6.670, "lon": -1.620},
     "Tamale": {"region": "Northern", "population": 371578, "lat": 9.400, "lon": -0.840},
-    "Sekondi-Takoradi": {"region": "Western", "population": 245567, "lat": 4.920, "lon": -1.710},
-    "Cape Coast": {"region": "Central", "population": 169894, "lat": 5.105, "lon": -1.250},
-    "Ho": {"region": "Volta", "population": 153705, "lat": 6.600, "lon": 0.470},
-    "Sunyani": {"region": "Bono", "population": 138256, "lat": 7.336, "lon": -2.348}
 }
 
 def call_api(endpoint, method="GET", data=None):
@@ -67,12 +64,26 @@ def call_api(endpoint, method="GET", data=None):
     except:
         return {}
 
-# ============================================================
-# GIS MAP
-# ============================================================
 def create_flood_risk_map(district: str, risk_level: str) -> folium.Map:
     m = folium.Map(location=[7.9465, -1.0232], zoom_start=7)
-    # ... (existing map code)
+    # Add districts (simplified)
+    districts_coords = {
+        "Accra Central": [5.560, -0.210],
+        "Tema": [5.650, -0.020],
+        "Kumasi": [6.670, -1.620],
+        "Tamale": [9.400, -0.840]
+    }
+    colors = {"EXTREME": "red", "HIGH": "orange", "MODERATE": "yellow", "LOW": "green"}
+    color = colors.get(risk_level, "blue")
+    if district in districts_coords:
+        folium.CircleMarker(
+            districts_coords[district],
+            radius=30,
+            color=color,
+            fill=True,
+            fillOpacity=0.4,
+            popup=f"{district}<br>Risk: {risk_level}"
+        ).add_to(m)
     return m
 
 # ============================================================
@@ -108,16 +119,14 @@ def main():
     score = score_data.get("score", 50)
     risk_tier = score_data.get("risk_tier", "MODERATE")
     
-    # Store in session state for other modules
+    # Store in session state for all modules
     st.session_state.current_risk = score
     st.session_state.current_district = district
     st.session_state.current_rainfall = rainfall_mm
-    st.session_state.current_soil = 85  # In production, from API
-    st.session_state.current_river = 0.45  # In production, from API
+    st.session_state.current_soil = 85  # In production from API
+    st.session_state.current_river = 0.45  # In production from API
     
-    # ============================================================
-    # HEADER
-    # ============================================================
+    # Header
     st.markdown("""
     <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 1.5rem 2rem; border-radius: 16px; color: white; margin-bottom: 1.5rem;">
         <h1 style="color: white; margin: 0;">🌊 CivicFlood AI</h1>
@@ -130,9 +139,7 @@ def main():
     </div>
     """, unsafe_allow_html=True)
     
-    # ============================================================
-    # METRICS ROW
-    # ============================================================
+    # Metrics
     risk_emoji = "🔴" if score >= 80 else "🟠" if score >= 60 else "🟡" if score >= 40 else "🟢"
     risk_color = "#ff0000" if score >= 80 else "#ff6600" if score >= 60 else "#ffaa00" if score >= 40 else "#00cc00"
     
@@ -160,16 +167,14 @@ def main():
     
     st.divider()
     
-    # ============================================================
-    # GIS MAP
-    # ============================================================
+    # Map
     st.markdown("### 🗺️ Flood Risk Map")
     m = create_flood_risk_map(district, risk_tier)
     folium_static(m, width=700, height=450)
     st.divider()
     
     # ============================================================
-    # EXISTING FEATURES (Already working)
+    # EXISTING FEATURES
     # ============================================================
     render_explainability(district, score)
     st.divider()
@@ -181,7 +186,7 @@ def main():
     st.divider()
     
     # ============================================================
-    # NEW FEATURES - INTEGRATED NOW
+    # NEW FEATURES - WITH ENHANCED COPILOT
     # ============================================================
     st.markdown("## 🆕 Advanced Intelligence Features")
     
@@ -194,9 +199,10 @@ def main():
     
     st.divider()
     
-    # Row 2: Enhanced Copilot + Timeline
+    # Row 2: ENHANCED COPILOT (REAL INTELLIGENCE) + Timeline
     col1, col2 = st.columns(2)
     with col1:
+        # THIS IS THE FIX - USING ENHANCED COPILOT, NOT OLD ONE
         render_enhanced_copilot(district, score, rainfall_mm, st.session_state.current_soil, st.session_state.current_river)
     with col2:
         render_timeline(score)
@@ -223,9 +229,7 @@ def main():
     render_district_ranking()
     st.divider()
     
-    # ============================================================
-    # RECOMMENDATIONS
-    # ============================================================
+    # Recommendations
     st.markdown("### 🚨 Actionable Recommendations")
     if score >= 80:
         st.error("🚨 IMMEDIATE EVACUATION - Seek higher ground")
@@ -238,9 +242,7 @@ def main():
     else:
         st.success("✅ NORMAL - No immediate risk")
     
-    # ============================================================
-    # FOOTER
-    # ============================================================
+    # Footer
     st.markdown(f"""
     <div style="text-align: center; color: #888; font-size: 0.8rem; padding: 2rem 0 0.5rem 0; border-top: 1px solid #e8e8e8; margin-top: 2rem;">
         <p>🌊 CivicFlood AI • Powered by NFCC Platform • Ghana AI Innovation Challenge 2026</p>
