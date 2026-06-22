@@ -1,6 +1,6 @@
 """
 CivicFlood AI - Enhanced Dashboard
-Full NFCC intelligence integration
+Full NFCC intelligence integration - GIS Map fixed
 """
 
 import streamlit as st
@@ -108,7 +108,7 @@ def create_flood_map(district, risk_level):
     return m
 
 def render_gis_panel(district, risk_level):
-    """Render GIS map panel."""
+    """Render GIS map panel - called from inside main() with valid variables."""
     st.markdown("### 🗺️ Flood Risk Map")
     
     try:
@@ -221,7 +221,7 @@ def main():
     st.divider()
     
     # ============================================================
-    # GIS MAP
+    # GIS MAP - CALLED INSIDE main() WITH VALID VARIABLES
     # ============================================================
     render_gis_panel(district, risk_tier)
     st.divider()
