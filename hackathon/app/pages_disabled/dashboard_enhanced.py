@@ -1,42 +1,47 @@
 """
-CivicFlood AI - Professional Dashboard
-Ghana AI Innovation Challenge 2026
-NO set_page_config() - handled by streamlit_app.py
+CivicFlood AI - Enhanced Dashboard
+Full NFCC intelligence integration
 """
 
 import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime
 import requests
-import json
+from datetime import datetime
 import sys
 from pathlib import Path
 import os
+import folium
+from streamlit_folium import folium_static
 
 # ============================================================
-# CONFIGURATION
+# FIX: Add project root to path
+# ============================================================
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# ============================================================
+# MODULE IMPORTS
+# ============================================================
+from hackathon.app.modules.explainability import render_explainability
+from hackathon.app.modules.hydrological import render_hydrological_intelligence
+from hackathon.app.modules.forecast import render_forecast
+from hackathon.app.modules.impact import render_impact_assessment
+from hackathon.app.modules.community import render_community_reports
+
+# ============================================================
+# CONFIG
 # ============================================================
 API_URL = os.getenv("NFCC_API_URL", "https://nfcc-platform-production.up.railway.app")
 
-# ============================================================
-# API HELPER
-# ============================================================
-def call_api(endpoint: str, method: str = "GET", data: dict = None) -> dict:
+def call_api(endpoint, method="GET", data=None):
     url = f"{API_URL}{endpoint}"
     try:
         if method == "GET":
             response = requests.get(url, timeout=10)
-        elif method == "POST":
-            response = requests.post(url, json=data, timeout=10)
         else:
-            return {"error": f"Unsupported method: {method}"}
-        if response.status_code == 200:
-            return response.json()
-        return {"error": f"API returned {response.status_code}"}
-    except Exception as e:
-        return {"error": str(e)}
+            response = requests.post(url, json=data, timeout=10)
+        return response.json() if response.status_code == 200 else {}
+    except:
+        return {}
 
 # ============================================================
 # DISTRICTS
@@ -55,115 +60,93 @@ DISTRICTS = {
 }
 
 # ============================================================
-# CUSTOM CSS (NO set_page_config)
+# GIS MAP FUNCTION
 # ============================================================
-st.markdown("""
-<style>
-    .header-gradient {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        padding: 1.5rem 2rem;
-        border-radius: 16px;
-        color: white;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+def create_flood_map(district, risk_level):
+    """Create interactive flood risk map."""
+    
+    m = folium.Map(location=[7.9465, -1.0232], zoom_start=7)
+    
+    flood_zones = {
+        "Accra Central": {"coords": [5.560, -0.210], "risk": "HIGH", "color": "orange"},
+        "Accra West": {"coords": [5.550, -0.230], "risk": "HIGH", "color": "orange"},
+        "Accra East": {"coords": [5.565, -0.190], "risk": "MODERATE", "color": "yellow"},
+        "Tema": {"coords": [5.650, -0.020], "risk": "HIGH", "color": "orange"},
+        "Kumasi": {"coords": [6.670, -1.620], "risk": "MODERATE", "color": "yellow"},
+        "Tamale": {"coords": [9.400, -0.840], "risk": "MODERATE", "color": "yellow"}
     }
-    .header-gradient h1 {
-        color: white;
-        margin: 0;
-        font-size: 2.5rem;
-        font-weight: 700;
-    }
-    .header-gradient p {
-        color: #a8d8ea;
-        margin: 0.2rem 0 0 0;
-        font-size: 1.1rem;
-    }
-    .badge {
-        background: rgba(255,255,255,0.15);
-        padding: 0.3rem 1rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        color: #8ecae6;
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    .metric-card {
-        background: white;
-        padding: 1rem 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-        border-left: 4px solid #0f3460;
-        height: 100%;
-        transition: transform 0.2s;
-    }
-    .metric-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-    }
-    .metric-card .label {
-        color: #666;
-        font-size: 0.85rem;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .metric-card .value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: #1a1a2e;
-        margin: 0.2rem 0;
-    }
-    .risk-extreme { border-left-color: #ff0000; }
-    .risk-high { border-left-color: #ff6600; }
-    .risk-moderate { border-left-color: #ffaa00; }
-    .risk-low { border-left-color: #00cc00; }
-    .footer {
-        text-align: center;
-        color: #888;
-        font-size: 0.8rem;
-        padding: 2rem 0 0.5rem 0;
-        border-top: 1px solid #e8e8e8;
-        margin-top: 2rem;
-    }
-</style>
-""", unsafe_allow_html=True)
+    
+    risk_colors = {"EXTREME": "red", "HIGH": "orange", "MODERATE": "yellow", "LOW": "green"}
+    
+    for zone_name, zone_data in flood_zones.items():
+        coords = zone_data["coords"]
+        risk = zone_data["risk"]
+        color = risk_colors.get(risk, "blue")
+        is_selected = district and district == zone_name
+        
+        folium.Circle(
+            location=coords,
+            radius=30000,
+            popup=f"{zone_name}<br>Risk: {risk}",
+            color=color,
+            fill=True,
+            fillOpacity=0.3 if not is_selected else 0.6,
+            weight=3 if is_selected else 2
+        ).add_to(m)
+    
+    # Add selected district marker
+    if district in DISTRICTS:
+        lat = DISTRICTS[district]["lat"]
+        lon = DISTRICTS[district]["lon"]
+        risk_color = risk_colors.get(risk_level, "blue")
+        folium.Marker(
+            [lat, lon],
+            popup=f"📍 {district}<br>Risk: {risk_level}",
+            icon=folium.Icon(color=risk_color, icon="info-sign")
+        ).add_to(m)
+    
+    return m
+
+def render_gis_panel(district, risk_level):
+    """Render GIS map panel."""
+    st.markdown("### 🗺️ Flood Risk Map")
+    
+    try:
+        m = create_flood_map(district, risk_level)
+        folium_static(m, width=700, height=400)
+    except Exception as e:
+        st.warning(f"⚠️ Map loading: {e}")
+    
+    # Legend
+    st.markdown("""
+    <div style="background: #f8f9fa; padding: 0.5rem 1rem; border-radius: 8px; margin-top: 0.5rem;">
+        <b>Risk Legend</b><br>
+        <span style="color: red;">●</span> EXTREME &nbsp;
+        <span style="color: orange;">●</span> HIGH &nbsp;
+        <span style="color: yellow;">●</span> MODERATE &nbsp;
+        <span style="color: green;">●</span> LOW
+    </div>
+    """, unsafe_allow_html=True)
 
 # ============================================================
 # MAIN DASHBOARD
 # ============================================================
 def main():
-    # Header
-    st.markdown(f"""
-    <div class="header-gradient">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-            <div>
-                <h1>🌊 CivicFlood AI</h1>
-                <p>National Flood Intelligence Platform • Ghana AI Innovation Challenge 2026</p>
-                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                    <span class="badge">🟢 SYSTEM ACTIVE</span>
-                    <span class="badge">v3.0.0</span>
-                    <span class="badge">🏆 Hackathon Submission</span>
-                </div>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 0.8rem; color: #8ecae6;">Last Updated</div>
-                <div style="font-size: 0.9rem; font-weight: 500;">{datetime.now().strftime('%d %b %Y, %H:%M')}</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
     # Sidebar
     with st.sidebar:
-        st.markdown("### 🎛️ Control Panel")
+        st.markdown("## 🎛️ Control Panel")
+        
         district = st.selectbox("📍 Select District", list(DISTRICTS.keys()), index=0)
         rainfall_mm = st.slider("🌧️ Rainfall (mm)", 0, 200, 75)
         
         st.divider()
+        
         st.markdown("### 📊 Data Sources")
         for src in ["CHIRPS Rainfall", "Open-Meteo Forecast", "NASA SMAP", "Sentinel-1 SAR", "Ghana River Gauges", "Dam Database"]:
             st.markdown(f"✅ {src}")
         
         st.divider()
+        
         health = call_api("/health")
         if health.get("status") == "healthy":
             st.success("✅ API Connected")
@@ -173,8 +156,25 @@ def main():
         
         st.divider()
         st.caption("v3.0.0 • Hackathon Submission")
-
-    # Get risk assessment
+    
+    # ============================================================
+    # HEADER
+    # ============================================================
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 1.5rem 2rem; border-radius: 16px; color: white; margin-bottom: 1.5rem;">
+        <h1 style="color: white; margin: 0;">🌊 CivicFlood AI</h1>
+        <p style="color: #a8d8ea;">National Flood Intelligence Platform • Ghana AI Innovation Challenge 2026</p>
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <span style="background: rgba(255,255,255,0.15); padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.8rem; color: #8ecae6;">🟢 SYSTEM ACTIVE</span>
+            <span style="background: rgba(255,255,255,0.15); padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.8rem; color: #8ecae6;">v3.0.0</span>
+            <span style="background: rgba(255,255,255,0.15); padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.8rem; color: #8ecae6;">🏆 Hackathon Submission</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ============================================================
+    # GET DATA
+    # ============================================================
     info = DISTRICTS[district]
     
     with st.spinner("🔄 Analyzing flood risk..."):
@@ -183,59 +183,70 @@ def main():
             "precipitation": rainfall_mm
         })
     
-    if score_data.get("error"):
-        st.warning(f"⚠️ API Error: {score_data['error']}")
-        score = 50
-        risk_tier = "MODERATE"
-    else:
-        score = score_data.get("score", 50)
-        risk_tier = score_data.get("risk_tier", "MODERATE")
-
-    # Metrics Row
-    risk_color = "risk-extreme" if score >= 80 else "risk-high" if score >= 60 else "risk-moderate" if score >= 40 else "risk-low"
+    score = score_data.get("score", 50)
+    risk_tier = score_data.get("risk_tier", "MODERATE")
+    
+    # ============================================================
+    # METRICS ROW
+    # ============================================================
     risk_emoji = "🔴" if score >= 80 else "🟠" if score >= 60 else "🟡" if score >= 40 else "🟢"
+    risk_color = "#ff0000" if score >= 80 else "#ff6600" if score >= 60 else "#ffaa00" if score >= 40 else "#00cc00"
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
-        <div class="metric-card {risk_color}">
-            <div class="label">Risk Score</div>
-            <div class="value">{risk_emoji} {score:.1f}%</div>
-            <div class="delta">Category: {risk_tier}</div>
+        <div style="background: white; padding: 1rem 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-left: 4px solid {risk_color};">
+            <div style="color: #666; font-size: 0.85rem; text-transform: uppercase;">Risk Score</div>
+            <div style="font-size: 1.8rem; font-weight: 700; color: #1a1a2e;">{risk_emoji} {score:.1f}%</div>
+            <div style="font-size: 0.8rem; color: #666;">Category: {risk_tier}</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="label">Confidence</div>
-            <div class="value">80%</div>
-            <div class="delta">Model reliability</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Confidence", "80%", "Model reliability")
     
     with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="label">Population</div>
-            <div class="value">{info['population']:,}</div>
-            <div class="delta">District total</div>
+        st.metric("Population", f"{info['population']:,}", "District total")
+    
+    with col4:
+        st.markdown("""
+        <div style="background: white; padding: 1rem 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+            <div style="color: #666; font-size: 0.85rem; text-transform: uppercase;">River Status</div>
+            <div style="font-size: 1.2rem; font-weight: 600;">🟢 Odaw</div>
+            <div style="font-size: 0.8rem; color: #666;">Level: 0.45m • NORMAL</div>
         </div>
         """, unsafe_allow_html=True)
     
-    with col4:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="label">River Status</div>
-            <div class="value" style="font-size: 1.2rem;">🟢 Odaw</div>
-            <div class="delta">Level: 0.45m • NORMAL</div>
-        </div>
-        """, unsafe_allow_html=True)
-
     st.divider()
-
-    # Recommendations
+    
+    # ============================================================
+    # GIS MAP
+    # ============================================================
+    render_gis_panel(district, risk_tier)
+    st.divider()
+    
+    # ============================================================
+    # EXPLAINABILITY
+    # ============================================================
+    render_explainability(district, score)
+    st.divider()
+    
+    # ============================================================
+    # HYDROLOGICAL INTELLIGENCE
+    # ============================================================
+    render_hydrological_intelligence(district)
+    st.divider()
+    
+    # ============================================================
+    # FORECAST
+    # ============================================================
+    render_forecast(district, score)
+    st.divider()
+    
+    # ============================================================
+    # RECOMMENDATIONS
+    # ============================================================
     st.markdown("### 🚨 Actionable Recommendations")
     
     if score >= 80:
@@ -248,26 +259,31 @@ def main():
         st.info("ℹ️ MONITOR CONDITIONS - Stay informed")
     else:
         st.success("✅ NORMAL - No immediate risk")
-
-    # Footer
+    
+    st.divider()
+    
+    # ============================================================
+    # IMPACT ASSESSMENT
+    # ============================================================
+    render_impact_assessment(district, score)
+    st.divider()
+    
+    # ============================================================
+    # COMMUNITY REPORTS
+    # ============================================================
+    render_community_reports(district)
+    st.divider()
+    
+    # ============================================================
+    # FOOTER
+    # ============================================================
     st.markdown(f"""
-    <div class="footer">
+    <div style="text-align: center; color: #888; font-size: 0.8rem; padding: 2rem 0 0.5rem 0; border-top: 1px solid #e8e8e8; margin-top: 2rem;">
         <p>🌊 CivicFlood AI • Powered by NFCC Platform • Ghana AI Innovation Challenge 2026</p>
+        <p style="font-size: 0.7rem; color: #aaa;">Data sources: CHIRPS, Open-Meteo, NASA SMAP, Sentinel-1, Ghana Hydrological Services</p>
         <p style="font-size: 0.7rem; color: #aaa;">🔗 API: {API_URL}</p>
     </div>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
-
-# ============================================================
-# GIS MAP SECTION
-# ============================================================
-st.divider()
-st.markdown("## 🗺️ Flood Risk Map")
-
-try:
-    from hackathon.app.pages_disabled.gis_map import render_gis_panel
-    render_gis_panel(district, risk_tier)
-except ImportError:
-    st.info("📱 GIS map module loading...")
