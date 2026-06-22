@@ -1,6 +1,6 @@
 """
 CivicFlood AI - Streamlit Cloud Entry Point
-Uses the complete enhanced dashboard
+Shows real error messages for debugging
 """
 
 import streamlit as st
@@ -28,27 +28,41 @@ sys.path.insert(0, str(project_root))
 # API CONFIGURATION
 # ============================================================
 os.environ["NFCC_API_URL"] = os.getenv(
-    "NFCC_API_URL", 
+    "NFCC_API_URL",
     "https://nfcc-platform-production.up.railway.app"
 )
 
+st.title("🌊 CivicFlood AI")
+st.markdown("### National Flood Intelligence Platform")
+st.markdown("**Ghana AI Innovation Challenge 2026**")
+
+# Show Python version for debugging
+st.caption(f"🐍 Python: {sys.version[:20]}")
+
 # ============================================================
-# RUN THE COMPLETE DASHBOARD
+# ATTEMPT TO LOAD DASHBOARD WITH DETAILED ERRORS
 # ============================================================
+
+st.divider()
+st.markdown("🔄 **Loading dashboard...**")
+
 try:
+    # Try to import the enhanced dashboard
     from hackathon.app.pages_disabled.dashboard_enhanced import main
+    st.success("✅ Dashboard loaded successfully!")
     main()
-except ImportError as e:
-    st.error(f"Error loading dashboard: {e}")
-    st.info("Falling back to simple dashboard...")
+except Exception as e:
+    # Show the actual error so we can fix it
+    st.error(f"❌ Error loading dashboard: {e}")
+    st.info("📱 Falling back to simple dashboard...")
+    
     try:
         from hackathon.app.pages_disabled.dashboard import main
+        st.success("✅ Fallback dashboard loaded!")
         main()
-    except ImportError:
-        st.title("🌊 CivicFlood AI")
-        st.markdown("### National Flood Intelligence Platform")
-        st.markdown("**Ghana AI Innovation Challenge 2026**")
-        st.info("📱 Dashboard loading... Please check your deployment configuration.")
+    except Exception as e2:
+        st.error(f"❌ Fallback dashboard also failed: {e2}")
         st.markdown("---")
+        st.markdown("### 🔧 Debug Information")
+        st.code(f"Error: {e2}", language="python")
         st.markdown("🔗 Backend API: https://nfcc-platform-production.up.railway.app")
-
