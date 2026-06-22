@@ -1,21 +1,16 @@
 services:
   - type: web
-    name: nfcc-platform
-    env: python
+    name: civicflood-ai-dashboard
+    runtime: python
+    plan: free
     buildCommand: |
-      pip install -r requirements.txt
+      pip install --upgrade pip
+      pip install -r requirements_streamlit.txt
     startCommand: |
-      uvicorn src.api.main:app --host 0.0.0.0 --port 8000
+      streamlit run hackathon/app/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
     envVars:
-      - key: ENVIRONMENT
-        value: production
-      - key: ALERT_DRY_RUN
-        value: false
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_WHATSAPP_FROM
-        sync: false
-      - key: WHATSAPP_RECIPIENTS
-        sync: false
+      - key: NFCC_API_URL
+        value: https://nfcc-platform-production.up.railway.app
+      - key: PYTHON_VERSION
+        value: 3.10.20
+    healthCheckPath: /_stcore/health
