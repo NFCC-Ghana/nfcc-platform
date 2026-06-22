@@ -8,7 +8,7 @@ pydantic>=2.0.0,<3.0.0
 pandas>=2.0.0
 numpy>=1.24.0
 
-# Visualization (NEEDED for dashboard_enhanced.py)
+# Visualization
 plotly>=5.14.0
 matplotlib>=3.7.0
 
@@ -20,3 +20,6 @@ joblib>=1.2.0
 
 # Utilities
 jinja2>=3.1.0
+
+# Google Earth Engine (REQUIRED for dashboard_enhanced.py)
+earthengine-api>=0.1.0

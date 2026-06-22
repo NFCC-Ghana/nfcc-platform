@@ -1,6 +1,5 @@
 """
 CivicFlood AI - Streamlit Cloud Entry Point
-Shows real error messages for debugging
 """
 
 import streamlit as st
@@ -32,37 +31,33 @@ os.environ["NFCC_API_URL"] = os.getenv(
     "https://nfcc-platform-production.up.railway.app"
 )
 
+# ============================================================
+# ATTEMPT TO LOAD DASHBOARD
+# ============================================================
 st.title("🌊 CivicFlood AI")
 st.markdown("### National Flood Intelligence Platform")
 st.markdown("**Ghana AI Innovation Challenge 2026**")
-
-# Show Python version for debugging
 st.caption(f"🐍 Python: {sys.version[:20]}")
-
-# ============================================================
-# ATTEMPT TO LOAD DASHBOARD WITH DETAILED ERRORS
-# ============================================================
+st.caption(f"🔗 API: {os.environ['NFCC_API_URL']}")
 
 st.divider()
-st.markdown("🔄 **Loading dashboard...**")
 
 try:
-    # Try to import the enhanced dashboard
+    # Try enhanced dashboard first
     from hackathon.app.pages_disabled.dashboard_enhanced import main
-    st.success("✅ Dashboard loaded successfully!")
+    st.success("✅ Enhanced dashboard loaded!")
     main()
-except Exception as e:
-    # Show the actual error so we can fix it
-    st.error(f"❌ Error loading dashboard: {e}")
-    st.info("📱 Falling back to simple dashboard...")
+except ImportError as e:
+    # If enhanced fails, try simple dashboard
+    st.error(f"⚠️ Enhanced dashboard unavailable: {e}")
+    st.info("📱 Loading simple dashboard...")
     
     try:
         from hackathon.app.pages_disabled.dashboard import main
-        st.success("✅ Fallback dashboard loaded!")
+        st.success("✅ Simple dashboard loaded!")
         main()
     except Exception as e2:
-        st.error(f"❌ Fallback dashboard also failed: {e2}")
+        st.error(f"❌ Both dashboards failed: {e2}")
         st.markdown("---")
         st.markdown("### 🔧 Debug Information")
-        st.code(f"Error: {e2}", language="python")
-        st.markdown("🔗 Backend API: https://nfcc-platform-production.up.railway.app")
+        st.code(str(e2), language="python")
