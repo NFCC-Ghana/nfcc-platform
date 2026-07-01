@@ -1,28 +1,20 @@
 """
 CivicFlood AI v4 - National Emergency Operations Center
 Single screen, Mission Control layout
+NO set_page_config() - handled by streamlit_app.py
 """
 
 import streamlit as st
 import sys
 from pathlib import Path
 import os
+import requests
 
 # ============================================================
 # PATH SETUP
 # ============================================================
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
-
-# ============================================================
-# PAGE CONFIG
-# ============================================================
-st.set_page_config(
-    page_title="CivicFlood AI - National EOC",
-    page_icon="🚨",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
 
 # ============================================================
 # IMPORT v4 MODULES
@@ -37,11 +29,8 @@ from hackathon.app.modules.v4.community_intelligence import render_community_int
 from hackathon.app.modules.v4.ai_copilot_v4 import render_ai_copilot_v4
 
 # ============================================================
-# API HELPER (Reuse existing)
+# API HELPER
 # ============================================================
-import requests
-import json
-
 API_URL = os.getenv("NFCC_API_URL", "https://nfcc-platform-production.up.railway.app")
 
 def call_api(endpoint, method="GET", data=None):
@@ -70,102 +59,113 @@ DISTRICTS = {
 # ============================================================
 # SIDEBAR (Minimal - Just controls)
 # ============================================================
-with st.sidebar:
-    st.markdown("### 🎛️ Controls")
-    district = st.selectbox("📍 Select District", list(DISTRICTS.keys()), index=0)
-    rainfall_mm = st.slider("🌧️ Rainfall (mm)", 0, 200, 75)
+def render_sidebar():
+    with st.sidebar:
+        st.markdown("### 🎛️ Controls")
+        district = st.selectbox("📍 Select District", list(DISTRICTS.keys()), index=0)
+        rainfall_mm = st.slider("🌧️ Rainfall (mm)", 0, 200, 75)
+        
+        st.divider()
+        st.markdown("### 📊 Data Status")
+        
+        health = call_api("/health")
+        if health.get("status") == "healthy":
+            st.success("✅ API Connected")
+        else:
+            st.warning("⚠️ API Unavailable")
+        
+        st.caption(f"🌐 {API_URL}")
+        st.divider()
+        st.caption("v3.0.0 • Ghana AI Challenge 2026")
+        
+        return district, rainfall_mm
+
+# ============================================================
+# MAIN FUNCTION
+# ============================================================
+def main():
+    """Main dashboard function - called by streamlit_app.py"""
+    
+    # Render sidebar and get inputs
+    district, rainfall_mm = render_sidebar()
+    
+    # Get risk score
+    with st.spinner("🔄 Analyzing..."):
+        score_data = call_api("/score", "POST", {
+            "location": district,
+            "precipitation": rainfall_mm
+        })
+    score = score_data.get("score", 50)
+    
+    # 1. HEADER
+    render_mission_control_header()
+    
+    # 2. AI NATIONAL BRIEFING (Hero section)
+    render_national_briefing(district, score)
     
     st.divider()
-    st.markdown("### 📊 Data Status")
     
-    health = call_api("/health")
-    if health.get("status") == "healthy":
-        st.success("✅ API Connected")
-    else:
-        st.warning("⚠️ API Unavailable")
+    # 3. MAP + RECOMMENDATIONS (Two columns)
+    col_left, col_right = st.columns([2, 1])
     
-    st.caption(f"🌐 {API_URL}")
+    with col_left:
+        render_situation_map(district, score)
+    
+    with col_right:
+        # Show recommendations based on risk
+        st.markdown("### 🚨 Recommended Actions")
+        
+        if score >= 80:
+            st.error("🚨 **IMMEDIATE EVACUATION**")
+            st.markdown("• Seek higher ground")
+            st.markdown("• Notify neighbors")
+            st.markdown("• Call emergency services")
+        elif score >= 60:
+            st.warning("⚠️ **PREPARE TO EVACUATE**")
+            st.markdown("• Move to higher ground")
+            st.markdown("• Prepare emergency kit")
+            st.markdown("• Monitor alerts")
+        elif score >= 40:
+            st.info("ℹ️ **MONITOR CONDITIONS**")
+            st.markdown("• Stay informed")
+            st.markdown("• Check community reports")
+        else:
+            st.success("✅ **NORMAL**")
+            st.markdown("• Continue monitoring")
+    
     st.divider()
-    st.caption("v3.0.0 • Ghana AI Challenge 2026")
-
-# ============================================================
-# MAIN DASHBOARD - MISSION CONTROL LAYOUT
-# ============================================================
-
-# 1. HEADER
-render_mission_control_header()
-
-# Get risk score
-with st.spinner("🔄 Analyzing..."):
-    score_data = call_api("/score", "POST", {
-        "location": district,
-        "precipitation": rainfall_mm
-    })
-score = score_data.get("score", 50)
-
-# 2. AI NATIONAL BRIEFING (Hero section)
-render_national_briefing(district, score)
-
-st.divider()
-
-# 3. MAP + RECOMMENDATIONS (Two columns)
-col_left, col_right = st.columns([2, 1])
-
-with col_left:
-    render_situation_map(district, score)
-
-with col_right:
-    # Show recommendations based on risk
-    st.markdown("### 🚨 Recommended Actions")
     
-    if score >= 80:
-        st.error("🚨 **IMMEDIATE EVACUATION**")
-        st.markdown("• Seek higher ground")
-        st.markdown("• Notify neighbors")
-        st.markdown("• Call emergency services")
-    elif score >= 60:
-        st.warning("⚠️ **PREPARE TO EVACUATE**")
-        st.markdown("• Move to higher ground")
-        st.markdown("• Prepare emergency kit")
-        st.markdown("• Monitor alerts")
-    elif score >= 40:
-        st.info("ℹ️ **MONITOR CONDITIONS**")
-        st.markdown("• Stay informed")
-        st.markdown("• Check community reports")
-    else:
-        st.success("✅ **NORMAL**")
-        st.markdown("• Continue monitoring")
+    # 4. EVIDENCE + IMPACT (Two columns)
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        render_evidence_panel(score)
+    
+    with col2:
+        render_impact_panel(district, score)
+    
+    st.divider()
+    
+    # 5. OPERATIONS + COMMUNITY (Two columns)
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        render_operations_panel(district)
+    
+    with col2:
+        render_community_intelligence()
+    
+    st.divider()
+    
+    # 6. AI COPILOT (Full width, prominent)
+    render_ai_copilot_v4(district, score)
+    
+    # ============================================================
+    # FOOTER
+    # ============================================================
+    st.divider()
+    st.caption("🌊 CivicFlood AI • Powered by NFCC Platform • Ghana AI Innovation Challenge 2026")
+    st.caption(f"🔗 API: {API_URL}")
 
-st.divider()
-
-# 4. EVIDENCE + IMPACT (Two columns)
-col1, col2 = st.columns(2)
-
-with col1:
-    render_evidence_panel(score)
-
-with col2:
-    render_impact_panel(district, score)
-
-st.divider()
-
-# 5. OPERATIONS + COMMUNITY (Two columns)
-col1, col2 = st.columns(2)
-
-with col1:
-    render_operations_panel(district)
-
-with col2:
-    render_community_intelligence()
-
-st.divider()
-
-# 6. AI COPILOT (Full width, prominent)
-render_ai_copilot_v4(district, score)
-
-# ============================================================
-# FOOTER
-# ============================================================
-st.divider()
-st.caption("🌊 CivicFlood AI • Powered by NFCC Platform • Ghana AI Innovation Challenge 2026")
-st.caption(f"🔗 API: {API_URL}")
+if __name__ == "__main__":
+    main()
