@@ -135,8 +135,8 @@ def main():
             <span style="background: rgba(255,255,255,0.15); padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.8rem; color: #8ecae6;">🟢 SYSTEM ACTIVE</span>
             <span style="background: rgba(255,255,255,0.15); padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.8rem; color: #8ecae6;">v3.0.0</span>
             <span style="background: rgba(255,255,255,0.15); padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.8rem; color: #8ecae6;">🏆 Hackathon Submission</span>
-        </div>
-    </div>
+        
+    
     """, unsafe_allow_html=True)
     
     # Metrics
@@ -147,10 +147,10 @@ def main():
     with col1:
         st.markdown(f"""
         <div style="background: white; padding: 1rem 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-left: 4px solid {risk_color};">
-            <div style="color: #666; font-size: 0.85rem; text-transform: uppercase;">Risk Score</div>
-            <div style="font-size: 1.8rem; font-weight: 700; color: #1a1a2e;">{risk_emoji} {score:.1f}%</div>
-            <div style="font-size: 0.8rem; color: #666;">Category: {risk_tier}</div>
-        </div>
+            <div style="color: #666; font-size: 0.85rem; text-transform: uppercase;">Risk Score
+            <div style="font-size: 1.8rem; font-weight: 700; color: #1a1a2e;">{risk_emoji} {score:.1f}%
+            <div style="font-size: 0.8rem; color: #666;">Category: {risk_tier}
+        
         """, unsafe_allow_html=True)
     with col2:
         st.metric("Confidence", "80%", "Model reliability")
@@ -159,10 +159,10 @@ def main():
     with col4:
         st.markdown(f"""
         <div style="background: white; padding: 1rem 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
-            <div style="color: #666; font-size: 0.85rem; text-transform: uppercase;">River Status</div>
-            <div style="font-size: 1.2rem; font-weight: 600;">🟢 Odaw</div>
-            <div style="font-size: 0.8rem; color: #666;">Level: 0.45m • NORMAL</div>
-        </div>
+            <div style="color: #666; font-size: 0.85rem; text-transform: uppercase;">River Status
+            <div style="font-size: 1.2rem; font-weight: 600;">🟢 Odaw
+            <div style="font-size: 0.8rem; color: #666;">Level: 0.45m • NORMAL
+        
         """, unsafe_allow_html=True)
     
     st.divider()
@@ -248,8 +248,90 @@ def main():
         <p>🌊 CivicFlood AI • Powered by NFCC Platform • Ghana AI Innovation Challenge 2026</p>
         <p style="font-size: 0.7rem; color: #aaa;">Data sources: CHIRPS, Open-Meteo, NASA SMAP, Sentinel-1, Ghana Hydrological Services</p>
         <p style="font-size: 0.7rem; color: #aaa;">🔗 API: {API_URL}</p>
-    </div>
+    
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
+
+# ============================================================
+# NEW IMPORTS - 7 WINNING FEATURES
+# ============================================================
+from hackathon.app.modules.unified_intelligence_engine import render_unified_intelligence
+from hackathon.app.modules.evidence_fusion import render_evidence_fusion
+from hackathon.app.modules.decision_confidence import render_decision_confidence
+from hackathon.app.modules.operational_resilience import render_operational_resilience
+from hackathon.app.modules.emergency_operations_dashboard import render_emergency_operations_dashboard
+from hackathon.app.modules.decision_copilot import render_decision_copilot
+from hackathon.app.modules.demo_orchestrator import render_demo_orchestrator
+
+# ============================================================
+# ADD THESE SECTIONS TO main() FUNCTION
+# ============================================================
+# Place these AFTER the existing features and BEFORE the footer
+
+    # ============================================================
+    # WINNING FEATURES - National Flood Decision Intelligence
+    # ============================================================
+    st.divider()
+    st.markdown("## 🏆 National Flood Decision Intelligence")
+    st.caption("7 integrated capabilities for emergency decision-making")
+    
+    # Feature 1: Unified Intelligence
+    render_unified_intelligence(district)
+    st.divider()
+    
+    # Feature 2: Evidence Fusion
+    render_evidence_fusion()
+    st.divider()
+    
+    # Feature 3: Decision Confidence
+    render_decision_confidence(district, score)
+    st.divider()
+    
+    # Feature 4: Operational Resilience
+    render_operational_resilience()
+    st.divider()
+    
+    # Feature 5: Emergency Operations Dashboard
+    render_emergency_operations_dashboard(district, score)
+    st.divider()
+    
+    # Feature 6: Decision Copilot
+    render_decision_copilot(district, score)
+    st.divider()
+    
+    # Feature 7: Demo Orchestrator
+    render_demo_orchestrator()
+    st.divider()
+
+
+# ============================================================
+# V4 MODULE IMPORTS
+# ============================================================
+from hackathon.app.modules.v4.decision_support import render_decision_support
+from hackathon.app.modules.v4.evidence_panel import render_evidence_panel
+from hackathon.app.modules.v4.forecast_timeline import render_forecast_timeline
+from hackathon.app.modules.v4.national_briefing import render_national_briefing
+from hackathon.app.modules.v4.ai_copilot import render_ai_copilot
+
+# ============================================================
+# ADD V4 SECTIONS TO MAIN()
+# ============================================================
+
+# After the existing features, add:
+
+# V4: National Briefing
+render_national_briefing(district, score)
+
+# V4: Decision Support
+render_decision_support(district, score)
+
+# V4: Evidence Panel
+render_evidence_panel()
+
+# V4: Forecast Timeline
+render_forecast_timeline()
+
+# V4: Enhanced AI Copilot
+render_ai_copilot()
