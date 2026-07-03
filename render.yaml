@@ -7,10 +7,14 @@ services:
       pip install --upgrade pip
       pip install -r requirements_streamlit.txt
     startCommand: |
-      streamlit run hackathon/app/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
+      cd hackathon
+      streamlit run app/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
     envVars:
       - key: NFCC_API_URL
         value: https://nfcc-platform-production.up.railway.app
       - key: PYTHON_VERSION
         value: 3.10.20
+      - key: PYTHONPATH
+        value: /opt/render/project/src:/opt/render/project/src/hackathon
     healthCheckPath: /_stcore/health
+    rootDir: hackathon
