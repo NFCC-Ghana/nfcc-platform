@@ -1,6 +1,6 @@
 """
 CivicFlood AI - National Emergency Operations Center
-Professional UI matching international corporation standards
+Clean modular architecture - dashboard orchestrates only
 """
 
 import streamlit as st
@@ -9,8 +9,6 @@ from datetime import datetime
 import sys
 from pathlib import Path
 import os
-import folium
-from streamlit_folium import folium_static
 
 # ============================================================
 # PATH SETUP
@@ -19,7 +17,7 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # ============================================================
-# CUSTOM CSS - PROFESSIONAL DARK THEME
+# PROFESSIONAL CSS - SINGLE DEFINITION
 # ============================================================
 st.markdown("""
 <style>
@@ -79,38 +77,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# V4 MODULE IMPORTS - WITH ERROR HANDLING
+# MODULE IMPORTS - ALL MODULES
 # ============================================================
 
-try:
-    from hackathon.app.modules.v4.decision_support import render_decision_support
-except ImportError:
-    render_decision_support = None
-
-try:
-    from hackathon.app.modules.v4.evidence_panel import render_evidence_panel
-except ImportError:
-    render_evidence_panel = None
-
-try:
-    from hackathon.app.modules.v4.forecast_timeline import render_forecast_timeline
-except ImportError:
-    render_forecast_timeline = None
-
-try:
-    from hackathon.app.modules.v4.national_briefing import render_national_briefing
-except ImportError:
-    render_national_briefing = None
-
-try:
-    from hackathon.app.modules.v4.ai_copilot import render_ai_copilot
-except ImportError:
-    render_ai_copilot = None
-
-try:
-    from hackathon.app.modules.v4.community_intelligence import render_community_intelligence
-except ImportError:
-    render_community_intelligence = None
+# All V4 modules with correct signatures
+from hackathon.app.modules.v4.mission_control_header import render_mission_control_header
+from hackathon.app.modules.v4.national_briefing import render_national_briefing
+from hackathon.app.modules.v4.situation_map import render_situation_map
+from hackathon.app.modules.v4.evidence_panel import render_evidence_panel
+from hackathon.app.modules.v4.operations_panel import render_operations_panel
+from hackathon.app.modules.v4.impact_panel import render_impact_panel
+from hackathon.app.modules.v4.community_intelligence import render_community_intelligence
+from hackathon.app.modules.v4.decision_support import render_decision_support
+from hackathon.app.modules.v4.forecast_timeline import render_forecast_timeline
+from hackathon.app.modules.v4.ai_copilot import render_ai_copilot
 
 # ============================================================
 # CONFIG
@@ -127,6 +107,7 @@ DISTRICTS = {
 }
 
 def call_api(endpoint, method="GET", data=None):
+    """Call the NFCC API - only external call with exception handling."""
     url = f"{API_URL}{endpoint}"
     try:
         if method == "GET":
@@ -134,78 +115,11 @@ def call_api(endpoint, method="GET", data=None):
         else:
             response = requests.post(url, json=data, timeout=10)
         return response.json() if response.status_code == 200 else {}
-    except:
+    except requests.RequestException:
         return {}
 
-def create_flood_risk_map(district: str, risk_level: str) -> folium.Map:
-    m = folium.Map(location=[7.9465, -1.0232], zoom_start=7)
-    districts_coords = {
-        "Accra Central": [5.560, -0.210],
-        "Tema": [5.650, -0.020],
-        "Kumasi": [6.670, -1.620],
-        "Tamale": [9.400, -0.840]
-    }
-    colors = {"EXTREME": "red", "HIGH": "orange", "MODERATE": "yellow", "LOW": "green"}
-    color = colors.get(risk_level, "blue")
-    if district in districts_coords:
-        folium.CircleMarker(
-            districts_coords[district],
-            radius=30,
-            color=color,
-            fill=True,
-            fillOpacity=0.4,
-            popup=f"{district}<br>Risk: {risk_level}"
-        ).add_to(m)
-    return m
-
 # ============================================================
-# SITUATION MAP FUNCTION - FIXED
-# ============================================================
-def render_situation_map():
-    """Render situation map - no parameters required."""
-    st.markdown("### 🗺️ National Flood Situation Map")
-    st.caption("Interactive map showing flood risk, affected areas, shelters, and infrastructure")
-    
-    # Create a simple map
-    m = folium.Map(location=[7.9465, -1.0232], zoom_start=7)
-    
-    # Add districts
-    districts = {
-        "Accra Central": [5.560, -0.210],
-        "Tema": [5.650, -0.020],
-        "Kumasi": [6.670, -1.620],
-        "Tamale": [9.400, -0.840]
-    }
-    
-    colors = {"EXTREME": "red", "HIGH": "orange", "MODERATE": "yellow", "LOW": "green"}
-    
-    for name, coords in districts.items():
-        color = colors.get("EXTREME" if name == "Accra Central" else "HIGH" if name == "Tema" else "MODERATE", "green")
-        folium.CircleMarker(
-            coords,
-            radius=30 if name == "Accra Central" else 20,
-            color=color,
-            fill=True,
-            fillOpacity=0.4,
-            popup=f"{name}<br>Risk: {color.upper()}"
-        ).add_to(m)
-    
-    # Add legend
-    legend_html = '''
-    <div style="position: fixed; bottom: 50px; left: 50px; z-index: 1000; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-        <div style="color: #ff0000;">● EXTREME</div>
-        <div style="color: #ff6600;">● HIGH</div>
-        <div style="color: #ffaa00;">● MODERATE</div>
-        <div style="color: #00cc00;">● LOW</div>
-        <div style="color: #4caf50;">🏛️ Shelter</div>
-    </div>
-    '''
-    m.get_root().html.add_child(folium.Element(legend_html))
-    
-    folium_static(m, width=700, height=400)
-
-# ============================================================
-# MAIN DASHBOARD
+# MAIN DASHBOARD - PURE ORCHESTRATOR
 # ============================================================
 def main():
     # Sidebar
@@ -225,8 +139,7 @@ def main():
             ("🏗️ Dam Database", "active")
         ]
         for name, status in sources:
-            dot = "🟢" if status == "active" else "🔴"
-            st.markdown(f"{dot} {name}")
+            st.markdown(f"{'🟢' if status == 'active' else '🔴'} {name}")
         
         st.divider()
         health = call_api("/health")
@@ -237,7 +150,6 @@ def main():
         st.caption(API_URL)
     
     # Get data
-    info = DISTRICTS[district]
     with st.spinner("🔄 Analyzing flood risk..."):
         score_data = call_api("/score", "POST", {"location": district, "precipitation": rainfall_mm})
     
@@ -247,30 +159,7 @@ def main():
     # ============================================================
     # HEADER
     # ============================================================
-    st.markdown(f"""
-    <div class="eoc-header">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <div>
-                <div style="display: flex; align-items: center; gap: 0.8rem;">
-                    <span style="font-size: 2rem;">🌊</span>
-                    <div>
-                        <div class="title">CivicFlood AI</div>
-                        <div class="subtitle">National Emergency Operations Center</div>
-                    </div>
-                </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
-                <span class="badge">🟢 SYSTEM ACTIVE</span>
-                <span class="timestamp">🕐 {datetime.now().strftime('%d %b %Y, %H:%M')} UTC</span>
-                <span style="color: rgba(255,255,255,0.3); font-size: 0.7rem;">v3.0.0</span>
-            </div>
-        </div>
-        <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            <span style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.8rem; border-radius: 12px; font-size: 0.7rem; color: #8ecae6;">🏆 Ghana AI Innovation Challenge 2026</span>
-            <span style="background: rgba(255,255,255,0.05); padding: 0.2rem 0.8rem; border-radius: 12px; font-size: 0.7rem; color: #8ecae6;">🇬🇭 Public Services AI</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    render_mission_control_header()
     
     # ============================================================
     # KEY METRICS
@@ -291,7 +180,7 @@ def main():
         st.markdown(f"""
         <div class="glass-card">
             <div class="label">Population</div>
-            <div class="value">{info['population']:,}</div>
+            <div class="value">{DISTRICTS[district]['population']:,}</div>
             <div class="delta">District total</div>
         </div>
         """, unsafe_allow_html=True)
@@ -317,94 +206,49 @@ def main():
     # ============================================================
     # AI SITUATION BRIEF
     # ============================================================
-    if render_national_briefing:
-        try:
-            render_national_briefing(district, score)
-        except Exception as e:
-            st.error(f"⚠️ National briefing error: {e}")
-    else:
-        st.markdown("""
-        <div style="background: rgba(255,255,255,0.04); padding: 1rem; border-radius: 12px; border-left: 4px solid #ff0000;">
-            <div style="color: #ffffff; font-weight: 600;">🤖 AI Situation Brief</div>
-            <div style="color: rgba(255,255,255,0.7); margin: 0.5rem 0;">
-                🔴 EMERGENCY LEVEL: HIGH<br>
-                Persistent rainfall has saturated catchments in Accra Central, increasing flash flood risk.
-            </div>
-            <div style="display: flex; gap: 1rem; color: rgba(255,255,255,0.4); font-size: 0.8rem;">
-                <span>🤖 Analysis complete</span>
-                <span>📊 5 data sources processed</span>
-                <span>✅ Confidence: 92%</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    render_national_briefing(district, score)
     
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
     
     # ============================================================
-    # SITUATION MAP - FIXED (no parameters)
+    # MAP + EVIDENCE
     # ============================================================
-    try:
-        render_situation_map()
-    except Exception as e:
-        st.warning(f"⚠️ Map loading: {e}")
-        st.info("🗺️ Interactive flood risk map loading...")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        render_situation_map(district, score)
+    with col2:
+        render_evidence_panel()
     
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
     
     # ============================================================
-    # EVIDENCE PANEL - FIXED (no parameters)
+    # OPERATIONS + IMPACT + COMMUNITY
     # ============================================================
-    if render_evidence_panel:
-        try:
-            render_evidence_panel()
-        except Exception as e:
-            st.warning(f"⚠️ Evidence panel error: {e}")
-    else:
-        st.info("📊 Evidence panel loading...")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        render_operations_panel(district)
+    with col2:
+        render_impact_panel(district, score)
+    with col3:
+        render_community_intelligence()
     
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
     
     # ============================================================
-    # DECISION SUPPORT
+    # DECISION SUPPORT + FORECAST TIMELINE
     # ============================================================
-    if render_decision_support:
-        try:
-            render_decision_support(district, score)
-        except Exception as e:
-            st.warning(f"⚠️ Decision support error: {e}")
-    
-    st.markdown('<hr class="divider">', unsafe_allow_html=True)
-    
-    # ============================================================
-    # FORECAST TIMELINE
-    # ============================================================
-    if render_forecast_timeline:
-        try:
-            render_forecast_timeline()
-        except Exception as e:
-            st.warning(f"⚠️ Forecast timeline error: {e}")
+    col1, col2 = st.columns(2)
+    with col1:
+        render_decision_support(district, score)
+    with col2:
+        render_forecast_timeline()
     
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
     
     # ============================================================
     # AI COPILOT
     # ============================================================
-    if render_ai_copilot:
-        try:
-            render_ai_copilot()
-        except Exception as e:
-            st.warning(f"⚠️ AI Copilot error: {e}")
-    
-    st.markdown('<hr class="divider">', unsafe_allow_html=True)
-    
-    # ============================================================
-    # COMMUNITY INTELLIGENCE
-    # ============================================================
-    if render_community_intelligence:
-        try:
-            render_community_intelligence()
-        except Exception as e:
-            st.warning(f"⚠️ Community intelligence error: {e}")
+    render_ai_copilot()
     
     # ============================================================
     # FOOTER
