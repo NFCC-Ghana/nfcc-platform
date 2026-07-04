@@ -1,54 +1,50 @@
 """
 CivicFlood AI - Streamlit Cloud Entry Point
-Single source of truth - loads the canonical dashboard
+
+This is the SINGLE entry point for the application.
+All dashboard logic is in hackathon/app/pages/dashboard.py
 """
 
 import streamlit as st
 import sys
+import logging
 from pathlib import Path
 import os
 
-# ============================================================
-# FIX: ADD PROJECT ROOT TO PYTHON PATH
-# ============================================================
-# Get the project root (3 levels up from this file)
-# hackathon/app/streamlit_app.py -> project root
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Also add the hackathon directory directly
+# Add hackathon directory to path
 hackathon_path = project_root / "hackathon"
 sys.path.insert(0, str(hackathon_path))
 
-# Debug: Print paths (remove after fixing)
-# st.write(f"Project root: {project_root}")
-# st.write(f"Python path: {sys.path[:3]}")
-
 # ============================================================
-# PAGE CONFIG - MUST BE FIRST
+# PAGE CONFIG - ONLY HERE
 # ============================================================
 st.set_page_config(
-    page_title="CivicFlood AI - National Flood Intelligence",
+    page_title="CivicFlood AI - National Emergency Operations Center",
     page_icon="🌊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ============================================================
-# API CONFIGURATION
+# APPLICATION ENTRY
 # ============================================================
-os.environ["NFCC_API_URL"] = os.getenv(
-    "NFCC_API_URL",
-    "https://nfcc-platform-production.up.railway.app"
-)
 
-# ============================================================
-# LOAD CANONICAL DASHBOARD - SINGLE SOURCE OF TRUTH
-# ============================================================
 try:
     from hackathon.app.pages.dashboard import main
     main()
+except ImportError as e:
+    logger.error(f"Import error: {e}")
+    st.error("🚨 Could not load the dashboard. Please check the deployment.")
+    st.exception(e)
 except Exception as e:
-    st.error(f"❌ Dashboard Error: {e}")
-    st.info("📱 Please check the deployment configuration.")
-    st.code(f"Error details: {str(e)}", language="python")
+    logger.exception("Dashboard error")
+    st.error("🚨 Dashboard encountered an error. Please check the logs.")
+    st.exception(e)

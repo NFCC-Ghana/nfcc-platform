@@ -1,44 +1,24 @@
-"""
-Forecast Timeline - Visual risk evolution.
-"""
+"""Risk Timeline module."""
 
 import streamlit as st
-import plotly.graph_objects as go
 
-def render_forecast_timeline() -> None:
-    """Render forecast timeline with visual bars."""
-    
-    st.markdown("### ⏰ Risk Timeline")
+
+def render_forecast_timeline(state):
+    """Render the risk timeline."""
+    st.markdown("## ⏰ Risk Timeline")
     st.caption("24-hour flood risk evolution")
     
-    # Timeline data
-    time_points = ["00h", "+6h", "+12h", "+18h", "+24h"]
-    risks = [88, 100, 95, 72, 45]
+    # Simulated timeline data
+    hours = ["Now", "6h", "12h", "18h", "24h"]
+    risks = [state.risk_score, min(100, state.risk_score + 15), 
+             min(100, state.risk_score + 10), 
+             min(100, state.risk_score + 5), 
+             min(100, state.risk_score)]
     
-    # Color mapping
-    colors = ["#ff0000" if r >= 80 else "#ff6600" if r >= 60 else "#ffaa00" if r >= 40 else "#00cc00" for r in risks]
+    # Create a simple progress bar visualization
+    st.markdown("### 📈 Risk Trend")
+    for hour, risk in zip(hours, risks):
+        color = "🔴" if risk >= 80 else "🟠" if risk >= 60 else "🟡" if risk >= 40 else "🟢"
+        st.progress(risk/100, text=f"{hour}: {color} {risk:.0f}%")
     
-    fig = go.Figure()
-    
-    fig.add_trace(go.Bar(
-        x=time_points,
-        y=risks,
-        marker_color=colors,
-        text=[f"{r}%" for r in risks],
-        textposition="outside",
-        name="Risk Level"
-    ))
-    
-    fig.update_layout(
-        height=250,
-        yaxis_title="Risk (%)",
-        yaxis_range=[0, 105],
-        xaxis_title="",
-        showlegend=False,
-        margin=dict(l=10, r=10, t=20, b=20)
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Peak warning
-    st.warning("⚠️ **Peak Risk:** 100% expected in 6 hours")
+    st.warning(f"⚠️ Peak Risk: {max(risks):.0f}% expected in 6 hours")
