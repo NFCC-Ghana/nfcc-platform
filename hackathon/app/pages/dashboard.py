@@ -36,12 +36,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Page config - ONLY HERE
-st.set_page_config(
-    page_title="CivicFlood AI - National Emergency Operations Center",
-    page_icon="🌊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # ============================================================
 # API CONFIGURATION
