@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting NFCC Flood Alert Platform...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
-    logger.info(f"API Version: {settings.APP_VERSION}")
+    logger.info(f"API Version: {settings.API_VERSION}")
     
     # Initialize alert engine
     alert_engine = AlertEngine()
@@ -51,14 +51,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
-    version=settings.APP_VERSION,
+    version=settings.API_VERSION,
     lifespan=lifespan,
 )
 
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,7 +80,7 @@ async def root():
     """Root endpoint."""
     return {
         "name": settings.APP_NAME,
-        "version": settings.APP_VERSION,
+        "version": settings.API_VERSION,
         "environment": settings.ENVIRONMENT,
         "status": "healthy",
     }

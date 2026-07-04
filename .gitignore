@@ -96,3 +96,13 @@ data/*.db
 # Python cache
 __pycache__/
 *.pyc
+
+# Archive (keep but ignore)
+hackathon/archive/
+
+# Runtime data
+*.db
+*.sqlite
+*.log
+*.pyc
+__pycache__/

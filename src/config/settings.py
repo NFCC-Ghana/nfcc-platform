@@ -257,3 +257,6 @@ if ALERT_DRY_RUN:
 
     # Alert dry run mode
     ALERT_DRY_RUN: bool = os.getenv("ALERT_DRY_RUN", "false").lower() == "true"
+
+    # CORS
+    CORS_ORIGINS: List[str] = ["*"]
