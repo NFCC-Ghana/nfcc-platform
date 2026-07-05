@@ -1,9 +1,4 @@
-"""
-DashboardState - Single source of truth for all dashboard data.
-
-This eliminates passing 10+ parameters between modules.
-All modules accept a single `state` object.
-"""
+"""DashboardState - Single source of truth for all dashboard data."""
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
@@ -82,12 +77,10 @@ class DashboardState:
     
     @property
     def active_sources_count(self) -> int:
-        """Dynamically count active data sources."""
         return len(self.active_sources)
     
     @property
     def risk_color(self) -> str:
-        """Get risk color based on score."""
         if self.risk_score >= 80:
             return "#ff0000"
         elif self.risk_score >= 60:
@@ -99,7 +92,6 @@ class DashboardState:
     
     @property
     def risk_emoji(self) -> str:
-        """Get risk emoji based on score."""
         if self.risk_score >= 80:
             return "🔴"
         elif self.risk_score >= 60:
@@ -111,7 +103,6 @@ class DashboardState:
     
     @property
     def river_emoji(self) -> str:
-        """Get river emoji based on status."""
         if self.river_status == "FLOOD":
             return "🔴"
         elif self.river_status == "DANGER":
@@ -122,7 +113,6 @@ class DashboardState:
             return "🟢"
     
     def to_dict(self) -> Dict:
-        """Convert state to dictionary for serialization."""
         return {
             "district": self.district,
             "region": self.region,
@@ -141,12 +131,10 @@ class DashboardState:
         }
 
 
-# Factory function to create state from API response
 def create_state_from_api(api_data: Dict) -> DashboardState:
     """Create a DashboardState from API response."""
     state = DashboardState()
     
-    # Update from API data
     if "location" in api_data:
         state.district = api_data["location"]
     
@@ -159,7 +147,6 @@ def create_state_from_api(api_data: Dict) -> DashboardState:
     if "precipitation" in api_data:
         state.rainfall_mm = api_data["precipitation"]
     
-    # Set default active sources
     state.active_sources = [
         "CHIRPS Rainfall",
         "Open-Meteo Forecast",
@@ -172,5 +159,4 @@ def create_state_from_api(api_data: Dict) -> DashboardState:
     return state
 
 
-# Default state instance
 default_state = DashboardState()
