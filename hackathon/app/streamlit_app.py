@@ -1,69 +1,52 @@
 """
-CivicFlood AI - Streamlit Cloud Entry Point
-
-This is the SINGLE entry point for the application.
-All dashboard logic is in hackathon/app/pages/dashboard.py
+CivicFlood AI - Diagnostic Entry Point
+Shows exactly where the error occurs.
 """
 
 import streamlit as st
 import sys
-import logging
+import traceback
 from pathlib import Path
+
+# ============================================================
+# DIAGNOSTIC: Show Python path
+# ============================================================
+st.write("## 🔍 Diagnostic Information")
+
+# Show current working directory
 import os
+st.write(f"**Working Directory:** `{os.getcwd()}`")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Show Python path
+st.write("**Python Path:**")
+for p in sys.path:
+    st.write(f"  - `{p}`")
 
 # ============================================================
-# FIX: Add the project root to Python path
-# This works whether you run from the root or from hackathon/
+# DIAGNOSTIC: Try importing the dashboard
 # ============================================================
-
-# Get the project root (where hackathon/ is located)
-current_file = Path(__file__).resolve()
-project_root = current_file.parent.parent.parent  # Go up from app/ to project root
-
-# If project_root doesn't contain hackathon/, try going up more
-if not (project_root / "hackathon").exists():
-    project_root = current_file.parent.parent  # Try going up from app/ to hackathon/
+st.write("---")
+st.write("## 🔍 Import Test")
 
 # Add project root to path
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Add hackathon directory to path
-hackathon_path = project_root / "hackathon"
-if hackathon_path.exists():
-    sys.path.insert(0, str(hackathon_path))
-
-# For debugging - remove in production
-logger.info(f"Project root: {project_root}")
-logger.info(f"Python path: {sys.path[:3]}")
-
-# ============================================================
-# SINGLE PAGE CONFIG - ONLY HERE
-# ============================================================
-st.set_page_config(
-    page_title="CivicFlood AI - National Emergency Operations Center",
-    page_icon="🌊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# ============================================================
-# APPLICATION ENTRY
-# ============================================================
+# Try to find the file
+pages_dir = Path(__file__).parent / "pages"
+st.write(f"**pages directory exists:** `{pages_dir.exists()}`")
+if pages_dir.exists():
+    st.write(f"**Files in pages:** `{list(pages_dir.glob('*.py'))}`")
 
 try:
-    # Try importing from hackathon.app.pages (when run from root)
+    st.write("**Attempting import:** `from hackathon.app.pages.dashboard import main`")
     from hackathon.app.pages.dashboard import main
-except ImportError:
-    try:
-        # Try importing from app.pages (when run from hackathon/)
-        from app.pages.dashboard import main
-    except ImportError:
-        logger.error("Could not import dashboard. Please check the path.")
-        st.error("🚨 Could not load the dashboard. Please check the deployment.")
-        raise
-
+    st.success("✅ Import successful!")
+    
+    # Try to call main
+    st.write("**Attempting:** `main()`")
     main()
+    
+except Exception as e:
+    st.error(f"❌ Error: {type(e).__name__}: {e}")
+    st.code(traceback.format_exc())
