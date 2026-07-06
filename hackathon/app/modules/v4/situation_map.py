@@ -88,3 +88,4 @@ def render_situation_map(state):
         st.metric("Verified Reports", "4")
     
     st.caption("🗺️ Click on markers for details • Updated in real-time")
+
