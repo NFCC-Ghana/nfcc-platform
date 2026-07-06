@@ -13,5 +13,3 @@ services:
         value: https://nfcc-platform-production.up.railway.app
       - key: PYTHON_VERSION
         value: 3.10.20
-      - key: PYTHONPATH
-        value: /opt/render/project/src
