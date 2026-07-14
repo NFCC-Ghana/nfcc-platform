@@ -2,10 +2,11 @@
 
 import logging
 import time
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
-from src.alerts.providers.base import BaseAlertProvider
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
+
 from src.alerts.models import AlertPayload
+from src.alerts.providers.base import BaseAlertProvider
 from src.config.settings import settings
 
 logger = logging.getLogger("nfcc.alert.whatsapp")

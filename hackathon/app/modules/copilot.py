@@ -3,16 +3,19 @@ AI Flood Copilot - Context-Aware Emergency Decision Support
 Integrates all NFCC intelligence for intelligent responses.
 """
 
-import streamlit as st
 from datetime import datetime, timedelta
+
 import pandas as pd
+import streamlit as st
+
 # ============================================================
 # CONTEXT DATA (Simulated - In production from NFCC API)
 # ============================================================
 
+
 def get_context_data(district: str = "Accra Central") -> dict:
     """Get all context data for the copilot."""
-    
+
     # In production, this would come from the NFCC API
     return {
         "district": district,
@@ -29,19 +32,39 @@ def get_context_data(district: str = "Accra Central") -> dict:
             "status": "NORMAL",
             "trend": "STABLE",
             "warning_level": 2.0,
-            "danger_level": 2.8
+            "danger_level": 2.8,
         },
         "soil_saturation": 85,
         "dams": [
             {"name": "Akosombo", "capacity": 88.2, "risk": "MEDIUM"},
-            {"name": "Bagre", "capacity": 90.0, "risk": "HIGH"}
+            {"name": "Bagre", "capacity": 90.0, "risk": "HIGH"},
         ],
         "communities_at_risk": ["Alajo", "Kaneshie", "Circle", "Nima", "Mamobi"],
         "reports": [
-            {"community": "Alajo", "type": "Active Flooding", "verified": True, "depth": 0.35},
-            {"community": "Kaneshie", "type": "Water Level Rising", "verified": False, "depth": 0.15},
-            {"community": "Dansoman", "type": "Drainage Blocked", "verified": True, "depth": 0.0},
-            {"community": "Circle", "type": "Flood Warning", "verified": False, "depth": 0.0}
+            {
+                "community": "Alajo",
+                "type": "Active Flooding",
+                "verified": True,
+                "depth": 0.35,
+            },
+            {
+                "community": "Kaneshie",
+                "type": "Water Level Rising",
+                "verified": False,
+                "depth": 0.15,
+            },
+            {
+                "community": "Dansoman",
+                "type": "Drainage Blocked",
+                "verified": True,
+                "depth": 0.0,
+            },
+            {
+                "community": "Circle",
+                "type": "Flood Warning",
+                "verified": False,
+                "depth": 0.0,
+            },
         ],
         "impact": {
             "population_exposed": 102157,
@@ -49,23 +72,18 @@ def get_context_data(district: str = "Accra Central") -> dict:
             "hospitals_at_risk": 3,
             "markets_at_risk": 6,
             "children_affected": 30647,
-            "elderly_affected": 10215
+            "elderly_affected": 10215,
         },
-        "forecast": {
-            "6h": 100,
-            "12h": 100,
-            "24h": 95,
-            "48h": 75
-        },
+        "forecast": {"6h": 100, "12h": 100, "24h": 95, "48h": 75},
         "risk_drivers": {
             "Rainfall Accumulation": 35,
             "Soil Saturation": 25,
             "Historical Similarity": 15,
             "Drainage Vulnerability": 10,
             "Community Reports": 10,
-            "River Conditions": 5
+            "River Conditions": 5,
         },
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
 
@@ -73,19 +91,35 @@ def get_high_risk_roads(district: str) -> list:
     """Get high-risk roads for a district."""
     roads = {
         "Accra Central": [
-            {"name": "Alajo Main Street", "risk": "HIGH", "reason": "Verified flooding report"},
-            {"name": "Kaneshie Market Road", "risk": "HIGH", "reason": "Rising water report"},
-            {"name": "Ring Road Central", "risk": "MODERATE", "reason": "Poor drainage"},
-            {"name": "Circle Interchange", "risk": "MODERATE", "reason": "Flood warning active"}
+            {
+                "name": "Alajo Main Street",
+                "risk": "HIGH",
+                "reason": "Verified flooding report",
+            },
+            {
+                "name": "Kaneshie Market Road",
+                "risk": "HIGH",
+                "reason": "Rising water report",
+            },
+            {
+                "name": "Ring Road Central",
+                "risk": "MODERATE",
+                "reason": "Poor drainage",
+            },
+            {
+                "name": "Circle Interchange",
+                "risk": "MODERATE",
+                "reason": "Flood warning active",
+            },
         ],
         "Accra West": [
             {"name": "Dansoman Road", "risk": "HIGH", "reason": "Blocked drainage"},
-            {"name": "Mallam Road", "risk": "MODERATE", "reason": "Low-lying area"}
+            {"name": "Mallam Road", "risk": "MODERATE", "reason": "Low-lying area"},
         ],
         "Tema": [
             {"name": "Community 1 Road", "risk": "HIGH", "reason": "Coastal proximity"},
-            {"name": "Harbour Road", "risk": "MODERATE", "reason": "Tidal influence"}
-        ]
+            {"name": "Harbour Road", "risk": "MODERATE", "reason": "Tidal influence"},
+        ],
     }
     return roads.get(district, [])
 
@@ -97,7 +131,7 @@ def get_affected_schools(district: str) -> list:
             {"name": "Alajo Basic School", "students": 450, "distance": 0.8},
             {"name": "Kaneshie Senior High", "students": 980, "distance": 1.2},
             {"name": "Nima Primary", "students": 620, "distance": 1.5},
-            {"name": "Mamobi Basic School", "students": 530, "distance": 2.0}
+            {"name": "Mamobi Basic School", "students": 530, "distance": 2.0},
         ]
     }
     return schools.get(district, [])
@@ -107,15 +141,21 @@ def get_affected_schools(district: str) -> list:
 # COPILOT RESPONSE GENERATOR
 # ============================================================
 
-def generate_copilot_response(question: str, context: dict, role: str = "resident") -> str:
+
+def generate_copilot_response(
+    question: str, context: dict, role: str = "resident"
+) -> str:
     """Generate context-aware response based on question and role."""
-    
+
     question_lower = question.lower()
-    
+
     # ============================================================
     # ROAD FLOODING QUESTIONS
     # ============================================================
-    if any(word in question_lower for word in ["road", "street", "drive", "route", "traffic"]):
+    if any(
+        word in question_lower
+        for word in ["road", "street", "drive", "route", "traffic"]
+    ):
         roads = get_high_risk_roads(context["district"])
         if roads:
             response = f"""
@@ -130,7 +170,7 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
    Risk: {road['risk']}
    Why: {road['reason']}
 """
-            
+
             response += f"""
 
 📊 **Evidence:**
@@ -148,11 +188,13 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
 • Deploy drainage crews to blocked areas
 """
             return response
-    
+
     # ============================================================
     # SCHOOL QUESTIONS
     # ============================================================
-    if any(word in question_lower for word in ["school", "student", "class", "education"]):
+    if any(
+        word in question_lower for word in ["school", "student", "class", "education"]
+    ):
         schools = get_affected_schools(context["district"])
         if schools:
             total_students = sum(s["students"] for s in schools)
@@ -172,7 +214,7 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
   - Students: {school['students']}
   - Distance to flood zone: {school['distance']}km
 """
-            
+
             response += f"""
 
 📋 **Recommendation: SUSPEND IN-PERSON INSTRUCTION**
@@ -186,7 +228,7 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
 ⏰ **Timeline:** Effective within 12 hours
 """
             return response
-    
+
     # ============================================================
     # WHY EXTREME RISK QUESTIONS
     # ============================================================
@@ -222,11 +264,14 @@ Therefore overall flood risk remains EXTREME.
 🎯 **Recommendation:** Prepare for evacuation within 6 hours.
 """
         return response
-    
+
     # ============================================================
     # IMPACT / EVACUATION QUESTIONS
     # ============================================================
-    if any(word in question_lower for word in ["evacuate", "evacuation", "people", "population", "impact"]):
+    if any(
+        word in question_lower
+        for word in ["evacuate", "evacuation", "people", "population", "impact"]
+    ):
         impact = context["impact"]
         response = f"""
 👥 **POPULATION IMPACT ASSESSMENT: {context['district'].upper()}**
@@ -243,7 +288,7 @@ Therefore overall flood risk remains EXTREME.
 
 **Affected Communities:**
 """
-        for community in context['communities_at_risk'][:5]:
+        for community in context["communities_at_risk"][:5]:
             response += f"• {community}\n"
 
         response += f"""
@@ -265,7 +310,7 @@ Therefore overall flood risk remains EXTREME.
 3. Coordinate with NADMO for transport
 """
         return response
-    
+
     # ============================================================
     # SITUATION REPORT GENERATOR
     # ============================================================
@@ -312,7 +357,7 @@ Therefore overall flood risk remains EXTREME.
 
 **PRIMARY DRIVERS:**
 """
-        for driver, contrib in context['risk_drivers'].items():
+        for driver, contrib in context["risk_drivers"].items():
             response += f"• {driver}: {contrib}%\n"
 
         response += f"""
@@ -333,7 +378,7 @@ Therefore overall flood risk remains EXTREME.
 *Next update: { (datetime.now() + timedelta(hours=6)).strftime('%d %b %Y, %H:%M') }*
 """
         return response
-    
+
     # ============================================================
     # RIVER AND DAM QUESTIONS
     # ============================================================
@@ -353,8 +398,12 @@ Therefore overall flood risk remains EXTREME.
 
 **Dam Status:**
 """
-        for dam in context['dams']:
-            risk_emoji = "🔴" if dam['risk'] == 'HIGH' else "🟡" if dam['risk'] == 'MEDIUM' else "🟢"
+        for dam in context["dams"]:
+            risk_emoji = (
+                "🔴"
+                if dam["risk"] == "HIGH"
+                else "🟡" if dam["risk"] == "MEDIUM" else "🟢"
+            )
             response += f"• {dam['name']}: {dam['capacity']}% full {risk_emoji} ({dam['risk']} risk)\n"
 
         response += f"""
@@ -366,12 +415,15 @@ Therefore overall flood risk remains EXTREME.
 • Coordinate with VRA for dam updates
 """
         return response
-    
+
     # ============================================================
     # FORECAST QUESTIONS
     # ============================================================
-    if any(word in question_lower for word in ["forecast", "prediction", "future", "next", "timeline"]):
-        forecast = context['forecast']
+    if any(
+        word in question_lower
+        for word in ["forecast", "prediction", "future", "next", "timeline"]
+    ):
+        forecast = context["forecast"]
         response = f"""
 📈 **FLOOD FORECAST: {context['district'].upper()}**
 
@@ -401,12 +453,15 @@ Therefore overall flood risk remains EXTREME.
 Implement immediate evacuation measures for high-risk areas.
 """
         return response
-    
+
     # ============================================================
     # VULNERABLE COMMUNITIES
     # ============================================================
-    if any(word in question_lower for word in ["vulnerable", "elderly", "children", "disabled"]):
-        impact = context['impact']
+    if any(
+        word in question_lower
+        for word in ["vulnerable", "elderly", "children", "disabled"]
+    ):
+        impact = context["impact"]
         response = f"""
 👥 **VULNERABLE POPULATIONS: {context['district'].upper()}**
 
@@ -418,7 +473,7 @@ Implement immediate evacuation measures for high-risk areas.
 
 **Communities with High Vulnerability:**
 """
-        for community in context['communities_at_risk'][:5]:
+        for community in context["communities_at_risk"][:5]:
             response += f"• {community}\n"
 
         response += f"""
@@ -436,7 +491,7 @@ Implement immediate evacuation measures for high-risk areas.
 • Shortfall: {max(0, int(impact['population_exposed'] * 0.2) - 3700)}
 """
         return response
-    
+
     # ============================================================
     # DEFAULT RESPONSE
     # ============================================================
@@ -474,20 +529,28 @@ Stay safe! 🌊
 # MAIN COPILOT UI
 # ============================================================
 
+
 def render_copilot(district: str, risk_score: float) -> None:
     """Render enhanced AI Flood Copilot with context-aware responses."""
-    
+
     st.markdown("### 🤖 AI Flood Copilot")
     st.caption("Ask any question about flood risk in your community")
-    
+
     # Get context
     context = get_context_data(district)
     context["risk_score"] = risk_score
-    
+
     # Role selector
-    roles = ["Resident", "School Principal", "NADMO Officer", "Hospital Administrator", "Assembly Member", "Farmer"]
+    roles = [
+        "Resident",
+        "School Principal",
+        "NADMO Officer",
+        "Hospital Administrator",
+        "Assembly Member",
+        "Farmer",
+    ]
     selected_role = st.selectbox("I am a:", roles, index=0, key="copilot_role")
-    
+
     # Quick questions
     quick_questions = [
         "Which roads will flood in the next 6 hours?",
@@ -495,36 +558,38 @@ def render_copilot(district: str, risk_score: float) -> None:
         "Why is risk EXTREME?",
         "How many people should be evacuated?",
         "Generate a situation report",
-        "Which communities are most vulnerable?"
+        "Which communities are most vulnerable?",
     ]
-    
+
     cols = st.columns(3)
     for i, q in enumerate(quick_questions):
         with cols[i % 3]:
             if st.button(q, key=f"copilot_q_{i}"):
                 st.session_state.copilot_query = q
-    
+
     # Text input
     query = st.text_input(
         "Ask CivicFlood AI:",
         placeholder="e.g., Which roads will flood in Accra Central?",
-        key="copilot_input"
+        key="copilot_input",
     )
-    
+
     # Process query
     if query or st.session_state.get("copilot_query"):
         question = query or st.session_state.get("copilot_query", "")
-        
+
         with st.spinner("🧠 Analyzing your question with flood intelligence..."):
-            response = generate_copilot_response(question, context, selected_role.lower().replace(" ", "_"))
-            
+            response = generate_copilot_response(
+                question, context, selected_role.lower().replace(" ", "_")
+            )
+
             # Display response in a nice box
             st.markdown("---")
             st.markdown("### 📋 Response")
             st.markdown(response)
             st.markdown("---")
             st.caption(f"🤖 CivicFlood AI • Based on live data • Role: {selected_role}")
-    
+
     # Tips
     with st.expander("💡 Tips for better questions"):
         st.markdown("""
@@ -539,25 +604,29 @@ def render_copilot(district: str, risk_score: float) -> None:
         - **Rivers** → "Will Odaw River overflow?"
         """)
 
+
 # ============================================================
 # SITUATION REPORT GENERATOR (Standalone)
 # ============================================================
 
+
 def render_situation_report(district: str, risk_score: float) -> None:
     """Generate and display a complete situation report."""
-    
+
     context = get_context_data(district)
     context["risk_score"] = risk_score
-    
+
     st.markdown("### 📋 Situation Report")
-    
+
     if st.button("📄 Generate Situation Report", use_container_width=True):
         with st.spinner("🔄 Generating comprehensive situation report..."):
-            response = generate_copilot_response("situation report", context, "resident")
+            response = generate_copilot_response(
+                "situation report", context, "resident"
+            )
             st.markdown(response)
             st.download_button(
                 "📥 Download Report",
                 response,
                 file_name=f"situation_report_{district}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                mime="text/plain"
+                mime="text/plain",
             )

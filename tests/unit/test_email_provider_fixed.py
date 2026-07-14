@@ -1,9 +1,11 @@
 """Fixed email provider tests - safe changes only."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-from src.alerts.providers.email_provider import EmailAlertProvider
+
+import pytest
+
 from src.alerts.models import AlertPayload
+from src.alerts.providers.email_provider import EmailAlertProvider
 
 
 class TestEmailProviderFixed:

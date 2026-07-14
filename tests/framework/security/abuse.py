@@ -1,8 +1,8 @@
 """Abuse testing utilities."""
 
-from typing import Dict, Any, List
 import random
 import string
+from typing import Any, Dict, List
 
 
 class AbuseTester:

@@ -3,6 +3,7 @@ Unit tests for dam spillage prediction model.
 """
 
 import pytest
+
 from src.models.dam_spillage import (
     compute_spillage_probability,
     get_spillage_forecast,

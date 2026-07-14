@@ -1,7 +1,7 @@
 """Geographic intelligence for flood risk assessment."""
 
-from typing import Dict, Optional
 from dataclasses import dataclass
+from typing import Dict, Optional
 
 
 @dataclass

@@ -7,15 +7,16 @@ Original: dashboard_enhanced.py (backed up)
 Enhanced: dashboard_enhanced_v2.py (new)
 """
 
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime, timedelta
-import requests
 import json
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import requests
+import streamlit as st
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -26,8 +27,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Original imports - keeping all original functionality
 try:
-    from hackathon.ai.flood_explainer import FloodExplainer
     from hackathon.ai.community_classifier import CommunityClassifier
+    from hackathon.ai.flood_explainer import FloodExplainer
     from hackathon.ai.impact_estimator import ImpactEstimator
     from hackathon.ai.timeline_predictor import TimelinePredictor
 except ImportError:
@@ -37,12 +38,12 @@ except ImportError:
 # NEW HYDROLOGICAL IMPORTS
 # ============================================================
 
-from src.hydrology.unified_intelligence import unified_intelligence
-from src.hydrology.rainfall_history import rainfall_history
-from src.hydrology.river_intelligence import river_intelligence
-from src.hydrology.reservoir_intelligence import reservoir_intelligence
-from src.hydrology.soil_moisture import soil_moisture
 from src.hydrology.flood_polygons import flood_polygons
+from src.hydrology.rainfall_history import rainfall_history
+from src.hydrology.reservoir_intelligence import reservoir_intelligence
+from src.hydrology.river_intelligence import river_intelligence
+from src.hydrology.soil_moisture import soil_moisture
+from src.hydrology.unified_intelligence import unified_intelligence
 
 # ============================================================
 # PAGE CONFIGURATION

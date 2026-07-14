@@ -2,12 +2,13 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Union
-from src.alerts.models import AlertPayload
-from src.alerts.rate_limit import RateLimiter
-from src.alerts.provider_factory import ProviderFactory
+from typing import Any, Dict, List, Optional, Union
+
 from src.alerts.cooldown import should_send_alert
+from src.alerts.models import AlertPayload
+from src.alerts.provider_factory import ProviderFactory
 from src.alerts.providers.base import BaseAlertProvider
+from src.alerts.rate_limit import RateLimiter
 from src.config.settings import settings
 from src.database.alert_db import save_alert
 
@@ -206,7 +207,9 @@ class AlertEngine:
                     "alert_sent": result.get("success", False),
                     "provider": result.get("provider", "unknown"),
                     "message_id": result.get("message_id"),  # Present if successful
-                    "error": None if result.get("success") else result.get("message"),  # Error if failed
+                    "error": (
+                        None if result.get("success") else result.get("message")
+                    ),  # Error if failed
                 }
 
                 # Insert into database

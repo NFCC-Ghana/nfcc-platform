@@ -88,8 +88,9 @@ def test_smtp():
 def test_model():
     """Test model loading."""
     try:
-        from src.config.settings import settings
         from pathlib import Path
+
+        from src.config.settings import settings
 
         model_path = Path(settings.MODEL_PATH)
         if not model_path.exists():

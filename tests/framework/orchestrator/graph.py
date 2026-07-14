@@ -1,12 +1,13 @@
 """Unified execution graph orchestrator."""
 
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
 class ExecutionNode:
     """Node in execution graph."""
+
     name: str
     module: str
     dependencies: List[str] = field(default_factory=list)
@@ -16,20 +17,22 @@ class ExecutionNode:
 
 class ExecutionGraph:
     """Unified execution graph orchestrator."""
-    
+
     def __init__(self):
         self.nodes: Dict[str, ExecutionNode] = {}
         self.execution_order: List[str] = []
-    
+
     def add_node(self, name: str, module: str, dependencies: List[str] = None):
         """Add node to graph."""
-        self.nodes[name] = ExecutionNode(name=name, module=module, dependencies=dependencies or [])
-    
+        self.nodes[name] = ExecutionNode(
+            name=name, module=module, dependencies=dependencies or []
+        )
+
     def build_order(self) -> List[str]:
         """Build execution order."""
         self.execution_order = list(self.nodes.keys())
         return self.execution_order
-    
+
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute graph."""
         results = {}

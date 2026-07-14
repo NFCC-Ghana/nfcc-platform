@@ -1,14 +1,14 @@
 """API authentication and security."""
 
-from fastapi import Security, HTTPException, status
+from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
-
-from src.config.settings import settings
 
 # Optional: Rate limiting dependency
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+
+from src.config.settings import settings
 
 limiter = Limiter(key_func=get_remote_address)
 

@@ -3,17 +3,18 @@ AI Flood Copilot Module - Full Implementation
 Interactive Q&A with AI-powered responses.
 """
 
-import streamlit as st
 import random
 from datetime import datetime
+
+import streamlit as st
 
 
 def render_ai_copilot(state):
     """Render the complete AI flood copilot."""
-    
+
     st.markdown("## 🤖 AI Flood Copilot")
     st.caption("Ask questions or use suggested prompts for instant insights")
-    
+
     # Suggested questions
     suggestions = [
         "💡 Will Odaw River overflow today?",
@@ -23,50 +24,57 @@ def render_ai_copilot(state):
         "💡 What areas are most at risk?",
         "💡 How many shelters are available?",
     ]
-    
+
     st.markdown("### 💡 Suggested Questions")
     cols = st.columns(3)
     for i, suggestion in enumerate(suggestions):
         with cols[i % 3]:
             if st.button(suggestion, key=f"suggestion_{i}", use_container_width=True):
-                st.session_state['copilot_query'] = suggestion
-    
+                st.session_state["copilot_query"] = suggestion
+
     # Chat interface
     st.markdown("### 💬 Ask CivicFlood AI")
-    
+
     # Initialize chat history
-    if 'copilot_messages' not in st.session_state:
-        st.session_state['copilot_messages'] = [
-            {"role": "assistant", "content": "Hello! I'm CivicFlood AI. I can help you understand flood risks, evacuation routes, and emergency response. What would you like to know?"}
+    if "copilot_messages" not in st.session_state:
+        st.session_state["copilot_messages"] = [
+            {
+                "role": "assistant",
+                "content": "Hello! I'm CivicFlood AI. I can help you understand flood risks, evacuation routes, and emergency response. What would you like to know?",
+            }
         ]
-    
+
     # Display chat history
-    for message in st.session_state['copilot_messages']:
+    for message in st.session_state["copilot_messages"]:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-    
+
     # Handle query
-    query = st.chat_input("Ask CivicFlood AI about flood risks, evacuation, or safety...")
-    
+    query = st.chat_input(
+        "Ask CivicFlood AI about flood risks, evacuation, or safety..."
+    )
+
     if query:
         # Add user message
-        st.session_state['copilot_messages'].append({"role": "user", "content": query})
-        
+        st.session_state["copilot_messages"].append({"role": "user", "content": query})
+
         # Generate response
         response = generate_copilot_response(query, state)
-        
+
         # Add assistant response
-        st.session_state['copilot_messages'].append({"role": "assistant", "content": response})
-        
+        st.session_state["copilot_messages"].append(
+            {"role": "assistant", "content": response}
+        )
+
         # Rerun to update chat
         st.rerun()
 
 
 def generate_copilot_response(query: str, state) -> str:
     """Generate AI response based on query and state."""
-    
+
     query_lower = query.lower()
-    
+
     # River related questions
     if any(word in query_lower for word in ["river", "odaw", "overflow", "level"]):
         return f"""
@@ -83,9 +91,11 @@ def generate_copilot_response(query: str, state) -> str:
         Based on current rainfall of {state.rainfall_mm}mm, 
         the river is expected to { "rise" if state.risk_score > 50 else "remain stable" }.
         """
-    
+
     # Evacuation questions
-    elif any(word in query_lower for word in ["evacuate", "evacuation", "shelter", "safe"]):
+    elif any(
+        word in query_lower for word in ["evacuate", "evacuation", "shelter", "safe"]
+    ):
         return f"""
         **🚨 Evacuation Information**
         
@@ -102,9 +112,11 @@ def generate_copilot_response(query: str, state) -> str:
         - Kaneshie → Community Center (20 min)
         - Circle → Trade Fair Centre (25 min)
         """
-    
+
     # Impact questions
-    elif any(word in query_lower for word in ["impact", "affected", "people", "population"]):
+    elif any(
+        word in query_lower for word in ["impact", "affected", "people", "population"]
+    ):
         return f"""
         **👥 Impact Assessment for {state.district}**
         
@@ -121,9 +133,11 @@ def generate_copilot_response(query: str, state) -> str:
         **Estimated Economic Impact:** GH₵ {state.total_loss_ghs:,.0f}
         Estimated Recovery Time: {state.recovery_weeks:.0f} weeks
         """
-    
+
     # Forecast questions
-    elif any(word in query_lower for word in ["forecast", "rain", "weather", "tomorrow"]):
+    elif any(
+        word in query_lower for word in ["forecast", "rain", "weather", "tomorrow"]
+    ):
         return f"""
         **🌤️ Weather Forecast**
         
@@ -137,7 +151,7 @@ def generate_copilot_response(query: str, state) -> str:
         **Risk Trend:** {"Increasing" if state.risk_score > 50 else "Stable"}
         Peak risk expected in {6} hours.
         """
-    
+
     # General questions
     else:
         return f"""

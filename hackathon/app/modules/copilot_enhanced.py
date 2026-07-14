@@ -2,23 +2,35 @@
 AI Flood Copilot Enhanced - Real intelligence with context.
 """
 
-import streamlit as st
 from datetime import datetime, timedelta
-from hackathon.app.modules.road_intelligence import get_road_flooding_data
-from hackathon.app.modules.risk_explainer import get_risk_breakdown
 
-def get_enhanced_response(question: str, district: str, risk_score: float, 
-                         rainfall: float, soil_saturation: float, river_level: float) -> str:
+import streamlit as st
+
+from hackathon.app.modules.risk_explainer import get_risk_breakdown
+from hackathon.app.modules.road_intelligence import get_road_flooding_data
+
+
+def get_enhanced_response(
+    question: str,
+    district: str,
+    risk_score: float,
+    rainfall: float,
+    soil_saturation: float,
+    river_level: float,
+) -> str:
     """Generate enhanced, context-aware responses."""
-    
+
     question_lower = question.lower()
-    
+
     # ============================================================
     # ROAD FLOODING QUESTIONS - REAL ANSWER
     # ============================================================
-    if any(word in question_lower for word in ["road", "street", "drive", "route", "traffic"]):
+    if any(
+        word in question_lower
+        for word in ["road", "street", "drive", "route", "traffic"]
+    ):
         roads = get_road_flooding_data(district, rainfall, soil_saturation)
-        
+
         if roads["high_risk"]:
             response = f"""
 🛣️ **HIGH-RISK ROADS: {district.upper()}**
@@ -32,21 +44,21 @@ Based on current flood intelligence:
    Confidence: {road['confidence']}%
    Reason: {road['reason']}
 """
-            
+
             if roads["moderate_risk"]:
                 response += f"""
 🟡 **Moderate Risk Roads:**
 """
                 for road in roads["moderate_risk"]:
                     response += f"   • {road['name']} ({road['depth']:.1f}m)\n"
-            
+
             if roads["safe_routes"]:
                 response += f"""
 🟢 **Recommended Safe Routes:**
 """
                 for route in roads["safe_routes"]:
                     response += f"   • {route['name']}\n"
-            
+
             response += f"""
 📊 **Confidence:** 78% based on {len(roads['high_risk'])} verified reports
 
@@ -57,13 +69,13 @@ Based on current flood intelligence:
 🎯 **Recommendation:** Avoid high-risk roads. Use safe routes.
 """
             return response
-    
+
     # ============================================================
     # WHY RISK - REAL EXPLANATION
     # ============================================================
     if any(word in question_lower for word in ["why", "reason", "explain", "cause"]):
         breakdown = get_risk_breakdown(district, rainfall, soil_saturation, river_level)
-        
+
         response = f"""
 📊 **RISK BREAKDOWN: {district.upper()}**
 
@@ -71,8 +83,16 @@ Total Risk: {breakdown['total_risk']:.1f}%
 
 **Driver Analysis:**
 """
-        for name, info in breakdown['drivers'].items():
-            status_emoji = "🔴" if info['status'] == "CRITICAL" else "🟠" if info['status'] == "HIGH" else "🟡" if info['status'] == "MODERATE" else "🟢"
+        for name, info in breakdown["drivers"].items():
+            status_emoji = (
+                "🔴"
+                if info["status"] == "CRITICAL"
+                else (
+                    "🟠"
+                    if info["status"] == "HIGH"
+                    else "🟡" if info["status"] == "MODERATE" else "🟢"
+                )
+            )
             response += f"""
 {status_emoji} **{name}**: {info['weight']}%
    • Current: {info['value']}
@@ -80,7 +100,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
    • Status: {info['status']}
    • Why: {info['description']}
 """
-        
+
         response += f"""
 **Conclusion:**
 {breakdown['drivers']['Rainfall Intensity']['status']} rainfall + {breakdown['drivers']['Soil Saturation']['status']} soil saturation = {breakdown['total_risk']:.1f}% risk
@@ -88,11 +108,13 @@ Total Risk: {breakdown['total_risk']:.1f}%
 🎯 **Recommendation:** { 'Immediate evacuation' if breakdown['total_risk'] > 80 else 'Prepare for evacuation' if breakdown['total_risk'] > 60 else 'Monitor conditions' }
 """
         return response
-    
+
     # ============================================================
     # FARMER-SPECIFIC RESPONSE
     # ============================================================
-    if any(word in question_lower for word in ["farm", "crop", "livestock", "agriculture"]):
+    if any(
+        word in question_lower for word in ["farm", "crop", "livestock", "agriculture"]
+    ):
         return f"""
 🌾 **FARMER ADVISORY: {district.upper()}**
 
@@ -122,7 +144,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
 
 📞 For assistance: NADMO hotline 112
 """
-    
+
     # ============================================================
     # SCHOOLS RESPONSE
     # ============================================================
@@ -150,7 +172,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
 
 **Contact:** Ghana Education Service Hotline: 191
 """
-    
+
     # ============================================================
     # DEFAULT
     # ============================================================
@@ -177,41 +199,46 @@ Total Risk: {breakdown['total_risk']:.1f}%
 """
 
 
-def render_enhanced_copilot(district: str, risk_score: float, 
-                           rainfall: float, soil_saturation: float, river_level: float) -> None:
+def render_enhanced_copilot(
+    district: str,
+    risk_score: float,
+    rainfall: float,
+    soil_saturation: float,
+    river_level: float,
+) -> None:
     """Render enhanced copilot with real intelligence."""
-    
+
     st.markdown("### 🤖 Enhanced AI Flood Copilot")
     st.caption("Ask any question about flood risk in your community - Get real answers")
-    
+
     # Quick questions
     quick_questions = [
         "Which roads will flood in the next 6 hours?",
         "Why is the risk EXTREME?",
         "What should farmers do?",
-        "Should schools close tomorrow?"
+        "Should schools close tomorrow?",
     ]
-    
+
     cols = st.columns(4)
     for i, q in enumerate(quick_questions):
         with cols[i]:
             if st.button(q, key=f"enhanced_q_{i}"):
                 st.session_state.enhanced_query = q
-    
+
     query = st.text_input(
         "Ask CivicFlood AI:",
         placeholder="e.g., Which roads will flood?",
-        key="enhanced_input"
+        key="enhanced_input",
     )
-    
+
     if query or st.session_state.get("enhanced_query"):
         question = query or st.session_state.get("enhanced_query", "")
-        
+
         with st.spinner("🧠 Analyzing with real flood intelligence..."):
             response = get_enhanced_response(
                 question, district, risk_score, rainfall, soil_saturation, river_level
             )
-            
+
             st.markdown("---")
             st.markdown("### 📋 Intelligence Response")
             st.markdown(response)

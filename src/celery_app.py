@@ -1,6 +1,7 @@
 """Celery configuration for distributed task queue."""
 
 import os
+
 from celery import Celery
 
 # Default to memory queue if Redis not configured

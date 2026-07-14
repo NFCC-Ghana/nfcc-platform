@@ -1,11 +1,12 @@
 """VRA (Volta River Authority) telemetry integration."""
 
-import requests
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import requests
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

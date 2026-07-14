@@ -3,19 +3,21 @@
 This module provides reusable fixtures for all tests.
 """
 
-# Model fixtures
-from tests.fixtures.model_fixtures import (
-    trained_model,
-    mock_model,
-    sample_alert_payload as model_sample_alert,
-)
-
 # DataFrame fixtures
 from tests.fixtures.dataframe_fixtures import (
-    sample_rainfall_dataframe,
-    sample_features_dataframe,
-    empty_dataframe,
     district_rainfall_dict,
+    empty_dataframe,
+    sample_features_dataframe,
+    sample_rainfall_dataframe,
+)
+
+# Model fixtures
+from tests.fixtures.model_fixtures import (
+    mock_model,
+)
+from tests.fixtures.model_fixtures import sample_alert_payload as model_sample_alert
+from tests.fixtures.model_fixtures import (
+    trained_model,
 )
 
 # Provider fixtures (using correct names from provider_fixtures.py)
@@ -23,6 +25,8 @@ from tests.fixtures.provider_fixtures import (
     mock_email_config,
     mock_sms_config,
     mock_whatsapp_config,
+)
+from tests.fixtures.provider_fixtures import (
     sample_alert_payload as provider_sample_alert,
 )
 

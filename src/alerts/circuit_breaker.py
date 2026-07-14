@@ -1,10 +1,11 @@
 """Circuit breaker for provider resilience."""
 
 import time
+from dataclasses import dataclass
 from enum import Enum
 from threading import Lock
 from typing import Dict, Optional
-from dataclasses import dataclass
+
 from src.config.settings import settings
 
 

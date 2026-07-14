@@ -1,6 +1,6 @@
 """Alert formatting utilities."""
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 def get_risk_tier(score: float) -> str:

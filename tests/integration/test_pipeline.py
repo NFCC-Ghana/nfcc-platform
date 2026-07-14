@@ -1,8 +1,9 @@
 """Integration tests for the ML pipeline."""
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from src.alerts.engine import AlertEngine
 from src.alerts.providers.mock_provider import MockAlertProvider
 

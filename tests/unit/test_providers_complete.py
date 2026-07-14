@@ -1,11 +1,13 @@
 """Complete unit tests for all providers with proper mocking."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from src.alerts.models import AlertPayload
+from src.alerts.providers.email_provider import EmailAlertProvider
 from src.alerts.providers.sms_provider import SMSAlertProvider
 from src.alerts.providers.whatsapp_provider import WhatsAppAlertProvider
-from src.alerts.providers.email_provider import EmailAlertProvider
 
 # ============================================================
 # SMS Provider Tests

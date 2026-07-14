@@ -1,9 +1,10 @@
 """Subscription management API endpoints for WhatsApp/SMS alerts."""
 
+import logging
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-import logging
 
 from src.alerts.subscriptions import subscription_manager
 

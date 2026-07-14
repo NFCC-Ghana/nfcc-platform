@@ -2,9 +2,10 @@
 """Convert model to proper format for loading."""
 
 import pickle
+from pathlib import Path
+
 import joblib
 import xgboost as xgb
-from pathlib import Path
 
 
 def convert_model():

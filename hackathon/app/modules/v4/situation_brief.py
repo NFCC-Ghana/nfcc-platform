@@ -1,44 +1,62 @@
-"""AI Situation Brief module."""
+"""
+CivicFlood AI - Situation Brief
+Provides a concise summary of the current flood situation.
+"""
 
-import streamlit as st
+from datetime import datetime
 
 
-def render_situation_brief(state):
-    """Render the AI situation brief."""
-    st.markdown("## 🤖 AI Situation Brief")
-    
+def generate_situation_brief(state) -> dict:
+    """Generate a situation brief from the current state."""
+    brief = {
+        "timestamp": datetime.now().isoformat(),
+        "risk_level": state.risk_category,
+        "risk_score": state.risk_score,
+        "summary": "",
+        "key_actions": [],
+        "affected_areas": (
+            state.affected_communities[:5] if state.affected_communities else []
+        ),
+    }
+
     if state.risk_score >= 80:
-        brief = f"""
-        🔴 **EMERGENCY LEVEL: HIGH**
-        
-        Persistent rainfall has saturated catchments in {state.district}, 
-        increasing flash flood risk. Verified flooding is already occurring 
-        in Alajo while Volta Basin conditions continue deteriorating. 
-        Immediate priority is evacuation readiness and deployment of 
-        drainage response teams.
-        """
+        brief["summary"] = (
+            "CRITICAL: Immediate evacuation required. "
+            "Multiple risk factors are at extreme levels."
+        )
+        brief["key_actions"] = [
+            "Issue mandatory evacuation order",
+            "Activate all emergency services",
+            "Open all shelters",
+            "Deploy rescue teams",
+        ]
     elif state.risk_score >= 60:
-        brief = f"""
-        🟠 **ALERT LEVEL: ELEVATED**
-        
-        Rainfall continues to impact {state.district} with rising water levels. 
-        Soil saturation is increasing rapidly. Monitor low-lying areas and 
-        prepare for potential evacuation orders.
-        """
+        brief["summary"] = (
+            "HIGH: Prepare for evacuation. " "Conditions are deteriorating rapidly."
+        )
+        brief["key_actions"] = [
+            "Prepare evacuation routes",
+            "Alert communities",
+            "Position resources",
+            "Monitor river levels",
+        ]
+    elif state.risk_score >= 40:
+        brief["summary"] = (
+            "MODERATE: Monitor conditions closely. " "Risk is elevated but manageable."
+        )
+        brief["key_actions"] = [
+            "Continue monitoring",
+            "Update community alerts",
+            "Prepare resources",
+            "Review evacuation plans",
+        ]
     else:
-        brief = f"""
-        🟢 **MONITORING LEVEL: NORMAL**
-        
-        Conditions in {state.district} remain stable. Continue monitoring 
-        rainfall and river levels. No immediate action required.
-        """
-    
-    st.info(brief)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Analysis", "✅ Complete")
-    with col2:
-        st.metric("Data Sources", f"{state.active_sources_count}")
-    with col3:
-        st.metric("Confidence", f"{state.confidence*100:.0f}%")
+        brief["summary"] = "LOW: Normal monitoring. " "No immediate action required."
+        brief["key_actions"] = [
+            "Routine monitoring",
+            "Maintain situational awareness",
+            "Update weather forecasts",
+            "Regular reporting",
+        ]
+
+    return brief

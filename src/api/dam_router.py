@@ -1,8 +1,10 @@
 """API endpoints for dam spillage prediction."""
 
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query
+
 from src.config.dams import DAM_CONFIG
 from src.models.dam_spillage import get_spillage_forecast, validate_historical_events
 

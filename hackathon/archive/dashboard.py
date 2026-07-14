@@ -2,9 +2,10 @@
 CivicFlood AI - Simple Dashboard Fallback
 """
 
-import streamlit as st
-import requests
 from datetime import datetime
+
+import requests
+import streamlit as st
 
 API_URL = "https://nfcc-platform-production.up.railway.app"
 

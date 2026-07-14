@@ -1,7 +1,7 @@
 """Denial of Service testing utilities."""
 
 import json
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 
 class DoSTester:

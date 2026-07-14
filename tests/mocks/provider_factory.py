@@ -1,9 +1,10 @@
 """Factory for creating mock providers with patched clients."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+from src.alerts.providers.email_provider import EmailProvider
 from src.alerts.providers.sms_provider import SMSProvider
 from src.alerts.providers.whatsapp_provider import WhatsAppProvider
-from src.alerts.providers.email_provider import EmailProvider
 
 
 class MockProviderFactory:

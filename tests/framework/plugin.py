@@ -1,8 +1,8 @@
 """Plugin-based architecture for extensible resilience testing."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
 from dataclasses import dataclass
+from typing import Any, Dict, List
 
 
 @dataclass
@@ -99,7 +99,7 @@ class SecurityPlugin(ResiliencePlugin):
     version = "1.0.0"
 
     def execute(self, context: TestContext) -> Dict[str, Any]:
-        from tests.framework.security import InjectionTester, DoSTester
+        from tests.framework.security import DoSTester, InjectionTester
 
         # Run security checks
         return {

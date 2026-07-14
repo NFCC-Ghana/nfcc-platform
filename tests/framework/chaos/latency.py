@@ -1,10 +1,10 @@
 """Latency injection for timeout testing."""
 
 import random
-import time
 import threading
-from typing import Callable, Any
+import time
 from functools import wraps
+from typing import Any, Callable
 
 
 class LatencyInjector:
@@ -78,6 +78,7 @@ class LatencyInjector:
     def simulate_hanging_model(api_client, endpoint: str, payload: dict):
         """Simulate hanging model (never returns)."""
         import threading
+
         import src.api.main as api_module
 
         def hanging_predict(*args, **kwargs):

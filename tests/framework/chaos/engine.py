@@ -1,9 +1,9 @@
 """Core chaos engineering engine."""
 
-import random
 import json
-from typing import Dict, Any, List, Tuple
+import random
 from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
 
 
 @dataclass

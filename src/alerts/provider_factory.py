@@ -18,10 +18,10 @@ class ProviderFactory:
             return cls._providers
 
         from src.alerts.providers import (
-            SMSAlertProvider,
-            WhatsAppAlertProvider,
             EmailAlertProvider,
             MockAlertProvider,
+            SMSAlertProvider,
+            WhatsAppAlertProvider,
         )
         from src.config.settings import settings
 

@@ -2,9 +2,10 @@
 """Resave XGBoost model in modern format to eliminate warnings."""
 
 import pickle
-import joblib
 import warnings
 from pathlib import Path
+
+import joblib
 
 # Suppress warnings during loading
 warnings.filterwarnings("ignore")

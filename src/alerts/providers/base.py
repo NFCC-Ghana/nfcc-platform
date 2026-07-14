@@ -1,7 +1,8 @@
 """Base alert provider interface."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
+
 from src.alerts.models import AlertPayload
 
 

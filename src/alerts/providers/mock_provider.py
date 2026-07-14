@@ -1,9 +1,10 @@
 """Mock alert provider for testing."""
 
 import logging
-from typing import Dict, Any
-from src.alerts.providers.base import BaseAlertProvider
+from typing import Any, Dict
+
 from src.alerts.models import AlertPayload
+from src.alerts.providers.base import BaseAlertProvider
 
 logger = logging.getLogger("nfcc.alert.mock")
 

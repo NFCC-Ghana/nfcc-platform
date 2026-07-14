@@ -1,7 +1,7 @@
 """State corruption testing for shared state."""
 
-import threading
 import random
+import threading
 from typing import Any, Dict, List
 
 

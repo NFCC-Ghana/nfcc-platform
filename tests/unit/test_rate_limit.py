@@ -1,7 +1,9 @@
 """Tests for rate limiter module."""
 
 import time
+
 import pytest
+
 from src.alerts.rate_limit import RateLimiter
 
 

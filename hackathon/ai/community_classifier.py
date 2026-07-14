@@ -1,9 +1,9 @@
 """Community Report Classifier - Validates citizen flood reports."""
 
-import re
 import logging
-from typing import Dict, Any, Tuple, Optional, List
+import re
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("hackathon.classifier")
 

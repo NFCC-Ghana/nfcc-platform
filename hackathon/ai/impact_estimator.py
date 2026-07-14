@@ -1,8 +1,8 @@
 """Impact Estimator - Estimates population, infrastructure exposure."""
 
 import logging
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any, Dict
 
 logger = logging.getLogger("hackathon.impact")
 

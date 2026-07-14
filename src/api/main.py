@@ -31,18 +31,18 @@ alert_engine = None
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events."""
     global alert_engine
-    
+
     # Startup
     logger.info("Starting NFCC Flood Alert Platform...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"API Version: {settings.API_VERSION}")
-    
+
     # Initialize alert engine
     alert_engine = AlertEngine()
     logger.info("Alert engine initialized")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down NFCC Flood Alert Platform...")
 

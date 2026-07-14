@@ -1,8 +1,9 @@
 """Explainability endpoints for model interpretability."""
 
+from typing import Any, Dict
+
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Dict, Any
 
 router = APIRouter(prefix="/explain", tags=["Explainability"])
 

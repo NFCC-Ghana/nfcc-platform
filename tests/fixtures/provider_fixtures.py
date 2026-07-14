@@ -1,6 +1,7 @@
 """Provider test fixtures with proper mocking."""
 
 import pytest
+
 from src.alerts.models import AlertPayload
 
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Test email with new app password."""
 
+import os
 import smtplib
 from email.mime.text import MIMEText
-import os
+
 from dotenv import load_dotenv
 
 # Load environment

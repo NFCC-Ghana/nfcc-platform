@@ -1,7 +1,8 @@
 """Tests for alert formatter module."""
 
 import pytest
-from src.alerts.formatter import get_risk_tier, get_instruction, format_alert
+
+from src.alerts.formatter import format_alert, get_instruction, get_risk_tier
 
 
 class TestGetRiskTier:

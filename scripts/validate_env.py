@@ -37,8 +37,9 @@ def validate_env_file():
 
 def validate_required_vars():
     """Check required variables exist (empty values are OK for optional vars)."""
-    from dotenv import load_dotenv
     import os
+
+    from dotenv import load_dotenv
 
     load_dotenv(".env.production")
 
@@ -82,8 +83,9 @@ def validate_required_vars():
 
 def validate_twilio_format():
     """Validate Twilio credential formats."""
-    from dotenv import load_dotenv
     import os
+
+    from dotenv import load_dotenv
 
     load_dotenv(".env.production")
 

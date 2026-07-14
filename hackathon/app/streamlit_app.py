@@ -4,9 +4,10 @@ Single authoritative entry point for the enterprise dashboard.
 Handles both local and Render deployments.
 """
 
-import streamlit as st
 import sys
 from pathlib import Path
+
+import streamlit as st
 
 # ============================================================
 # DYNAMIC PATH HANDLING - WORKS EVERYWHERE
@@ -31,7 +32,7 @@ st.set_page_config(
     page_title="CivicFlood AI - National Emergency Operations Center",
     page_icon="🌊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # ============================================================
@@ -40,11 +41,13 @@ st.set_page_config(
 try:
     # Try the standard import path
     from hackathon.app.pages.dashboard import main
+
     main()
 except ImportError as e:
     try:
         # Try the relative import path (when running from hackathon/)
         from app.pages.dashboard import main
+
         main()
     except ImportError as e2:
         st.error("🚨 Could not load the dashboard. Please check the deployment.")
@@ -52,4 +55,3 @@ except ImportError as e:
         st.code(f"Second error: {e2}")
         st.code(f"Python path: {sys.path[:5]}")
         raise
-

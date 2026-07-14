@@ -1,7 +1,7 @@
 """Async tasks for Celery worker."""
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 logger = logging.getLogger("nfcc.tasks")
 
@@ -20,8 +20,8 @@ try:
     )
     def send_whatsapp_alert(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Send WhatsApp alert asynchronously."""
-        from src.alerts.providers.whatsapp_provider import WhatsAppAlertProvider
         from src.alerts.models import AlertPayload
+        from src.alerts.providers.whatsapp_provider import WhatsAppAlertProvider
 
         logger.info(f"Processing async alert for {payload.get('location')}")
 
@@ -43,8 +43,8 @@ except ImportError:
 
     def send_whatsapp_alert(payload):
         """Synchronous fallback when Celery not available."""
-        from src.alerts.providers.whatsapp_provider import WhatsAppAlertProvider
         from src.alerts.models import AlertPayload
+        from src.alerts.providers.whatsapp_provider import WhatsAppAlertProvider
 
         logger.warning("Celery not available - sending synchronously")
         provider = WhatsAppAlertProvider()

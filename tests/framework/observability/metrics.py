@@ -1,7 +1,7 @@
 """Metrics validation utilities."""
 
-from typing import Dict, Any, Optional
 from collections import defaultdict
+from typing import Any, Dict, Optional
 
 
 class MetricsValidator:

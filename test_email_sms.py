@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Test email-to-SMS with your actual credentials."""
 
+import os
 import smtplib
 from email.mime.text import MIMEText
-import os
 
 # Your credentials (loaded from .env.production)
 from dotenv import load_dotenv

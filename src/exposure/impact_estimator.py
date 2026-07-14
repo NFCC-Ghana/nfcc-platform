@@ -1,8 +1,8 @@
 """Complete impact estimator with lead time and vulnerable populations."""
 
-from typing import Dict, List, Optional
 import logging
 from datetime import datetime
+from typing import Dict, List, Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

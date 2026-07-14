@@ -1,11 +1,11 @@
 """Alert database module - stores and retrieves flood alerts."""
 
-import sqlite3
 import json
+import logging
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
-import logging
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -183,3 +183,16 @@ def get_total_alerts_count(location_filter: Optional[str] = None) -> int:
     count = cursor.fetchone()[0]
     conn.close()
     return count
+
+
+# ============================================================
+# Database connection for testing (added for compatibility)
+# ============================================================
+
+
+def get_db():
+    """
+    Get database connection - used by tests.
+    This is an alias for get_db_connection() for backward compatibility.
+    """
+    return get_db_connection()

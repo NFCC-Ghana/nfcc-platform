@@ -1,9 +1,10 @@
 """Community report API endpoints for citizen flood reporting."""
 
+import logging
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-import logging
 
 from src.community.community_memory import community_memory
 

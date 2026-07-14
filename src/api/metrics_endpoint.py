@@ -1,13 +1,15 @@
 """Advanced health metrics endpoint."""
 
-import time
-import psutil
 import logging
-from typing import Dict, Any
+import time
+from typing import Any, Dict
+
+import psutil
 from fastapi import APIRouter
-from src.config.settings import settings
-from src.alerts.rate_limit import RateLimiter
+
 from src.alerts.cooldown import is_redis_available
+from src.alerts.rate_limit import RateLimiter
+from src.config.settings import settings
 
 logger = logging.getLogger("nfcc-api.metrics")
 

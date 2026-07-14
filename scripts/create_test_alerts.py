@@ -5,13 +5,14 @@ This script generates realistic flood alert data for testing the alert API.
 It creates alerts across multiple locations, risk tiers, and time periods.
 """
 
-import requests
 import json
-import time
-from datetime import datetime, timedelta
 import random
 import sqlite3
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
+
+import requests
 
 # Configuration
 BASE_URL = "http://localhost:8000"

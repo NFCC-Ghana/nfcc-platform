@@ -4,11 +4,12 @@ Single screen, Mission Control layout
 NO set_page_config() - handled by streamlit_app.py
 """
 
-import streamlit as st
+import os
 import sys
 from pathlib import Path
-import os
+
 import requests
+import streamlit as st
 
 # ============================================================
 # PATH SETUP
@@ -16,17 +17,22 @@ import requests
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from hackathon.app.modules.v4.ai_copilot_v4 import render_ai_copilot_v4
+from hackathon.app.modules.v4.community_intelligence import (
+    render_community_intelligence,
+)
+from hackathon.app.modules.v4.evidence_panel import render_evidence_panel
+from hackathon.app.modules.v4.impact_panel import render_impact_panel
+
 # ============================================================
 # IMPORT v4 MODULES
 # ============================================================
-from hackathon.app.modules.v4.mission_control_header import render_mission_control_header
+from hackathon.app.modules.v4.mission_control_header import (
+    render_mission_control_header,
+)
 from hackathon.app.modules.v4.national_briefing import render_national_briefing
-from hackathon.app.modules.v4.situation_map import render_situation_map
-from hackathon.app.modules.v4.evidence_panel import render_evidence_panel
-from hackathon.app.modules.v4.impact_panel import render_impact_panel
 from hackathon.app.modules.v4.operations_panel import render_operations_panel
-from hackathon.app.modules.v4.community_intelligence import render_community_intelligence
-from hackathon.app.modules.v4.ai_copilot_v4 import render_ai_copilot_v4
+from hackathon.app.modules.v4.situation_map import render_situation_map
 
 # ============================================================
 # API HELPER

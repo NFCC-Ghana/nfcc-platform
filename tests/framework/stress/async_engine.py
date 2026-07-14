@@ -1,11 +1,12 @@
 """Async load engine for high-concurrency testing."""
 
 import asyncio
-import aiohttp
-import time
 import statistics
-from typing import Dict, Any, List, Optional
+import time
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
+import aiohttp
 
 
 @dataclass

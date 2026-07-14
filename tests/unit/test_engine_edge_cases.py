@@ -1,7 +1,9 @@
 """Edge case tests for AlertEngine - provider failures, rate limiting, force bypass."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from src.alerts.engine import AlertEngine
 from src.alerts.providers.mock_provider import MockAlertProvider
 

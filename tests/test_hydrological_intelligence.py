@@ -1,12 +1,13 @@
 """Comprehensive tests for hydrological intelligence."""
 
 import pytest
-from src.hydrology.unified_intelligence import unified_intelligence
-from src.hydrology.rainfall_history import rainfall_history
-from src.hydrology.river_intelligence import river_intelligence
-from src.hydrology.reservoir_intelligence import reservoir_intelligence
-from src.hydrology.soil_moisture import soil_moisture
+
 from src.hydrology.flood_polygons import flood_polygons
+from src.hydrology.rainfall_history import rainfall_history
+from src.hydrology.reservoir_intelligence import reservoir_intelligence
+from src.hydrology.river_intelligence import river_intelligence
+from src.hydrology.soil_moisture import soil_moisture
+from src.hydrology.unified_intelligence import unified_intelligence
 
 
 def test_rainfall_history():

@@ -1,9 +1,10 @@
 """Pytest configuration and global fixtures."""
 
-import sys
 import os
-import pytest
+import sys
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -19,17 +20,17 @@ os.environ.setdefault("TESTING", "true")
 
 # Model fixtures
 try:
-    from tests.fixtures.model_fixtures import trained_model, mock_model
+    from tests.fixtures.model_fixtures import mock_model, trained_model
 except ImportError as e:
     print(f"⚠️ Could not load model_fixtures: {e}")
 
 # DataFrame fixtures
 try:
     from tests.fixtures.dataframe_fixtures import (
-        sample_rainfall_dataframe,
-        sample_features_dataframe,
-        empty_dataframe,
         district_rainfall_dict,
+        empty_dataframe,
+        sample_features_dataframe,
+        sample_rainfall_dataframe,
     )
 except ImportError as e:
     print(f"⚠️ Could not load dataframe_fixtures: {e}")
@@ -107,6 +108,7 @@ def test_client():
     """Create a test client for FastAPI."""
     try:
         from fastapi.testclient import TestClient
+
         from src.api.main import app
 
         return TestClient(app)

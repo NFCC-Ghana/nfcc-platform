@@ -3,12 +3,14 @@ Decision Copilot - Orchestrates all platform capabilities.
 One prompt, one actionable answer.
 """
 
-import streamlit as st
 from datetime import datetime
+
+import streamlit as st
+
 
 def get_operational_briefing(district: str, risk_score: float) -> str:
     """Generate concise operational briefing."""
-    
+
     return f"""
 ┌─────────────────────────────────────────────────────────────────┐
 │           OPERATIONAL BRIEFING • {district.upper()}           │
@@ -47,15 +49,16 @@ def get_operational_briefing(district: str, risk_score: float) -> str:
 └─────────────────────────────────────────────────────────────────┘
 """
 
+
 def render_decision_copilot(district: str, risk_score: float) -> None:
     """Render Decision Copilot interface."""
-    
+
     st.markdown("### 🎖️ Decision Copilot")
     st.caption("Orchestrates all platform capabilities - One prompt, one answer")
-    
+
     # Quick actions
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         if st.button("📄 Generate Briefing", use_container_width=True):
             briefing = get_operational_briefing(district, risk_score)
@@ -63,9 +66,9 @@ def render_decision_copilot(district: str, risk_score: float) -> None:
             st.download_button(
                 "📥 Download Briefing",
                 briefing,
-                file_name=f"operational_briefing_{district}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt"
+                file_name=f"operational_briefing_{district}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
             )
-    
+
     with col2:
         if st.button("📢 Generate Alert", use_container_width=True):
             st.success("✅ Alert generated:")
@@ -77,20 +80,20 @@ Communities: Alajo, Kaneshie, Circle
 Shelters: Accra High School (1.2km)
 Confidence: 92%
             """)
-    
+
     with col3:
         if st.button("📋 Generate Report", use_container_width=True):
             st.success("✅ Report generated for NADMO")
-    
+
     # Free text input
     st.divider()
     st.markdown("#### 💬 Ask Decision Copilot")
-    
+
     query = st.text_input(
         "What would you like to know?",
-        placeholder="e.g., What should NADMO do in the next 12 hours?"
+        placeholder="e.g., What should NADMO do in the next 12 hours?",
     )
-    
+
     if query:
         with st.spinner("🧠 Orchestrating all intelligence sources..."):
             response = f"""
@@ -147,5 +150,5 @@ NADMO should:
 **Timeline:** Next 12-24 hours
 **Confidence:** MEDIUM (85%)
 """
-            
+
             st.markdown(response)

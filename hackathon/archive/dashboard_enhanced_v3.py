@@ -3,22 +3,25 @@ CivicFlood AI - Enhanced Dashboard v3
 Full NFCC intelligence with enhanced AI Copilot
 """
 
-import streamlit as st
 import sys
 from pathlib import Path
+
+import streamlit as st
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Import original dashboard
-from hackathon.app.pages_disabled.dashboard_enhanced import main as original_main
-
-# Import enhanced modules
-from hackathon.app.modules.timeline import render_timeline
 from hackathon.app.modules.copilot import render_copilot, render_situation_report
 from hackathon.app.modules.evacuation import render_evacuation_info
 from hackathon.app.modules.ranking import render_district_ranking
+
+# Import enhanced modules
+from hackathon.app.modules.timeline import render_timeline
+
+# Import original dashboard
+from hackathon.app.pages_disabled.dashboard_enhanced import main as original_main
+
 
 def main():
     # Call original dashboard first

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Standardize model to joblib format only."""
 
-import joblib
 import pickle
 from pathlib import Path
+
+import joblib
 
 
 def standardize_model():

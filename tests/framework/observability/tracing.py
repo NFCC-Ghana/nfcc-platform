@@ -1,7 +1,7 @@
 """Tracing validation utilities."""
 
 import uuid
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 class TracingValidator:

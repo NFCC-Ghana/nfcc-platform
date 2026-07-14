@@ -1,15 +1,15 @@
 """Email alert provider using SMTP."""
 
 import logging
-import smtplib
 import os
+import smtplib
 import time
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Dict, Any, List, Optional
+from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional
 
-from src.alerts.providers.base import BaseAlertProvider
 from src.alerts.models import AlertPayload
+from src.alerts.providers.base import BaseAlertProvider
 
 logger = logging.getLogger("nfcc.alert.email")
 

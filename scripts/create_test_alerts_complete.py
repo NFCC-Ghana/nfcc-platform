@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Complete test data generator for NFCC Alert API."""
 
-import sqlite3
-import requests
 import random
+import sqlite3
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import requests
 
 # Configuration
 BASE_URL = "http://localhost:8000"

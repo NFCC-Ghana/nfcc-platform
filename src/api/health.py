@@ -1,7 +1,8 @@
 """Production health check endpoints - no startup network calls."""
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
+
 from fastapi import APIRouter
 
 logger = logging.getLogger("nfcc-api.health")
@@ -38,8 +39,8 @@ def check_model_health() -> Dict[str, Any]:
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
     """Comprehensive health check - no startup network calls."""
-    from src.config.settings import settings
     from src.alerts.cooldown import is_redis_available
+    from src.config.settings import settings
 
     provider_status = settings.get_provider_status()
     is_dry_run = getattr(settings, "ALERT_DRY_RUN", False)

@@ -1,8 +1,10 @@
 """Property-based testing with Hypothesis - automatic invariant discovery."""
 
-from hypothesis import given, strategies as st, assume, settings, HealthCheck
-from typing import Dict, Any, Callable
 import json
+from typing import Any, Callable, Dict
+
+from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import strategies as st
 
 
 class PropertyTestEngine:

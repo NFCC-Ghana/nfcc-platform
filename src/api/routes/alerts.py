@@ -1,7 +1,7 @@
 """FastAPI router for flood alert history and statistics endpoints."""
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field

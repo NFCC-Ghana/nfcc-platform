@@ -1,9 +1,9 @@
 """Single source of truth for alert payloads - NEVER duplicate this definition."""
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any
-import json
+from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)

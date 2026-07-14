@@ -1,10 +1,10 @@
 """Failure analytics and dashboard generation."""
 
 import json
-from datetime import datetime
 from collections import Counter, defaultdict
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

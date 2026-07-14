@@ -1,6 +1,6 @@
 """Shared payload fixtures for testing."""
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 
 class PayloadFixtures:
