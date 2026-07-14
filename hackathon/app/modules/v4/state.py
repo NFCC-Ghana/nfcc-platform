@@ -599,3 +599,50 @@ default_state = DashboardState()
 
 __all__ = ['DashboardState', 'create_state_from_api', 'default_state']
 
+
+    # ============================================================
+    # BACKWARD COMPATIBILITY PROPERTIES
+    # ============================================================
+    @property
+    def confidence(self) -> float:
+        """Backward compatibility for confidence attribute."""
+        return self.risk_confidence
+
+
+    # ============================================================
+    # BACKWARD COMPATIBILITY PROPERTIES
+    # ============================================================
+    @property
+    def confidence(self) -> float:
+        """Backward compatibility for confidence attribute."""
+        return self.risk_confidence
+
+    @property
+    def risk_tier(self) -> str:
+        """Backward compatibility for risk_tier attribute."""
+        return self.risk_category
+
+    @property
+    def precipitation(self) -> float:
+        """Backward compatibility for precipitation attribute."""
+        return self.rainfall_mm
+
+
+    # ============================================================
+    # BACKWARD COMPATIBILITY PROPERTIES
+    # ============================================================
+    @property
+    def confidence(self) -> float:
+        """Backward compatibility for confidence attribute."""
+        return self.risk_confidence
+
+    @property
+    def risk_tier(self) -> str:
+        """Backward compatibility for risk_tier attribute."""
+        return self.risk_category
+
+    @property
+    def precipitation(self) -> float:
+        """Backward compatibility for precipitation attribute."""
+        return self.rainfall_mm
+
