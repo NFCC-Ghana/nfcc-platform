@@ -1,19 +1,12 @@
 """
-CivicFlood AI - Streamlit Cloud Entry Point
+CivicFlood AI - Streamlit Entry Point
+Single authoritative entry point for the enterprise dashboard.
 """
 
 import streamlit as st
-import sys
-from pathlib import Path
 
 # ============================================================
-# PATH SETUP
-# ============================================================
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
-
-# ============================================================
-# PAGE CONFIG
+# SINGLE PAGE CONFIG
 # ============================================================
 st.set_page_config(
     page_title="CivicFlood AI - National Emergency Operations Center",
@@ -23,11 +16,11 @@ st.set_page_config(
 )
 
 # ============================================================
-# DASHBOARD
+# LOAD THE ENTERPRISE DASHBOARD
 # ============================================================
 try:
     from hackathon.app.pages.dashboard import main
     main()
 except Exception as e:
-    st.error(f"🚨 Dashboard error")
+    st.error("🚨 Dashboard encountered an error. Please check the logs.")
     st.exception(e)
