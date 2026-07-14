@@ -1,0 +1,1 @@
+{"data": {"gauge_id": "ODAW-001", "river": "Odaw", "location": "Odaw River at Accra", "water_level_m": 0.8, "flow_rate_m3s": 8.0, "timestamp": "2026-06-19T04:11:17.670239", "source": "hydrological_services_api", "warning_level_m": 2.0, "danger_level_m": 2.8, "flood_stage_m": 3.2, "status": "NORMAL"}, "cached_at": "2026-06-19T04:11:17.670247"}

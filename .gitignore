@@ -82,3 +82,27 @@ Thumbs.db
 # Deployment
 # ==========================================
 railway.toml.env.production.backup
+.streamlit/
+data/alerts.db
+
+# Backup directories
+backups/
+
+# Runtime data
+data/community_reports.db
+data/*.db
+*.db
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Archive (keep but ignore)
+hackathon/archive/
+
+# Runtime data
+*.db
+*.sqlite
+*.log
+*.pyc
+__pycache__/

@@ -1,6 +1,7 @@
 """Alert engine for processing and sending alerts."""
 
 import logging
+from datetime import datetime
 from typing import Dict, Any, List, Optional, Union
 from src.alerts.models import AlertPayload
 from src.alerts.rate_limit import RateLimiter
@@ -8,6 +9,7 @@ from src.alerts.provider_factory import ProviderFactory
 from src.alerts.cooldown import should_send_alert
 from src.alerts.providers.base import BaseAlertProvider
 from src.config.settings import settings
+from src.database.alert_db import save_alert
 
 logger = logging.getLogger("nfcc.alert.engine")
 
@@ -149,6 +151,15 @@ class AlertEngine:
 
         logger.warning(f"🚨 ALERT | {location} | Score: {score} | {risk_tier}")
 
+        # Save alert to database for persistence and analytics
+        self._save_alert_to_db(
+            location=location,
+            score=score,
+            risk_tier=risk_tier,
+            alert_sent=any_success,
+            provider_results=results,
+        )
+
         return {
             "alert_sent": any_success,
             "risk_tier": risk_tier,
@@ -156,6 +167,59 @@ class AlertEngine:
             "providers": results,
             "cooldown_minutes": self.cooldown_minutes,
         }
+
+    def _save_alert_to_db(
+        self,
+        location: str,
+        score: float,
+        risk_tier: str,
+        alert_sent: bool,
+        provider_results: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Save alert to SQLite database after processing.
+
+        Logs each provider's attempt separately if multiple providers were tried.
+        For each provider result, creates a database record capturing:
+        - Provider name that attempted to send the alert
+        - Message ID if the send was successful
+        - Error details if the send failed
+
+        Args:
+            location: Geographic location of the alert
+            score: Alert risk score
+            risk_tier: Categorical risk level (LOW, MODERATE, HIGH, CRITICAL, EXTREME)
+            alert_sent: Whether at least one provider succeeded
+            provider_results: List of result dicts from each provider
+        """
+        try:
+            # Generate timestamp in ISO format
+            timestamp = datetime.utcnow().isoformat() + "Z"
+
+            # Save a record for each provider's attempt
+            for result in provider_results:
+                alert_record = {
+                    "timestamp": timestamp,
+                    "location": location,
+                    "risk_score": score,
+                    "risk_tier": risk_tier,
+                    "alert_sent": result.get("success", False),
+                    "provider": result.get("provider", "unknown"),
+                    "message_id": result.get("message_id"),  # Present if successful
+                    "error": None if result.get("success") else result.get("message"),  # Error if failed
+                }
+
+                # Insert into database
+                alert_id = save_alert(alert_record)
+                logger.debug(
+                    f"Saved alert to DB | ID: {alert_id} | "
+                    f"Provider: {alert_record['provider']} | "
+                    f"Success: {alert_record['alert_sent']}"
+                )
+
+        except Exception as e:
+            # Log but don't raise - database errors should not break alert processing
+            logger.error(f"Failed to save alert to database: {str(e)}")
 
     def _get_default_message(self, risk_tier: str) -> str:
         messages = {

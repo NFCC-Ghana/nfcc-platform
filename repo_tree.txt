@@ -1,0 +1,731 @@
+.
+├── 20260524_results.json
+├── Dockerfile
+├── Dockerfile.prod
+├── FORCE_REBUILD.md
+├── README.md
+├── alerts.log
+├── backups
+│   ├── pre_enhancement_20260617_022640
+│   │   ├── alerts
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   ├── cooldown.cpython-310.pyc
+│   │   │   │   ├── engine.cpython-310.pyc
+│   │   │   │   ├── formatter.cpython-310.pyc
+│   │   │   │   ├── logger_config.cpython-310.pyc
+│   │   │   │   ├── models.cpython-310.pyc
+│   │   │   │   ├── provider_factory.cpython-310.pyc
+│   │   │   │   └── rate_limit.cpython-310.pyc
+│   │   │   ├── circuit_breaker.py
+│   │   │   ├── cooldown.py
+│   │   │   ├── district_risk.py
+│   │   │   ├── engine.py
+│   │   │   ├── formatter.py
+│   │   │   ├── geographic.py
+│   │   │   ├── logger_config.py
+│   │   │   ├── models.py
+│   │   │   ├── provider_factory.py
+│   │   │   ├── providers
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── __pycache__
+│   │   │   │   ├── base.py
+│   │   │   │   ├── email_provider.py
+│   │   │   │   ├── mock_provider.py
+│   │   │   │   ├── sms_provider.py
+│   │   │   │   └── whatsapp_provider.py
+│   │   │   ├── rate_limit.py
+│   │   │   └── structured_logger.py
+│   │   ├── dashboard_enhanced.py
+│   │   ├── exposure
+│   │   │   └── __pycache__
+│   │   │       ├── __init__.cpython-310.pyc
+│   │   │       └── exposure_mapper.cpython-310.pyc
+│   │   └── hydrology
+│   │       ├── __init__.py
+│   │       ├── __pycache__
+│   │       │   ├── __init__.cpython-310.pyc
+│   │       │   ├── flood_polygons.cpython-310.pyc
+│   │       │   ├── rainfall_history.cpython-310.pyc
+│   │       │   ├── reservoir_intelligence.cpython-310.pyc
+│   │       │   ├── river_intelligence.cpython-310.pyc
+│   │       │   ├── soil_moisture.cpython-310.pyc
+│   │       │   └── unified_intelligence.cpython-310.pyc
+│   │       ├── flood_polygons.py
+│   │       ├── rainfall_history.py
+│   │       ├── rainfall_history.py.bak
+│   │       ├── reservoir_intelligence.py
+│   │       ├── reservoir_intelligence.py.bak
+│   │       ├── river_intelligence.py
+│   │       ├── soil_moisture.py
+│   │       └── unified_intelligence.py
+│   └── pre_enhancement_20260617_025651
+│       ├── data
+│       │   ├── alerts.db
+│       │   ├── climate
+│       │   ├── community_reports.db
+│       │   ├── dams
+│       │   ├── events
+│       │   │   └── flood_events.json
+│       │   ├── flood_polygons
+│       │   ├── processed
+│       │   │   ├── accra_anomaly_detection_2024.png
+│       │   │   ├── accra_cumulative_rainfall_2024.png
+│       │   │   ├── accra_feature_importance_2024.png
+│       │   │   ├── accra_features_2024.parquet
+│       │   │   ├── accra_flood_risk_score_2024.png
+│       │   │   ├── accra_monthly_rainfall_2024.png
+│       │   │   ├── accra_rainfall_2024.png
+│       │   │   ├── accra_rainfall_classes_2024.png
+│       │   │   ├── accra_rainfall_histogram_2024.png
+│       │   │   ├── accra_rolling_avg_2024.png
+│       │   │   ├── accra_xgb_predictions_2024.png
+│       │   │   ├── accra_zscore_anomaly_2024.png
+│       │   │   └── chirps_accra_2024.csv
+│       │   ├── raw
+│       │   │   └── chirps
+│       │   └── rivers
+│       ├── hackathon
+│       │   ├── README.md
+│       │   ├── ai
+│       │   │   ├── __init__.py
+│       │   │   ├── __pycache__
+│       │   │   ├── community_classifier.py
+│       │   │   ├── flood_explainer.py
+│       │   │   ├── hydrological_intelligence.py
+│       │   │   ├── impact_estimator.py
+│       │   │   └── timeline_predictor.py
+│       │   ├── app
+│       │   │   └── pages
+│       │   ├── datasets
+│       │   │   ├── demo_events.csv
+│       │   │   ├── district_population.csv
+│       │   │   ├── health_facilities.csv
+│       │   │   └── schools.csv
+│       │   ├── docs
+│       │   │   ├── architecture.md
+│       │   │   ├── dataset_sources.md
+│       │   │   ├── pitch_deck.md
+│       │   │   └── poster.md
+│       │   └── tests
+│       │       └── test_ai_modules.py
+│       ├── requirements.txt
+│       ├── scripts
+│       │   ├── convert_model.py
+│       │   ├── coverage_dashboard.py
+│       │   ├── create_test_alerts.py
+│       │   ├── create_test_alerts_complete.py
+│       │   ├── daily_chirps_pull.py
+│       │   ├── deploy_production.sh
+│       │   ├── generate_openapi.py
+│       │   ├── generate_ssl.sh
+│       │   ├── improve_coverage.sh
+│       │   ├── resave_model.py
+│       │   ├── run_complete_enhancement.sh
+│       │   ├── run_elite_tests.sh
+│       │   ├── setup_directories.sh
+│       │   ├── setup_redis.sh
+│       │   ├── standardize_model.py
+│       │   ├── start_production.sh
+│       │   ├── test_credentials.py
+│       │   └── validate_env.py
+│       └── src
+│           ├── __init__.py
+│           ├── __pycache__
+│           │   ├── __init__.cpython-310.pyc
+│           │   └── __init__.cpython-313.pyc
+│           ├── alerts
+│           │   ├── __init__.py
+│           │   ├── __pycache__
+│           │   ├── circuit_breaker.py
+│           │   ├── cooldown.py
+│           │   ├── district_risk.py
+│           │   ├── engine.py
+│           │   ├── formatter.py
+│           │   ├── geographic.py
+│           │   ├── logger_config.py
+│           │   ├── models.py
+│           │   ├── provider_factory.py
+│           │   ├── providers
+│           │   ├── rate_limit.py
+│           │   └── structured_logger.py
+│           ├── api
+│           │   ├── __init__.py
+│           │   ├── __pycache__
+│           │   ├── auth.py
+│           │   ├── dam_router.py
+│           │   ├── dam_spillage.py
+│           │   ├── explain.py
+│           │   ├── health.py
+│           │   ├── main.py
+│           │   ├── metrics.py
+│           │   ├── metrics_endpoint.py
+│           │   └── routes
+│           ├── celery_app.py
+│           ├── community
+│           │   ├── __init__.py
+│           │   ├── __pycache__
+│           │   └── community_memory.py
+│           ├── config
+│           │   ├── __init__.py
+│           │   ├── __pycache__
+│           │   ├── dams.py
+│           │   └── settings.py
+│           ├── data
+│           │   ├── __pycache__
+│           │   └── ingestion
+│           ├── database
+│           │   ├── __init__.py
+│           │   ├── __pycache__
+│           │   └── alert_db.py
+│           ├── explainability
+│           │   └── __pycache__
+│           ├── exposure
+│           │   ├── __init__.py
+│           │   ├── __pycache__
+│           │   └── impact_estimator.py
+│           ├── features
+│           │   └── __pycache__
+│           ├── forecast
+│           │   └── __pycache__
+│           ├── hydrology
+│           │   ├── __init__.py
+│           │   ├── __pycache__
+│           │   ├── flood_polygons.py
+│           │   ├── rainfall_history.py
+│           │   ├── rainfall_history.py.bak
+│           │   ├── reservoir_intelligence.py
+│           │   ├── reservoir_intelligence.py.bak
+│           │   ├── river_intelligence.py
+│           │   ├── soil_moisture.py
+│           │   └── unified_intelligence.py
+│           ├── labels
+│           │   └── __pycache__
+│           ├── models
+│           │   ├── __pycache__
+│           │   ├── dam_spillage.py
+│           │   └── train_model.py
+│           ├── monitoring
+│           │   └── __pycache__
+│           ├── optimization
+│           │   └── __pycache__
+│           └── tasks.py
+├── check_env.py
+├── check_imports.py
+├── daily_report.html
+├── dashboard
+│   ├── app.py
+│   └── requirements.txt
+├── dashboard.html
+├── data
+│   ├── alert_history.json
+│   ├── alerts.db
+│   ├── climate
+│   ├── community_reports.db
+│   ├── dams
+│   ├── events
+│   │   └── flood_events.json
+│   ├── flood_polygons
+│   ├── processed
+│   │   ├── accra_anomaly_detection_2024.png
+│   │   ├── accra_cumulative_rainfall_2024.png
+│   │   ├── accra_feature_importance_2024.png
+│   │   ├── accra_features_2024.parquet
+│   │   ├── accra_flood_risk_score_2024.png
+│   │   ├── accra_monthly_rainfall_2024.png
+│   │   ├── accra_rainfall_2024.png
+│   │   ├── accra_rainfall_classes_2024.png
+│   │   ├── accra_rainfall_histogram_2024.png
+│   │   ├── accra_rolling_avg_2024.png
+│   │   ├── accra_xgb_predictions_2024.png
+│   │   ├── accra_zscore_anomaly_2024.png
+│   │   └── chirps_accra_2024.csv
+│   ├── raw
+│   │   └── chirps
+│   ├── rivers
+│   └── subscriptions.db
+├── docker-compose.yml
+├── docs
+│   └── ONBOARDING.md
+├── environment.yml
+├── hackathon
+│   ├── README.md
+│   ├── ai
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   └── hydrological_intelligence.cpython-310.pyc
+│   │   ├── community_classifier.py
+│   │   ├── flood_explainer.py
+│   │   ├── hydrological_intelligence.py
+│   │   ├── impact_estimator.py
+│   │   └── timeline_predictor.py
+│   ├── app
+│   │   └── pages
+│   │       ├── 00_home.py
+│   │       ├── 01_dashboard.py
+│   │       ├── 04_community_report.py
+│   │       ├── backups
+│   │       │   └── 20260617_010823
+│   │       ├── dashboard.py
+│   │       ├── dashboard_enhanced.py
+│   │       ├── dashboard_enhanced.py.bak2
+│   │       ├── dashboard_enhanced_v2.py
+│   │       └── switch_dashboard.sh
+│   ├── datasets
+│   │   ├── demo_events.csv
+│   │   ├── district_population.csv
+│   │   ├── health_facilities.csv
+│   │   └── schools.csv
+│   ├── docs
+│   │   ├── architecture.md
+│   │   ├── dataset_sources.md
+│   │   ├── pitch_deck.md
+│   │   └── poster.md
+│   └── tests
+│       └── test_ai_modules.py
+├── hackathon_tree.txt
+├── htmlcov
+│   ├── class_index.html
+│   ├── coverage_html_cb_dd2e7eb5.js
+│   ├── favicon_32_cb_c827f16f.png
+│   ├── function_index.html
+│   ├── index.html
+│   ├── keybd_closed_cb_900cfef5.png
+│   ├── status.json
+│   ├── style_cb_9ff733b0.css
+│   ├── z_24ba73a9a3f27651___init___py.html
+│   ├── z_24ba73a9a3f27651_engine_py.html
+│   ├── z_24ba73a9a3f27651_formatter_py.html
+│   ├── z_24ba73a9a3f27651_logger_config_py.html
+│   ├── z_24ba73a9a3f27651_models_py.html
+│   ├── z_24ba73a9a3f27651_rate_limit_py.html
+│   ├── z_ecd0a644d057b051___init___py.html
+│   ├── z_ecd0a644d057b051_base_py.html
+│   ├── z_ecd0a644d057b051_email_provider_py.html
+│   ├── z_ecd0a644d057b051_mock_provider_py.html
+│   ├── z_ecd0a644d057b051_sms_provider_py.html
+│   ├── z_ecd0a644d057b051_whatsapp_provider_py.html
+│   ├── z_f0e24b7f04f99860___init___py.html
+│   └── z_f0e24b7f04f99860_main_py.html
+├── logs
+│   ├── alert_engine.jsonl
+│   ├── alert_log.jsonl
+│   ├── api.log
+│   └── nfcc.log
+├── models
+│   ├── xgboost_flood_risk.joblib
+│   └── xgboost_flood_risk.pkl
+├── nginx.conf
+├── nohup.out
+├── notebooks
+│   ├── 04_flood_risk_model.ipynb
+│   └── chirps_analysis.ipynb
+├── prometheus.yml
+├── pyproject.toml
+├── pytest.ini
+├── python_files.txt
+├── railway.json
+├── repo_tree.txt
+├── reports
+│   └── coverage
+│       ├── class_index.html
+│       ├── coverage_html_cb_dd2e7eb5.js
+│       ├── favicon_32_cb_c827f16f.png
+│       ├── function_index.html
+│       ├── index.html
+│       ├── keybd_closed_cb_900cfef5.png
+│       ├── status.json
+│       ├── style_cb_9ff733b0.css
+│       ├── z_04ee3d945ea3e237___init___py.html
+│       ├── z_04ee3d945ea3e237_exposure_mapper_py.html
+│       ├── z_145eef247bfb46b6___init___py.html
+│       ├── z_145eef247bfb46b6_celery_app_py.html
+│       ├── z_145eef247bfb46b6_tasks_py.html
+│       ├── z_24ba73a9a3f27651___init___py.html
+│       ├── z_24ba73a9a3f27651_circuit_breaker_py.html
+│       ├── z_24ba73a9a3f27651_cooldown_py.html
+│       ├── z_24ba73a9a3f27651_district_risk_py.html
+│       ├── z_24ba73a9a3f27651_engine_py.html
+│       ├── z_24ba73a9a3f27651_formatter_py.html
+│       ├── z_24ba73a9a3f27651_geographic_py.html
+│       ├── z_24ba73a9a3f27651_logger_config_py.html
+│       ├── z_24ba73a9a3f27651_logger_py.html
+│       ├── z_24ba73a9a3f27651_models_py.html
+│       ├── z_24ba73a9a3f27651_provider_factory_py.html
+│       ├── z_24ba73a9a3f27651_rate_limit_py.html
+│       ├── z_24ba73a9a3f27651_structured_logger_py.html
+│       ├── z_26587ac33cd389b8___init___py.html
+│       ├── z_26587ac33cd389b8_forecast_engine_py.html
+│       ├── z_42e4620a1ab18ccc___init___py.html
+│       ├── z_42e4620a1ab18ccc_resource_optimizer_py.html
+│       ├── z_6f57f923ae69d111___init___py.html
+│       ├── z_6f57f923ae69d111_explain_fusion_py.html
+│       ├── z_6f57f923ae69d111_forecast_py.html
+│       ├── z_728217a82b4537cc___init___py.html
+│       ├── z_728217a82b4537cc_flood_labels_py.html
+│       ├── z_7530dad8cd1eb93b___init___py.html
+│       ├── z_7530dad8cd1eb93b_data_health_py.html
+│       ├── z_77d70a5ed3be051c___init___py.html
+│       ├── z_77d70a5ed3be051c_shap_explainer_py.html
+│       ├── z_defad1a87623d8bf_confidence_scoring_py.html
+│       ├── z_defad1a87623d8bf_dam_spillage_py.html
+│       ├── z_defad1a87623d8bf_forecast_fusion_py.html
+│       ├── z_defad1a87623d8bf_fusion_explain_py.html
+│       ├── z_e3d496e5189f5be2___init___py.html
+│       ├── z_e3d496e5189f5be2_rainfall_features_py.html
+│       ├── z_ecd0a644d057b051___init___py.html
+│       ├── z_ecd0a644d057b051_base_py.html
+│       ├── z_ecd0a644d057b051_email_provider_py.html
+│       ├── z_ecd0a644d057b051_mock_provider_py.html
+│       ├── z_ecd0a644d057b051_mock_py.html
+│       ├── z_ecd0a644d057b051_sms_provider_py.html
+│       ├── z_ecd0a644d057b051_whatsapp_provider_py.html
+│       ├── z_f0e24b7f04f99860___init___py.html
+│       ├── z_f0e24b7f04f99860_auth_py.html
+│       ├── z_f0e24b7f04f99860_dam_spillage_py.html
+│       ├── z_f0e24b7f04f99860_explain_py.html
+│       ├── z_f0e24b7f04f99860_health_py.html
+│       ├── z_f0e24b7f04f99860_main_py.html
+│       ├── z_f0e24b7f04f99860_metrics_endpoint_py.html
+│       ├── z_f0e24b7f04f99860_metrics_py.html
+│       ├── z_f954cdf8d5380f57___init___py.html
+│       ├── z_f954cdf8d5380f57_dams_py.html
+│       └── z_f954cdf8d5380f57_settings_py.html
+├── repository_inventory.txt
+├── requirements-dev.txt
+├── requirements.txt
+├── results.json
+├── scripts
+│   ├── convert_model.py
+│   ├── coverage_dashboard.py
+│   ├── create_test_alerts.py
+│   ├── create_test_alerts_complete.py
+│   ├── daily_chirps_pull.py
+│   ├── deploy_production.sh
+│   ├── generate_openapi.py
+│   ├── generate_ssl.sh
+│   ├── improve_coverage.sh
+│   ├── resave_model.py
+│   ├── run_complete_enhancement.sh
+│   ├── run_elite_tests.sh
+│   ├── setup_directories.sh
+│   ├── setup_redis.sh
+│   ├── standardize_model.py
+│   ├── start_production.sh
+│   ├── test_credentials.py
+│   └── validate_env.py
+├── sql
+│   └── init_hydrology.sql
+├── src
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── __init__.cpython-313.pyc
+│   ├── alerts
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── cooldown.cpython-310.pyc
+│   │   │   ├── engine.cpython-310.pyc
+│   │   │   ├── enhanced_alert_network.cpython-310.pyc
+│   │   │   ├── formatter.cpython-310.pyc
+│   │   │   ├── logger_config.cpython-310.pyc
+│   │   │   ├── models.cpython-310.pyc
+│   │   │   ├── provider_factory.cpython-310.pyc
+│   │   │   ├── rate_limit.cpython-310.pyc
+│   │   │   └── subscriptions.cpython-310.pyc
+│   │   ├── circuit_breaker.py
+│   │   ├── cooldown.py
+│   │   ├── district_risk.py
+│   │   ├── engine.py
+│   │   ├── enhanced_alert_network.py
+│   │   ├── formatter.py
+│   │   ├── geographic.py
+│   │   ├── logger_config.py
+│   │   ├── models.py
+│   │   ├── provider_factory.py
+│   │   ├── providers
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-310.pyc
+│   │   │   │   ├── base.cpython-310.pyc
+│   │   │   │   ├── email_provider.cpython-310.pyc
+│   │   │   │   ├── mock_provider.cpython-310.pyc
+│   │   │   │   ├── sms_provider.cpython-310.pyc
+│   │   │   │   └── whatsapp_provider.cpython-310.pyc
+│   │   │   ├── base.py
+│   │   │   ├── email_provider.py
+│   │   │   ├── mock_provider.py
+│   │   │   ├── sms_provider.py
+│   │   │   └── whatsapp_provider.py
+│   │   ├── rate_limit.py
+│   │   ├── structured_logger.py
+│   │   └── subscriptions.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── dam_router.cpython-310.pyc
+│   │   │   ├── explain.cpython-310.pyc
+│   │   │   ├── health.cpython-310.pyc
+│   │   │   ├── main.cpython-310.pyc
+│   │   │   └── main.cpython-313.pyc
+│   │   ├── auth.py
+│   │   ├── dam_router.py
+│   │   ├── dam_spillage.py
+│   │   ├── explain.py
+│   │   ├── health.py
+│   │   ├── main.py
+│   │   ├── metrics.py
+│   │   ├── metrics_endpoint.py
+│   │   └── routes
+│   │       ├── __init__.py
+│   │       ├── __pycache__
+│   │       │   ├── __init__.cpython-310.pyc
+│   │       │   ├── alerts.cpython-310.pyc
+│   │       │   ├── explain_fusion.cpython-310.pyc
+│   │       │   ├── forecast.cpython-310.pyc
+│   │       │   └── subscriptions.cpython-310.pyc
+│   │       └── alerts.py
+│   ├── celery_app.py
+│   ├── community
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   └── community_memory.cpython-310.pyc
+│   │   └── community_memory.py
+│   ├── config
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── dams.cpython-310.pyc
+│   │   │   └── settings.cpython-310.pyc
+│   │   ├── dams.py
+│   │   └── settings.py
+│   ├── data
+│   │   ├── __pycache__
+│   │   │   ├── chirps_live.cpython-310.pyc
+│   │   │   └── live_weather.cpython-310.pyc
+│   │   └── ingestion
+│   │       └── download_chirps.py
+│   ├── database
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   └── alert_db.cpython-310.pyc
+│   │   └── alert_db.py
+│   ├── explainability
+│   │   └── __pycache__
+│   │       ├── __init__.cpython-310.pyc
+│   │       └── shap_explainer.cpython-310.pyc
+│   ├── exposure
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── exposure_mapper.cpython-310.pyc
+│   │   │   └── impact_estimator.cpython-310.pyc
+│   │   └── impact_estimator.py
+│   ├── features
+│   │   └── __pycache__
+│   │       ├── __init__.cpython-310.pyc
+│   │       ├── district_features.cpython-310.pyc
+│   │       └── rainfall_features.cpython-310.pyc
+│   ├── forecast
+│   │   └── __pycache__
+│   │       ├── __init__.cpython-310.pyc
+│   │       └── forecast_engine.cpython-310.pyc
+│   ├── hydrology
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── flood_polygons.cpython-310.pyc
+│   │   │   ├── rainfall_history.cpython-310.pyc
+│   │   │   ├── reservoir_intelligence.cpython-310.pyc
+│   │   │   ├── river_intelligence.cpython-310.pyc
+│   │   │   ├── soil_moisture.cpython-310.pyc
+│   │   │   ├── unified_intelligence.cpython-310.pyc
+│   │   │   └── weather_forecast.cpython-310.pyc
+│   │   ├── flood_polygons.py
+│   │   ├── rainfall_history.py
+│   │   ├── rainfall_history.py.bak
+│   │   ├── reservoir_intelligence.py
+│   │   ├── reservoir_intelligence.py.bak
+│   │   ├── river_intelligence.py
+│   │   ├── soil_moisture.py
+│   │   ├── unified_intelligence.py
+│   │   └── weather_forecast.py
+│   ├── labels
+│   │   └── __pycache__
+│   │       ├── __init__.cpython-310.pyc
+│   │       └── flood_labels.cpython-310.pyc
+│   ├── models
+│   │   ├── __pycache__
+│   │   │   ├── confidence_scoring.cpython-310.pyc
+│   │   │   ├── dam_spillage.cpython-310.pyc
+│   │   │   ├── forecast_fusion.cpython-310.pyc
+│   │   │   └── fusion_explain.cpython-310.pyc
+│   │   ├── dam_spillage.py
+│   │   └── train_model.py
+│   ├── monitoring
+│   │   └── __pycache__
+│   │       ├── __init__.cpython-310.pyc
+│   │       └── data_health.cpython-310.pyc
+│   ├── optimization
+│   │   └── __pycache__
+│   │       ├── __init__.cpython-310.pyc
+│   │       └── resource_optimizer.cpython-310.pyc
+│   └── tasks.py
+├── src_inventory.txt
+├── src_tree.txt
+├── ssl
+│   ├── cert.pem
+│   └── key.pem
+├── submission_package
+│   └── models
+│       ├── xgboost_flood_risk.joblib
+│       └── xgboost_flood_risk.pkl
+├── test.txt
+├── test_email.py
+├── test_email_sms.py
+├── test_environment.py
+├── tests
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   ├── __init__.cpython-313.pyc
+│   │   ├── conftest.cpython-310-pytest-7.4.3.pyc
+│   │   ├── conftest.cpython-310.pyc
+│   │   ├── conftest.cpython-313-pytest-9.1.0.pyc
+│   │   ├── test_elite_complete.cpython-310-pytest-7.4.3.pyc
+│   │   ├── test_elite_simple.cpython-310-pytest-7.4.3.pyc
+│   │   └── test_imports.cpython-310-pytest-7.4.3.pyc
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── test_endpoints.cpython-310-pytest-7.4.3.pyc
+│   │   │   ├── test_subscriptions.cpython-310-pytest-7.4.3.pyc
+│   │   │   └── test_subscriptions.cpython-313-pytest-9.1.0.pyc
+│   │   ├── test_endpoints.py
+│   │   └── test_explain.py
+│   ├── conftest.py
+│   ├── contract
+│   │   ├── __pycache__
+│   │   │   └── test_openapi_contract.cpython-310-pytest-7.4.3.pyc
+│   │   └── test_openapi_contract.py
+│   ├── fixtures
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── __init__.cpython-313.pyc
+│   │   │   ├── dataframe_fixtures.cpython-310.pyc
+│   │   │   ├── dataframe_fixtures.cpython-313.pyc
+│   │   │   ├── model_fixtures.cpython-310.pyc
+│   │   │   ├── model_fixtures.cpython-313.pyc
+│   │   │   └── provider_fixtures.cpython-310.pyc
+│   │   ├── payloads
+│   │   │   ├── __init__.py
+│   │   │   └── payloads.py
+│   │   ├── provider_fixtures.py
+│   │   └── scenarios
+│   │       └── __init__.py
+│   ├── framework
+│   │   ├── __init__.py
+│   │   ├── analytics
+│   │   │   ├── __init__.py
+│   │   │   └── vector_similarity.py
+│   │   ├── analytics.py
+│   │   ├── assertions.py
+│   │   ├── chaos
+│   │   │   ├── __init__.py
+│   │   │   ├── engine.py
+│   │   │   ├── latency.py
+│   │   │   └── state.py
+│   │   ├── ci
+│   │   │   ├── __init__.py
+│   │   │   └── enforcer.py
+│   │   ├── contracts
+│   │   │   └── __init__.py
+│   │   ├── determinism.py
+│   │   ├── fuzz
+│   │   │   ├── __init__.py
+│   │   │   ├── property_tests.py
+│   │   │   └── schema_fuzzer.py
+│   │   ├── observability
+│   │   │   ├── __init__.py
+│   │   │   ├── logs.py
+│   │   │   ├── metrics.py
+│   │   │   └── tracing.py
+│   │   ├── orchestrator
+│   │   │   ├── __init__.py
+│   │   │   └── graph.py
+│   │   ├── orchestrator.py
+│   │   ├── plugin
+│   │   │   ├── __init__.py
+│   │   │   └── isolation.py
+│   │   ├── plugin.py
+│   │   ├── replay
+│   │   │   ├── __init__.py
+│   │   │   └── event_sourcing.py
+│   │   ├── security
+│   │   │   ├── __init__.py
+│   │   │   ├── abuse.py
+│   │   │   ├── dos.py
+│   │   │   └── injection.py
+│   │   └── stress
+│   │       ├── __init__.py
+│   │       └── async_engine.py
+│   ├── integration
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── test_forecast_api.cpython-310-pytest-7.4.3.pyc
+│   │   │   ├── test_model_performance.cpython-310-pytest-7.4.3.pyc
+│   │   │   └── test_pipeline.cpython-310-pytest-7.4.3.pyc
+│   │   ├── test_model_performance.py
+│   │   └── test_pipeline.py
+│   ├── mocks
+│   │   ├── __init__.py
+│   │   ├── provider_factory.py
+│   │   ├── smtp_mock.py
+│   │   └── twilio_mock.py
+│   ├── test_alert_api.py
+│   ├── test_dam_spillage.py
+│   ├── test_elite_complete.py
+│   ├── test_elite_simple.py
+│   ├── test_hydrological_intelligence.py
+│   ├── test_imports.py
+│   └── unit
+│       ├── __init__.py
+│       ├── __pycache__
+│       │   ├── __init__.cpython-310.pyc
+│       │   ├── test_email_provider_comprehensive.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_email_provider_fixed.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_engine_edge_cases.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_feature_engineering.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_flood_risk_scoring.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_forecast_fusion.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_formatter.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_providers_complete.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_providers_mock.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_rainfall_classification.cpython-310-pytest-7.4.3.pyc
+│       │   ├── test_rate_limit.cpython-310-pytest-7.4.3.pyc
+│       │   └── test_sms_provider_comprehensive.cpython-310-pytest-7.4.3.pyc
+│       ├── test_email_provider_comprehensive.py
+│       ├── test_email_provider_fixed.py
+│       ├── test_engine_edge_cases.py
+│       ├── test_feature_engineering.py
+│       ├── test_flood_risk_scoring.py
+│       ├── test_formatter.py
+│       ├── test_providers_complete.py
+│       ├── test_providers_mock.py
+│       ├── test_rainfall_classification.py
+│       ├── test_rate_limit.py
+│       └── test_sms_provider_comprehensive.py
+└── update_system.sh
+
+161 directories, 568 files

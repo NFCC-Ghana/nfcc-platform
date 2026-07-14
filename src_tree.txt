@@ -1,0 +1,162 @@
+src
+├── __init__.py
+├── __pycache__
+│   ├── __init__.cpython-310.pyc
+│   └── __init__.cpython-313.pyc
+├── alerts
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   ├── cooldown.cpython-310.pyc
+│   │   ├── engine.cpython-310.pyc
+│   │   ├── enhanced_alert_network.cpython-310.pyc
+│   │   ├── formatter.cpython-310.pyc
+│   │   ├── logger_config.cpython-310.pyc
+│   │   ├── models.cpython-310.pyc
+│   │   ├── provider_factory.cpython-310.pyc
+│   │   ├── rate_limit.cpython-310.pyc
+│   │   └── subscriptions.cpython-310.pyc
+│   ├── circuit_breaker.py
+│   ├── cooldown.py
+│   ├── district_risk.py
+│   ├── engine.py
+│   ├── enhanced_alert_network.py
+│   ├── formatter.py
+│   ├── geographic.py
+│   ├── logger_config.py
+│   ├── models.py
+│   ├── provider_factory.py
+│   ├── providers
+│   │   ├── __init__.py
+│   │   ├── __pycache__
+│   │   │   ├── __init__.cpython-310.pyc
+│   │   │   ├── base.cpython-310.pyc
+│   │   │   ├── email_provider.cpython-310.pyc
+│   │   │   ├── mock_provider.cpython-310.pyc
+│   │   │   ├── sms_provider.cpython-310.pyc
+│   │   │   └── whatsapp_provider.cpython-310.pyc
+│   │   ├── base.py
+│   │   ├── email_provider.py
+│   │   ├── mock_provider.py
+│   │   ├── sms_provider.py
+│   │   └── whatsapp_provider.py
+│   ├── rate_limit.py
+│   ├── structured_logger.py
+│   └── subscriptions.py
+├── api
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   ├── __init__.cpython-313.pyc
+│   │   ├── dam_router.cpython-310.pyc
+│   │   ├── explain.cpython-310.pyc
+│   │   ├── health.cpython-310.pyc
+│   │   ├── main.cpython-310.pyc
+│   │   └── main.cpython-313.pyc
+│   ├── auth.py
+│   ├── dam_router.py
+│   ├── dam_spillage.py
+│   ├── explain.py
+│   ├── health.py
+│   ├── main.py
+│   ├── metrics.py
+│   ├── metrics_endpoint.py
+│   └── routes
+│       ├── __init__.py
+│       ├── __pycache__
+│       │   ├── __init__.cpython-310.pyc
+│       │   ├── alerts.cpython-310.pyc
+│       │   ├── explain_fusion.cpython-310.pyc
+│       │   ├── forecast.cpython-310.pyc
+│       │   └── subscriptions.cpython-310.pyc
+│       └── alerts.py
+├── celery_app.py
+├── community
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── community_memory.cpython-310.pyc
+│   └── community_memory.py
+├── config
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   ├── dams.cpython-310.pyc
+│   │   └── settings.cpython-310.pyc
+│   ├── dams.py
+│   └── settings.py
+├── data
+│   ├── __pycache__
+│   │   ├── chirps_live.cpython-310.pyc
+│   │   └── live_weather.cpython-310.pyc
+│   └── ingestion
+│       └── download_chirps.py
+├── database
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── alert_db.cpython-310.pyc
+│   └── alert_db.py
+├── explainability
+│   └── __pycache__
+│       ├── __init__.cpython-310.pyc
+│       └── shap_explainer.cpython-310.pyc
+├── exposure
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   ├── exposure_mapper.cpython-310.pyc
+│   │   └── impact_estimator.cpython-310.pyc
+│   └── impact_estimator.py
+├── features
+│   └── __pycache__
+│       ├── __init__.cpython-310.pyc
+│       ├── district_features.cpython-310.pyc
+│       └── rainfall_features.cpython-310.pyc
+├── forecast
+│   └── __pycache__
+│       ├── __init__.cpython-310.pyc
+│       └── forecast_engine.cpython-310.pyc
+├── hydrology
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   ├── flood_polygons.cpython-310.pyc
+│   │   ├── rainfall_history.cpython-310.pyc
+│   │   ├── reservoir_intelligence.cpython-310.pyc
+│   │   ├── river_intelligence.cpython-310.pyc
+│   │   ├── soil_moisture.cpython-310.pyc
+│   │   ├── unified_intelligence.cpython-310.pyc
+│   │   └── weather_forecast.cpython-310.pyc
+│   ├── flood_polygons.py
+│   ├── rainfall_history.py
+│   ├── rainfall_history.py.bak
+│   ├── reservoir_intelligence.py
+│   ├── reservoir_intelligence.py.bak
+│   ├── river_intelligence.py
+│   ├── soil_moisture.py
+│   ├── unified_intelligence.py
+│   └── weather_forecast.py
+├── labels
+│   └── __pycache__
+│       ├── __init__.cpython-310.pyc
+│       └── flood_labels.cpython-310.pyc
+├── models
+│   ├── __pycache__
+│   │   ├── confidence_scoring.cpython-310.pyc
+│   │   ├── dam_spillage.cpython-310.pyc
+│   │   ├── forecast_fusion.cpython-310.pyc
+│   │   └── fusion_explain.cpython-310.pyc
+│   ├── dam_spillage.py
+│   └── train_model.py
+├── monitoring
+│   └── __pycache__
+│       ├── __init__.cpython-310.pyc
+│       └── data_health.cpython-310.pyc
+├── optimization
+│   └── __pycache__
+│       ├── __init__.cpython-310.pyc
+│       └── resource_optimizer.cpython-310.pyc
+└── tasks.py
+
+37 directories, 123 files

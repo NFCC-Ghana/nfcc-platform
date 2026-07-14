@@ -1,0 +1,33 @@
+2026-06-21 04:07:33.872 
+Warning: the config option 'server.enableCORS=false' is not compatible with 'server.enableXsrfProtection=true'.
+As a result, 'server.enableCORS' is being overridden to 'true'.
+
+More information:
+In order to protect against CSRF attacks, we send a cookie with each request.
+To do so, we must specify allowable origins, which places a restriction on
+cross-origin resource sharing.
+
+If cross origin resource sharing is required, please disable server.enableXsrfProtection.
+            
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://172.26.154.207:8501
+
+INFO:src.hydrology.rainfall_history:Rainfall History Engine initialized
+INFO:src.hydrology.river_intelligence:River Intelligence Engine initialized
+INFO:src.hydrology.reservoir_intelligence:Reservoir Intelligence Engine initialized with 11 dams
+INFO:src.hydrology.flood_polygons:Flood Polygon Engine initialized with 3 events
+INFO:src.hydrology.unified_intelligence:Unified Hydrological Intelligence initialized
+INFO:src.hydrology.river_gauge_api:RiverGaugeAPI initialized with 7 gauges
+INFO:src.hydrology.vra_telemetry:VRA Telemetry initialized with 3 dams
+/home/nfcc/miniconda3/envs/nfcc/lib/python3.10/site-packages/google/api_core/_python_version_support.py:273: FutureWarning: You are using a Python version (3.10.20) which Google will stop supporting in new releases of google.api_core once it reaches its end of life (2026-10-04). Please upgrade to the latest Python version, or at least Python 3.11, to continue receiving updates for google.api_core past that date.
+  warnings.warn(message, FutureWarning)
+INFO:src.hydrology.sentinel_processor:Earth Engine initialized for Sentinel-1 processing
+INFO:src.hydrology.sentinel_processor:Sentinel-1 Processor initialized
+INFO:src.hydrology.urban_drainage:Urban Drainage initialized
+INFO:src.community.community_memory:Community Memory Engine initialized
+INFO:src.exposure.impact_estimator:Impact Estimator initialized
+/home/nfcc/projects/nfcc-platform/src/hydrology/river_intelligence.py:154: FutureWarning: 'H' is deprecated and will be removed in a future version, please use 'h' instead.
+  dates = pd.date_range(start_date, end_date, freq='H')

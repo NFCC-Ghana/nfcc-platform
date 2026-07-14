@@ -1,0 +1,13 @@
+date,district,rainfall_mm,risk_score,risk_tier,alert_sent
+2023-10-15,Akosombo,125.5,98.3,EXTREME,True
+2023-10-14,Akosombo,95.2,87.1,CRITICAL,True
+2023-10-13,Akosombo,78.3,72.4,CRITICAL,True
+2023-05-20,Accra Central,85.5,78.9,CRITICAL,True
+2023-05-19,Accra Central,52.3,64.2,HIGH,True
+2023-05-18,Accra Central,45.1,58.4,HIGH,False
+2023-06-15,Tema,95.5,90.6,EXTREME,True
+2023-06-14,Tema,67.8,70.2,HIGH,True
+2023-09-10,Kumasi,72.4,75.1,HIGH,True
+2023-09-09,Kumasi,48.2,60.3,HIGH,False
+2024-03-25,Takoradi,82.3,76.8,HIGH,True
+2024-03-24,Takoradi,55.6,63.1,HIGH,False
