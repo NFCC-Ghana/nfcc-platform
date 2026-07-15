@@ -28,10 +28,10 @@ uvicorn>=0.23.0
 # Earth Engine
 earthengine-api>=0.1.0
 
-# Folium
-folium>=0.20.0
-streamlit-folium>=0.26.0
-branca>=0.8.0
+# Folium - PINNED to working versions
+folium==0.19.0
+streamlit-folium==0.24.0
+branca==0.8.1
 
 # Utilities
 pydantic>=2.0.0
