@@ -1,23 +1,42 @@
 """
 CivicFlood AI - Enterprise Command Center
-Phase 3: Every section answers ONE question with clarity.
-Palantir/IBM-level professional command center.
+Phase 4: Visual Storytelling Implementation (Fixed)
+International-standard professional dashboard
 """
 
+# ============================================================
+# IMPORTS - ALL AT THE TOP (E402 fixed)
+# ============================================================
+
 import sys
+from datetime import datetime
 from pathlib import Path
 
-# Add project root to path BEFORE imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-
-from datetime import datetime
+# Add project root to path BEFORE other imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))  # noqa: E402
 
 import requests
 import streamlit as st
 
+from hackathon.app.modules.v4.situation_map import render_map_fallback
+from hackathon.app.modules.v4.situation_map import render_situation_map
 from hackathon.app.modules.v4.state import create_state_from_api
-# ADDED: Map import
-from hackathon.app.modules.v4.situation_map import render_situation_map, render_map_fallback
+from hackathon.app.modules.v4.visual_components import (
+    render_affected_communities,
+    render_economic_impact,
+    render_evidence_confidence,
+    render_horizontal_progress_bar,
+    render_impact_card,
+    render_metric_card,
+    render_population_visual,
+    render_quick_stats,
+    render_resource_status,
+    render_risk_indicator,
+    render_risk_timeline_visual,
+    render_shelter_status,
+    render_status_indicator,
+    render_visual_metric_card,
+)
 
 # ============================================================
 # CONFIGURATION
@@ -118,7 +137,7 @@ def get_district_data(district: str) -> dict:
 
 
 # ============================================================
-# SECTIONS - EACH ANSWERS ONE QUESTION
+# SECTIONS - EACH ANSWERS ONE QUESTION WITH VISUALS
 # ============================================================
 
 
@@ -191,24 +210,51 @@ def render_control_panel():
 
 
 def render_executive_summary(state):
-    """QUESTION 1: What is happening?"""
+    """QUESTION 1: What is happening? - VISUAL VERSION"""
     st.markdown("## 📊 Executive Summary")
     st.caption("*What is happening right now?*")
 
     col1, col2 = st.columns([1.5, 1])
 
     with col1:
-        risk_color = state.risk_color
-        risk_emoji = state.risk_emoji
-
-        st.markdown(f"{risk_emoji} **Risk Score**")
-        st.markdown(
-            f"<h1 style='color:{risk_color};'>{state.risk_score:.0f}%</h1>",
-            unsafe_allow_html=True,
+        # Visual risk indicator
+        render_risk_indicator(
+            risk_score=state.risk_score,
+            risk_category=state.risk_category,
+            show_progress=True,
         )
-        st.caption(f"**{state.risk_category}** Emergency Level")
-        st.progress(state.risk_score / 100)
-        st.metric("Confidence", f"{state.risk_confidence * 100:.0f}%")
+
+        # Quick stats below
+        render_quick_stats(
+            [
+                {
+                    "label": "Confidence",
+                    "value": f"{state.risk_confidence * 100:.0f}%",
+                    "emoji": "🎯",
+                    "color": "#38a169",
+                },
+                {
+                    "label": "Lead Time",
+                    "value": f"{state.lead_time_hours}",
+                    "emoji": "⏰",
+                    "color": "#4299e1",
+                    "subtitle": "hours",
+                },
+                {
+                    "label": "Data Quality",
+                    "value": f"{state.data_quality_score:.0f}%",
+                    "emoji": "📊",
+                    "color": "#9f7aea",
+                },
+                {
+                    "label": "Active Sources",
+                    "value": state.active_sources_count,
+                    "emoji": "📡",
+                    "color": "#ed8936",
+                },
+            ],
+            columns=4,
+        )
 
     with col2:
         st.markdown("🤖 **AI Situation Summary**")
@@ -245,7 +291,7 @@ def render_executive_summary(state):
 
 
 def render_national_map(state):
-    """QUESTION 2: Where is it happening? - REPLACED WITH WORKING MAP"""
+    """QUESTION 2: Where is it happening? - MAP VISUAL"""
     st.markdown("## 🗺️ National Flood Map")
     st.caption("*Where is flooding occurring or expected?*")
 
@@ -259,11 +305,11 @@ def render_national_map(state):
             self.risk_category = "MODERATE"
 
     map_state = MapState()
-    map_state.lat = getattr(state, 'lat', 5.560)
-    map_state.lon = getattr(state, 'lon', -0.210)
-    map_state.district = getattr(state, 'district', 'Accra Central')
-    map_state.risk_score = getattr(state, 'risk_score', 50)
-    map_state.risk_category = getattr(state, 'risk_category', 'MODERATE')
+    map_state.lat = getattr(state, "lat", 5.560)
+    map_state.lon = getattr(state, "lon", -0.210)
+    map_state.district = getattr(state, "district", "Accra Central")
+    map_state.risk_score = getattr(state, "risk_score", 50)
+    map_state.risk_category = getattr(state, "risk_category", "MODERATE")
 
     # Render the actual map
     try:
@@ -272,15 +318,43 @@ def render_national_map(state):
         st.error(f"❌ Map error: {str(e)}")
         render_map_fallback()
 
-    # Stats are already displayed inside the map component
-    # No duplicate stats here - removed to avoid duplication
+    # Visual stats
+    render_quick_stats(
+        [
+            {
+                "label": "Districts Monitored",
+                "value": 10,
+                "emoji": "🗺️",
+                "color": "#4299e1",
+            },
+            {
+                "label": "Active Flood Zones",
+                "value": 3,
+                "emoji": "🌊",
+                "color": "#e53e3e",
+            },
+            {
+                "label": "Shelters Available",
+                "value": 3,
+                "emoji": "🏛️",
+                "color": "#38a169",
+            },
+            {
+                "label": "Verified Reports",
+                "value": 4,
+                "emoji": "✅",
+                "color": "#9f7aea",
+            },
+        ],
+        columns=4,
+    )
 
     st.caption("🗺️ Click on markers for details • Updated in real-time")
     st.divider()
 
 
 def render_evidence_panel(state):
-    """QUESTION 3: Why does the AI believe this?"""
+    """QUESTION 3: Why does the AI believe this? - VISUAL VERSION"""
     st.markdown("## 🔬 Evidence & Confidence")
     st.caption("*Why does the AI believe this is happening?*")
 
@@ -337,94 +411,135 @@ def render_evidence_panel(state):
         },
     ]
 
+    # Visual evidence rendering
     col1, col2 = st.columns(2)
 
     with col1:
-        for item in evidence_items[:3]:
-            st.markdown(f"**{item['name']}**")
-            st.markdown(f"{item['stars']} ({item['score']:.0f}%)")
-            st.progress(item["score"] / 100)
-            st.caption("")
+        render_evidence_confidence(evidence_items[:3])
 
     with col2:
-        for item in evidence_items[3:]:
-            st.markdown(f"**{item['name']}**")
-            st.markdown(f"{item['stars']} ({item['score']:.0f}%)")
-            st.progress(item["score"] / 100)
-            st.caption("")
+        render_evidence_confidence(evidence_items[3:])
 
     st.markdown("---")
 
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        st.metric("Overall Confidence", f"{state.risk_confidence * 100:.0f}%")
-    with col2:
-        st.metric("Data Quality", f"{state.data_quality_score:.0f}%")
-    with col3:
-        st.metric("Active Sources", state.active_sources_count)
+    # Summary metrics with visual cards
+    render_quick_stats(
+        [
+            {
+                "label": "Overall Confidence",
+                "value": f"{state.risk_confidence * 100:.0f}%",
+                "emoji": "🎯",
+                "color": "#38a169",
+            },
+            {
+                "label": "Data Quality",
+                "value": f"{state.data_quality_score:.0f}%",
+                "emoji": "📊",
+                "color": "#4299e1",
+            },
+            {
+                "label": "Active Sources",
+                "value": state.active_sources_count,
+                "emoji": "📡",
+                "color": "#ed8936",
+            },
+        ],
+        columns=3,
+    )
 
     st.divider()
 
 
 def render_impact_panel(state):
-    """QUESTION 4: Who is affected?"""
+    """QUESTION 4: Who is affected? - VISUAL VERSION (FIXED)"""
     st.markdown("## 👥 Impact Assessment")
     st.caption("*Who is affected and how?*")
 
-    # People
-    st.markdown("### 👤 People")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total Exposed", f"{state.population_exposed:,}")
-    with col2:
-        st.metric("Children (<18)", f"{state.children_exposed:,}")
-    with col3:
-        st.metric("Elderly (>60)", f"{state.elderly_exposed:,}")
-    with col4:
-        st.metric("Households", f"{state.households_affected:,}")
+    # People - Visual population display
+    render_population_visual(
+        total=getattr(state, "population_exposed", 0),
+        children=getattr(state, "children_exposed", 0),
+        elderly=getattr(state, "elderly_exposed", 0),
+        households=getattr(state, "households_affected", 0),
+    )
 
-    # Infrastructure
+    # Infrastructure - Visual metrics
     st.markdown("### 🏗️ Infrastructure")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Schools", state.schools_exposed)
-    with col2:
-        st.metric("Hospitals", state.hospitals_exposed)
-    with col3:
-        st.metric("Markets", state.markets_exposed)
-    with col4:
-        st.metric("Power Substations", state.power_substations_affected)
+    render_quick_stats(
+        [
+            {
+                "label": "Schools",
+                "value": getattr(state, "schools_exposed", 0),
+                "emoji": "🏫",
+                "color": "#4299e1",
+            },
+            {
+                "label": "Hospitals",
+                "value": getattr(state, "hospitals_exposed", 0),
+                "emoji": "🏥",
+                "color": "#e53e3e",
+            },
+            {
+                "label": "Markets",
+                "value": getattr(state, "markets_exposed", 0),
+                "emoji": "🏪",
+                "color": "#ed8936",
+            },
+            {
+                "label": "Power Substations",
+                "value": getattr(state, "power_substations_affected", 0),
+                "emoji": "⚡",
+                "color": "#9f7aea",
+            },
+        ],
+        columns=4,
+    )
 
-    # Economy
-    st.markdown("### 💰 Economy")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Residential Loss", f"GH₵ {state.residential_loss_ghs:,.0f}")
-    with col2:
-        st.metric("Infrastructure Loss", f"GH₵ {state.infrastructure_loss_ghs:,.0f}")
-    with col3:
-        st.metric("Total Loss", f"GH₵ {state.total_loss_ghs:,.0f}")
+    # Economy - Visual economic impact (FIXED - handles missing agriculture)
+    render_economic_impact(
+        residential=getattr(state, "residential_loss_ghs", 0),
+        infrastructure=getattr(state, "infrastructure_loss_ghs", 0),
+        total=getattr(state, "total_loss_ghs", 0),
+        agriculture=getattr(state, "agricultural_loss_ghs", None),
+    )
 
-    # Environment
+    # Environment - Visual metrics
     st.markdown("### 🌍 Environment")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Soil Saturation", f"{state.soil_saturation_percent:.0f}%")
+        render_visual_metric_card(
+            value=getattr(state, "soil_saturation_percent", 0),
+            label="Soil Saturation",
+            emoji="💧",
+            color="#38a169",
+            max_value=100,
+            subtitle="Current saturation level",
+        )
     with col2:
-        st.metric("River Level", f"{state.river_level_m:.1f}m")
+        render_visual_metric_card(
+            value=getattr(state, "river_level_m", 0),
+            label="River Level",
+            emoji="🌊",
+            color="#4299e1",
+            max_value=3.0,
+            subtitle=f"{getattr(state, 'river_level_m', 0):.1f}m / 3.0m",
+        )
 
-    if state.affected_communities:
+    # Affected communities - Visual list
+    affected = getattr(state, "affected_communities", [])
+    if affected:
         st.markdown("### 🏘️ Affected Communities")
-        st.markdown("• " + " • ".join(state.affected_communities[:5]))
+        render_affected_communities(affected[:5])
 
     st.divider()
 
 
 def render_operations_panel(state):
-    """QUESTION 5: What are we doing?"""
+    """QUESTION 5: What are we doing? - VISUAL VERSION"""
     st.markdown("## 🚗 Operations")
     st.caption("*What resources are deployed and available?*")
 
+    # Shelters - Visual status
     st.markdown("### 🏛️ Shelters")
     shelters = [
         {
@@ -446,28 +561,39 @@ def render_operations_panel(state):
             "available": 2000,
         },
     ]
+    render_shelter_status(shelters)
 
-    for shelter in shelters:
-        status_color = "🟢" if shelter["status"] == "OPEN" else "🟡"
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col1:
-            st.markdown(f"{status_color} **{shelter['name']}**")
-        with col2:
-            st.caption(f"Capacity: {shelter['capacity']:,}")
-        with col3:
-            st.caption(f"Available: {shelter['available']:,}")
-
+    # Resources - Visual status
     st.markdown("### 📦 Resources")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Rescue Boats", state.rescue_boats, "🚤 Ready")
-    with col2:
-        st.metric("Ambulances", state.ambulances, "🚑 Deployed")
-    with col3:
-        st.metric("Pumps", state.pumps, "💧 Available")
-    with col4:
-        st.metric("Rescue Teams", state.rescue_teams, "👥 Active")
+    resources = [
+        {
+            "name": "Rescue Boats",
+            "value": getattr(state, "rescue_boats", 0),
+            "emoji": "🚤",
+            "status": "Ready",
+        },
+        {
+            "name": "Ambulances",
+            "value": getattr(state, "ambulances", 0),
+            "emoji": "🚑",
+            "status": "Deployed",
+        },
+        {
+            "name": "Pumps",
+            "value": getattr(state, "pumps", 0),
+            "emoji": "💧",
+            "status": "Available",
+        },
+        {
+            "name": "Rescue Teams",
+            "value": getattr(state, "rescue_teams", 0),
+            "emoji": "👥",
+            "status": "Active",
+        },
+    ]
+    render_resource_status(resources)
 
+    # Evacuation Routes - Visual display
     st.markdown("### 🗺️ Evacuation Routes")
     routes = [
         {"from": "Alajo", "to": "Accra High School", "time": "15 min"},
@@ -475,13 +601,34 @@ def render_operations_panel(state):
         {"from": "Circle", "to": "Trade Fair Centre", "time": "25 min"},
     ]
     for route in routes:
-        st.markdown(f"🚗 **{route['from']}** → **{route['to']}** ({route['time']})")
+        st.markdown(
+            f"""
+        <div style="
+            background: #ffffff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 3px solid #4299e1;
+            font-size: 14px;
+        ">
+            <span>🚗</span>
+            <span><strong>{route['from']}</strong></span>
+            <span style="color: #999;">→</span>
+            <span><strong>{route['to']}</strong></span>
+            <span style="margin-left: auto; color: #666; font-size: 12px;">⏱️ {route['time']}</span>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
 
     st.divider()
 
 
 def render_ai_decision_center(state):
-    """QUESTION 6: What should we do? (AI Decision Center)"""
+    """QUESTION 6: What should we do? - VISUAL VERSION"""
     st.markdown("## 🎯 AI Decision Center")
     st.caption("*What actions should we take and why?*")
 
@@ -498,6 +645,7 @@ def render_ai_decision_center(state):
         cost = 120000
         time_window = "Within 45 minutes"
         urgency = "CRITICAL"
+        urgency_color = "#ff0000"
     elif state.risk_score >= 60:
         action = "⚠️ Prepare for Evacuation"
         confidence = 87
@@ -511,6 +659,7 @@ def render_ai_decision_center(state):
         cost = 65000
         time_window = "Within 2 hours"
         urgency = "HIGH"
+        urgency_color = "#ff6600"
     elif state.risk_score >= 40:
         action = "📢 Issue Public Awareness Message"
         confidence = 78
@@ -523,6 +672,7 @@ def render_ai_decision_center(state):
         cost = 15000
         time_window = "Within 4 hours"
         urgency = "MEDIUM"
+        urgency_color = "#ffaa00"
     else:
         action = "✅ Continue Normal Monitoring"
         confidence = 92
@@ -535,20 +685,33 @@ def render_ai_decision_center(state):
         cost = 5000
         time_window = "Ongoing"
         urgency = "LOW"
+        urgency_color = "#00cc00"
 
     col1, col2 = st.columns([2, 1])
 
     with col1:
-        urgency_color = (
-            "🔴"
-            if urgency == "CRITICAL"
-            else "🟠" if urgency == "HIGH" else "🟡" if urgency == "MEDIUM" else "🟢"
-        )
-        st.markdown(f"{urgency_color} **Recommended Action**")
         st.markdown(
-            f"<h2 style='font-size: 24px;'>{action}</h2>", unsafe_allow_html=True
+            f"""
+        <div style="
+            background: #ffffff;
+            padding: 16px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 6px solid {urgency_color};
+        ">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 20px;">{urgency_color.replace('#', '')}</span>
+                <span style="font-weight: 600; color: {urgency_color}; font-size: 14px;">
+                    {urgency}
+                </span>
+            </div>
+            <h2 style="font-size: 22px; margin: 0 0 12px 0;">{action}</h2>
+        </div>
+        """,
+            unsafe_allow_html=True,
         )
 
+        # Confidence bar
         st.progress(confidence / 100, text=f"Confidence: {confidence}%")
 
         st.markdown("**Why?**")
@@ -557,15 +720,20 @@ def render_ai_decision_center(state):
 
     with col2:
         st.markdown("**Expected Impact**")
-        st.metric("Protection", impact)
-        st.metric("Estimated Cost", f"GH₵ {cost:,.0f}")
-        st.metric("Time Window", time_window)
+        render_impact_card(
+            value=cost,
+            label="Estimated Cost",
+            emoji="💰",
+            color="#ed8936",
+            detail=impact,
+        )
+        st.caption(f"⏱️ Time Window: {time_window}")
 
     st.divider()
 
 
 def render_risk_timeline(state):
-    """QUESTION 7: What happens next?"""
+    """QUESTION 7: What happens next? - VISUAL VERSION"""
     st.markdown("## ⏰ Risk Timeline")
     st.caption("*What is expected to happen in the next 24 hours?*")
 
@@ -579,28 +747,24 @@ def render_risk_timeline(state):
         min(100, current_risk),
     ]
 
-    for hour, risk in zip(hours, risks):
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            st.markdown(f"**{hour}**")
-        with col2:
-            color = (
-                "🔴"
-                if risk >= 80
-                else "🟠" if risk >= 60 else "🟡" if risk >= 40 else "🟢"
-            )
-            st.progress(risk / 100, text=f"{color} {risk:.0f}%")
+    render_risk_timeline_visual(hours, risks, current_risk)
 
+    # Summary metrics
     peak_risk = max(risks)
     peak_hour = hours[risks.index(peak_risk)]
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Peak Risk", f"{peak_risk:.0f}%")
+        delta = (
+            f"{peak_risk - current_risk:.0f}%" if peak_risk > current_risk else "Stable"
+        )
+        st.metric("Peak Risk", f"{peak_risk:.0f}%", delta=delta)
     with col2:
         st.metric("Peak Time", peak_hour)
     with col3:
-        st.metric("Trend", "Increasing" if peak_risk > current_risk else "Stable")
+        trend = "Increasing" if peak_risk > current_risk else "Stable"
+        trend_delta = "↗️" if peak_risk > current_risk else "→"
+        st.metric("Trend", trend, delta=trend_delta)
 
     st.divider()
 
@@ -691,7 +855,7 @@ def render_ai_copilot(state):
 
 
 def main():
-    """Enterprise Command Center."""
+    """Enterprise Command Center with Visual Storytelling."""
     control_data = render_control_panel()
     district = control_data["district"]
     rainfall_mm = control_data["rainfall_mm"]
@@ -739,7 +903,7 @@ def main():
 
     render_header(state)
     render_executive_summary(state)
-    render_national_map(state)  # <-- REPLACED WITH WORKING MAP (duplicate stats removed)
+    render_national_map(state)
     render_evidence_panel(state)
     render_impact_panel(state)
 
