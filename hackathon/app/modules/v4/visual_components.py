@@ -321,6 +321,8 @@ def render_visual_metric_card(
     
     st.markdown(html, unsafe_allow_html=True)
 
+
+
 def render_economic_impact(
     residential: float,
     infrastructure: float,
@@ -328,49 +330,68 @@ def render_economic_impact(
     agriculture: float = None,
     currency: str = "GH₵"
 ) -> None:
-    """Render complete economic impact summary."""
+    """Render complete economic impact summary - Using st.components.v1.html for proper CSS."""
     if agriculture is None:
         agriculture = 0
     
     max_value = max(residential, infrastructure, agriculture, 1)
-    colors = {"Residential": THEME.DANGER, "Infrastructure": "#EA580C", "Agriculture": THEME.SUCCESS}
+    colors = {
+        "Residential": "#DC2626",
+        "Infrastructure": "#EA580C",
+        "Agriculture": "#16A34A"
+    }
     
-    html = f"""
-    <div style="margin-bottom: {THEME.SPACE_16}px;">
-        <h3 style="font-size: {THEME.FONT_LG}; font-weight: 600; color: {THEME.GRAY_800}; margin-bottom: {THEME.SPACE_12}px;">
-            💰 Estimated Economic Impact
-        </h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: {THEME.SPACE_12}px;">
-            <div style="background: {THEME.WHITE}; padding: {THEME.SPACE_12}px {THEME.SPACE_16}px; border-radius: {THEME.RADIUS_LG}; border-left: 4px solid {colors['Residential']}; box-shadow: {THEME.SHADOW_SM};">
-                <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500};">🏠 Residential</div>
-                <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {colors['Residential']};">{format_currency(residential, currency)}</div>
-                <div style="width: 100%; background: {THEME.GRAY_100}; border-radius: {THEME.RADIUS_FULL}; height: 4px; margin-top: {THEME.SPACE_6}px; overflow: hidden;">
-                    <div style="width: {clamp((residential/max_value)*100)}%; background: {colors['Residential']}; height: 4px; border-radius: {THEME.RADIUS_FULL};"></div>
-                </div>
-            </div>
-            <div style="background: {THEME.WHITE}; padding: {THEME.SPACE_12}px {THEME.SPACE_16}px; border-radius: {THEME.RADIUS_LG}; border-left: 4px solid {colors['Infrastructure']}; box-shadow: {THEME.SHADOW_SM};">
-                <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500};">🏗️ Infrastructure</div>
-                <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {colors['Infrastructure']};">{format_currency(infrastructure, currency)}</div>
-                <div style="width: 100%; background: {THEME.GRAY_100}; border-radius: {THEME.RADIUS_FULL}; height: 4px; margin-top: {THEME.SPACE_6}px; overflow: hidden;">
-                    <div style="width: {clamp((infrastructure/max_value)*100)}%; background: {colors['Infrastructure']}; height: 4px; border-radius: {THEME.RADIUS_FULL};"></div>
-                </div>
-            </div>
-            <div style="background: {THEME.WHITE}; padding: {THEME.SPACE_12}px {THEME.SPACE_16}px; border-radius: {THEME.RADIUS_LG}; border-left: 4px solid {colors['Agriculture']}; box-shadow: {THEME.SHADOW_SM};">
-                <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500};">🌾 Agriculture</div>
-                <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {colors['Agriculture']};">{format_currency(agriculture, currency)}</div>
-                <div style="width: 100%; background: {THEME.GRAY_100}; border-radius: {THEME.RADIUS_FULL}; height: 4px; margin-top: {THEME.SPACE_6}px; overflow: hidden;">
-                    <div style="width: {clamp((agriculture/max_value)*100)}%; background: {colors['Agriculture']}; height: 4px; border-radius: {THEME.RADIUS_FULL};"></div>
-                </div>
-            </div>
-        </div>
-        <div style="margin-top: {THEME.SPACE_12}px; background: linear-gradient(135deg, #1a1a2e, #16213e); padding: {THEME.SPACE_16}px {THEME.SPACE_24}px; border-radius: {THEME.RADIUS_LG}; text-align: center;">
-            <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_400};">Total Estimated Impact</div>
-            <div style="font-size: {THEME.FONT_3XL}; font-weight: 700; color: {THEME.WHITE};">{format_currency(total, currency)}</div>
-        </div>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
-
+    total_display = format_currency(total, currency)
+    res_display = format_currency(residential, currency)
+    inf_display = format_currency(infrastructure, currency)
+    ag_display = format_currency(agriculture, currency)
+    
+    res_pct = clamp((residential / max_value) * 100)
+    inf_pct = clamp((infrastructure / max_value) * 100)
+    ag_pct = clamp((agriculture / max_value) * 100)
+    
+    # Build HTML using string concatenation (NO indentation inside the string)
+    html = "<div style='margin-bottom:16px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>"
+    html += "<h3 style='font-size:18px; font-weight:600; color:#1F2937; margin-bottom:12px;'>💰 Estimated Economic Impact</h3>"
+    html += "<div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;'>"
+    
+    # Residential
+    html += "<div style='background:#FFFFFF; padding:12px 16px; border-radius:10px; border-left:4px solid " + colors['Residential'] + "; box-shadow:0 1px 2px rgba(0,0,0,0.05);'>"
+    html += "<div style='font-size:12px; color:#6B7280;'>🏠 Residential</div>"
+    html += "<div style='font-size:18px; font-weight:700; color:" + colors['Residential'] + ";'>" + res_display + "</div>"
+    html += "<div style='width:100%; background:#F3F4F6; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
+    html += "<div style='width:" + f"{res_pct:.0f}" + "%; background:" + colors['Residential'] + "; height:4px; border-radius:9999px;'></div>"
+    html += "</div></div>"
+    
+    # Infrastructure
+    html += "<div style='background:#FFFFFF; padding:12px 16px; border-radius:10px; border-left:4px solid " + colors['Infrastructure'] + "; box-shadow:0 1px 2px rgba(0,0,0,0.05);'>"
+    html += "<div style='font-size:12px; color:#6B7280;'>🏗️ Infrastructure</div>"
+    html += "<div style='font-size:18px; font-weight:700; color:" + colors['Infrastructure'] + ";'>" + inf_display + "</div>"
+    html += "<div style='width:100%; background:#F3F4F6; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
+    html += "<div style='width:" + f"{inf_pct:.0f}" + "%; background:" + colors['Infrastructure'] + "; height:4px; border-radius:9999px;'></div>"
+    html += "</div></div>"
+    
+    # Agriculture
+    html += "<div style='background:#FFFFFF; padding:12px 16px; border-radius:10px; border-left:4px solid " + colors['Agriculture'] + "; box-shadow:0 1px 2px rgba(0,0,0,0.05);'>"
+    html += "<div style='font-size:12px; color:#6B7280;'>🌾 Agriculture</div>"
+    html += "<div style='font-size:18px; font-weight:700; color:" + colors['Agriculture'] + ";'>" + ag_display + "</div>"
+    html += "<div style='width:100%; background:#F3F4F6; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
+    html += "<div style='width:" + f"{ag_pct:.0f}" + "%; background:" + colors['Agriculture'] + "; height:4px; border-radius:9999px;'></div>"
+    html += "</div></div>"
+    
+    html += "</div>"  # Close grid
+    
+    # Total Impact - with WHITE text
+    html += "<div style='margin-top:12px; background:linear-gradient(135deg, #1a1a2e, #16213e); padding:20px 24px; border-radius:10px; text-align:center; border:1px solid #4B5563; box-shadow:0 4px 12px rgba(0,0,0,0.2);'>"
+    html += "<div style='font-size:13px; color:#9CA3AF; font-weight:500; letter-spacing:0.5px;'>Total Estimated Impact</div>"
+    # CRITICAL: White text on dark background
+    html += "<div style='font-size:38px; font-weight:700; color:#FFFFFF; text-shadow:0 2px 8px rgba(0,0,0,0.5); padding:4px 0;'>"
+    html += total_display
+    html += "</div></div></div>"
+    
+    # Use st.components.v1.html for proper CSS rendering
+    # Using st.html() for better style preservation
+    st.html(html)
 
 def render_population_visual(
     total: int,

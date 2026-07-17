@@ -21,8 +21,7 @@ import streamlit as st
 from hackathon.app.modules.v4.situation_map import render_map_fallback
 from hackathon.app.modules.v4.situation_map import render_situation_map
 from hackathon.app.modules.v4.state import create_state_from_api
-from hackathon.app.modules.v4.visual_components import (
-    render_affected_communities,
+from hackathon.app.modules.v4.visual_components import (    render_affected_communities,
     render_economic_impact,
     render_evidence_confidence,
     render_horizontal_progress_bar,
@@ -36,8 +35,31 @@ from hackathon.app.modules.v4.visual_components import (
     render_shelter_status,
     render_status_indicator,
     render_visual_metric_card,
-)
+    render_evacuation_routes)
 from hackathon.app.modules.v4.state_fallback import get_fallback_data
+
+# ============================================================
+# FORCE BLACK TEXT - CSS OVERRIDE
+# ============================================================
+st.markdown(
+    """
+    <style>
+        /* Force ALL text to be black */
+        .stApp, .stApp p, .stApp div, .stApp span, .stApp label {
+            color: #000000 !important;
+        }
+        /* Keep emojis visible */
+        .stAlert, .stAlert * {
+            color: inherit !important;
+        }
+        /* Force markdown text to black */
+        .stMarkdown, .stMarkdown p, .stMarkdown div, .stMarkdown span {
+            color: #000000 !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # ============================================================
 # CONFIGURATION
@@ -569,34 +591,16 @@ def render_operations_panel(state):
     ]
     render_resource_status(resources)
 
-    # Evacuation Routes - Visual display
+    # Evacuation Routes - Visual display using component
     st.markdown("### 🗺️ Evacuation Routes")
     routes = [
         {"from": "Alajo", "to": "Accra High School", "time": "15 min"},
         {"from": "Kaneshie", "to": "Community Center", "time": "20 min"},
         {"from": "Circle", "to": "Trade Fair Centre", "time": "25 min"},
     ]
-    for route in routes:
-        st.markdown(f"""
-        <div style="
-            background: #ffffff;
-            padding: 8px 16px;
-            border-radius: 8px;
-            margin-bottom: 4px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border-left: 3px solid #4299e1;
-            font-size: 14px;
-        ">
-            <span>🚗</span>
-            <span><strong>{route['from']}</strong></span>
-            <span style="color: #999;">→</span>
-            <span><strong>{route['to']}</strong></span>
-            <span style="margin-left: auto; color: #666; font-size: 12px;">⏱️ {route['time']}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
+    render_evacuation_routes(routes)
+    
+    st.divider()
     st.divider()
 
 
