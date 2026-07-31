@@ -29,7 +29,8 @@ class CommunityMemoryEngine:
         cursor = conn.cursor()
 
         # Main reports table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 report_id TEXT UNIQUE NOT NULL,
@@ -48,7 +49,8 @@ class CommunityMemoryEngine:
                 trusted_score REAL DEFAULT 0.5,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """
+        )
 
         # Add indexes
         cursor.execute(

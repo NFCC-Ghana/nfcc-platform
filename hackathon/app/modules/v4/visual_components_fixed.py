@@ -400,7 +400,8 @@ def render_risk_indicator(
         color = "#00cc00"
         emoji = "🟢"
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="
         background: #ffffff;
         padding: 16px 20px;
@@ -417,7 +418,8 @@ def render_risk_indicator(
                 </div>
             </div>
         </div>
-    """)
+    """
+    )
 
     if show_progress:
         st.markdown(

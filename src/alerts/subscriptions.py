@@ -26,7 +26,8 @@ class SubscriptionManager:
 
         cursor.execute("DROP TABLE IF EXISTS subscriptions")
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE subscriptions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 phone_number VARCHAR(20) UNIQUE NOT NULL,
@@ -39,17 +40,22 @@ class SubscriptionManager:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_subscriptions_phone
             ON subscriptions(phone_number)
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_subscriptions_district
             ON subscriptions(district)
-        """)
+        """
+        )
 
         conn.commit()
         conn.close()
@@ -146,14 +152,16 @@ class SubscriptionManager:
         )
         sms = cursor.fetchone()[0]
 
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT district, COUNT(*) as count
             FROM subscriptions
             WHERE active = TRUE
             GROUP BY district
             ORDER BY count DESC
             LIMIT 5
-        """)
+        """
+        )
         top_districts = cursor.fetchall()
 
         conn.close()

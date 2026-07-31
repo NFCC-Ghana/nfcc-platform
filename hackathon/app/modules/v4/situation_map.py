@@ -146,7 +146,7 @@ def render_situation_map(state):
         st.caption("🗺️ Click on markers for details • Updated in real-time")
 
     except Exception as e:
-        st.warning(f"⚠️ Map temporarily unavailable")
+        st.warning("⚠️ Map temporarily unavailable")
         st.markdown("### 📍 Affected Areas")
 
         risk_df = pd.DataFrame(
