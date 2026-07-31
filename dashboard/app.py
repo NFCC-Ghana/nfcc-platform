@@ -586,3 +586,88 @@ st.caption(
     "NFCC Flood-Risk Intelligence Platform · Accra, Ghana · "
     "Powered by CHIRPS + XGBoost · Phase 3B MVP"
 )
+# ══════════════════════════════════════════════════════════════════════
+# CIVISENTI COMMUNITY FLOOD REPORTS
+# ══════════════════════════════════════════════════════════════════════
+
+st.markdown("---")
+st.markdown("## 📲 CiviSenti Community Flood Reports")
+
+CIVISENTI_REPORTS_PATH = BASE_DIR / "data" / "community_reports" / "reports.jsonl"
+
+
+def load_civisenti_reports():
+    """Load CiviSenti community flood reports from JSONL storage."""
+
+    if not CIVISENTI_REPORTS_PATH.exists():
+        return pd.DataFrame()
+
+    records = []
+
+    with CIVISENTI_REPORTS_PATH.open("r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if line:
+                records.append(pd.json_normalize(pd.read_json(line, typ="series")))
+
+    if not records:
+        return pd.DataFrame()
+
+    return pd.concat(records, ignore_index=True)
+
+
+community_reports = load_civisenti_reports()
+
+if community_reports.empty:
+    st.info(
+        "No CiviSenti community flood reports found yet. "
+        "Reports will appear here after WhatsApp submissions are processed."
+    )
+else:
+    total_reports = len(community_reports)
+
+    validated_reports = (
+        community_reports["status"].eq("validated").sum()
+        if "status" in community_reports.columns
+        else 0
+    )
+
+    supported_reports = (
+        community_reports["satellite_validation"].eq("supported").sum()
+        if "satellite_validation" in community_reports.columns
+        else 0
+    )
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Reports", total_reports)
+    col2.metric("Validated Reports", int(validated_reports))
+    col3.metric("Satellite Supported", int(supported_reports))
+
+    display_columns = [
+        "report_id",
+        "created_at",
+        "reporter_phone",
+        "location_text",
+        "latitude",
+        "longitude",
+        "severity",
+        "status",
+        "satellite_validation",
+        "message",
+    ]
+
+    available_columns = [
+        column for column in display_columns if column in community_reports.columns
+    ]
+
+    if "created_at" in community_reports.columns:
+        community_reports["created_at"] = pd.to_datetime(
+            community_reports["created_at"], errors="coerce"
+        )
+        community_reports = community_reports.sort_values("created_at", ascending=False)
+
+    st.dataframe(community_reports[available_columns], use_container_width=True)
+
+    if "severity" in community_reports.columns:
+        st.markdown("### Severity Breakdown")
+        st.bar_chart(community_reports["severity"].value_counts())
