@@ -1,0 +1,1313 @@
+"""
+Visual Storytelling Components - Enterprise Edition
+CivicFlood AI Component Library
+
+Enterprise-grade improvements:
+- Design System (Theme Engine)
+- HTML Builders (no duplication)
+- Formatters (single source of truth)
+- Accessibility (WCAG 2.2 AA)
+- Input Validation
+- HTML Escaping (security)
+- Responsive Design
+- Component Classes
+- Documentation
+
+Version: 2.0.0
+"""
+
+import streamlit as st
+from typing import List, Dict, Any, Optional, Tuple, Union
+from dataclasses import dataclass
+from html import escape
+from enum import Enum
+import math
+import logging
+
+# ============================================================
+# SECTION 1: THEME ENGINE (Design System)
+# ============================================================
+
+@dataclass(frozen=True)
+class Theme:
+    """Centralized design tokens - change once, update everywhere."""
+    
+    # Colors - Brand
+    SUCCESS: str = "#16A34A"
+    WARNING: str = "#F59E0B"
+    DANGER: str = "#DC2626"
+    INFO: str = "#2563EB"
+    PRIMARY: str = "#1E40AF"
+    
+    # Colors - Neutrals
+    WHITE: str = "#FFFFFF"
+    BLACK: str = "#111827"
+    GRAY_50: str = "#F9FAFB"
+    GRAY_100: str = "#F3F4F6"
+    GRAY_200: str = "#E5E7EB"
+    GRAY_300: str = "#D1D5DB"
+    GRAY_400: str = "#9CA3AF"
+    GRAY_500: str = "#6B7280"
+    GRAY_600: str = "#4B5563"
+    GRAY_700: str = "#374151"
+    GRAY_800: str = "#1F2937"
+    GRAY_900: str = "#111827"
+    
+    # Risk Colors
+    RISK_CRITICAL: str = "#DC2626"
+    RISK_HIGH: str = "#EA580C"
+    RISK_MODERATE: str = "#F59E0B"
+    RISK_LOW: str = "#16A34A"
+    
+    # Spacing (in pixels)
+    SPACE_2: int = 2
+    SPACE_4: int = 4
+    SPACE_6: int = 6
+    SPACE_8: int = 8
+    SPACE_10: int = 10
+    SPACE_12: int = 12
+    SPACE_14: int = 14
+    SPACE_16: int = 16
+    SPACE_18: int = 18
+    SPACE_20: int = 20
+    SPACE_22: int = 22
+    SPACE_24: int = 24
+    SPACE_28: int = 28
+    SPACE_30: int = 30
+    SPACE_32: int = 32
+    SPACE_40: int = 40
+    
+    # Typography
+    FONT_XS: str = "10px"
+    FONT_SM: str = "12px"
+    FONT_BASE: str = "14px"
+    FONT_MD: str = "16px"
+    FONT_LG: str = "18px"
+    FONT_XL: str = "22px"
+    FONT_2XL: str = "28px"
+    FONT_3XL: str = "36px"
+    FONT_4XL: str = "48px"
+    
+    # Border Radius
+    RADIUS_SM: str = "4px"
+    RADIUS_MD: str = "6px"
+    RADIUS_LG: str = "10px"
+    RADIUS_XL: str = "16px"
+    RADIUS_2XL: str = "24px"
+    RADIUS_FULL: str = "9999px"
+    
+    # Shadows
+    SHADOW_SM: str = "0 1px 2px rgba(0,0,0,0.05)"
+    SHADOW_MD: str = "0 2px 8px rgba(0,0,0,0.06)"
+    SHADOW_LG: str = "0 4px 16px rgba(0,0,0,0.08)"
+    SHADOW_XL: str = "0 8px 32px rgba(0,0,0,0.10)"
+    
+    # Transitions
+    TRANSITION_FAST: str = "0.15s ease"
+    TRANSITION_MD: str = "0.3s ease"
+    TRANSITION_SLOW: str = "0.5s ease"
+
+THEME = Theme()
+
+# ============================================================
+# SECTION 2: ENUMS (Type Safety)
+# ============================================================
+
+class RiskLevel(Enum):
+    """Standardized risk levels."""
+    CRITICAL = ("CRITICAL", THEME.RISK_CRITICAL, "🔴")
+    HIGH = ("HIGH", THEME.RISK_HIGH, "🟠")
+    MODERATE = ("MODERATE", THEME.RISK_MODERATE, "🟡")
+    LOW = ("LOW", THEME.RISK_LOW, "🟢")
+    
+    @property
+    def label(self) -> str:
+        return self.value[0]
+    
+    @property
+    def color(self) -> str:
+        return self.value[1]
+    
+    @property
+    def emoji(self) -> str:
+        return self.value[2]
+
+class StatusType(Enum):
+    """Standardized status types."""
+    OPEN = ("OPEN", THEME.SUCCESS, "✅")
+    CLOSED = ("CLOSED", THEME.DANGER, "❌")
+    PREPARING = ("PREPARING", THEME.WARNING, "⚡")
+    ACTIVE = ("ACTIVE", THEME.SUCCESS, "🟢")
+    INACTIVE = ("INACTIVE", THEME.GRAY_400, "⚪")
+    HIGH = ("HIGH", THEME.RISK_HIGH, "⚠️")
+    MODERATE = ("MODERATE", THEME.RISK_MODERATE, "⚡")
+    LOW = ("LOW", THEME.RISK_LOW, "✅")
+    
+    @property
+    def label(self) -> str:
+        return self.value[0]
+    
+    @property
+    def color(self) -> str:
+        return self.value[1]
+    
+    @property
+    def emoji(self) -> str:
+        return self.value[2]
+
+# ============================================================
+# SECTION 3: FORMATTERS (Single Source of Truth)
+# ============================================================
+
+def format_number(value: float, decimals: int = 1) -> str:
+    """
+    Format numbers with K, M, B suffixes.
+    
+    Args:
+        value: Number to format
+        decimals: Number of decimal places
+    
+    Returns:
+        Formatted string like "1.5K", "2.3M", "1.2B"
+    """
+    if value is None:
+        return "0"
+    if value >= 1_000_000_000:
+        return f"{value/1e9:.{decimals}f}B"
+    if value >= 1_000_000:
+        return f"{value/1e6:.{decimals}f}M"
+    if value >= 1_000:
+        return f"{value/1e3:.{decimals}f}K"
+    return f"{value:,.0f}"
+
+def format_currency(value: float, currency: str = "GH₵") -> str:
+    """Format currency with proper suffixes."""
+    if value is None or value == 0:
+        return f"{currency} 0"
+    if value >= 1_000_000_000:
+        return f"{currency} {value/1e9:.2f}B"
+    if value >= 1_000_000:
+        return f"{currency} {value/1e6:.1f}M"
+    if value >= 1_000:
+        return f"{currency} {value/1e3:.1f}K"
+    return f"{currency} {value:,.0f}"
+
+def format_percentage(value: float, decimals: int = 0) -> str:
+    """Format percentage with optional decimals."""
+    return f"{value:.{decimals}f}%"
+
+def format_compact(value: Union[int, float]) -> str:
+    """
+    Compact number formatting for display in cards.
+    Uses K for thousands, M for millions.
+    """
+    if value is None:
+        return "0"
+    if value >= 1_000_000:
+        return f"{value/1_000_000:.1f}M"
+    if value >= 10_000:
+        return f"{value/1_000:.1f}K"
+    return f"{value:,.0f}"
+
+# ============================================================
+# SECTION 4: VALIDATORS (Input Safety)
+# ============================================================
+
+def validate_percentage(value: float, max_value: float = 100) -> float:
+    """Validate and clamp percentage between 0 and max_value."""
+    if max_value <= 0:
+        raise ValueError(f"max_value must be > 0, got {max_value}")
+    return max(0, min(max_value, value))
+
+def validate_risk_score(score: float) -> float:
+    """Validate risk score is between 0-100."""
+    if not 0 <= score <= 100:
+        raise ValueError(f"Risk score must be between 0-100, got {score}")
+    return score
+
+def validate_positive(value: float, name: str = "Value") -> float:
+    """Validate value is positive."""
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative, got {value}")
+    return value
+
+# ============================================================
+# SECTION 5: HTML BUILDERS (No Duplication)
+# ============================================================
+
+def card(
+    content: str,
+    accent: str = None,
+    shadow: str = "md",
+    padding: int = None,
+    background: str = None
+) -> str:
+    """
+    Build a consistent card with optional accent border.
+    
+    Args:
+        content: HTML content inside the card
+        accent: Optional accent color for left border
+        shadow: Shadow size (sm, md, lg, xl)
+        padding: Custom padding (default: 16)
+        background: Custom background color
+    
+    Returns:
+        HTML string for the card
+    """
+    shadow_map = {
+        "sm": THEME.SHADOW_SM,
+        "md": THEME.SHADOW_MD,
+        "lg": THEME.SHADOW_LG,
+        "xl": THEME.SHADOW_XL,
+    }
+    border = f"border-left: 4px solid {accent};" if accent else ""
+    pad = padding or THEME.SPACE_16
+    bg = background or THEME.WHITE
+    
+    return f"""
+    <div style="
+        background: {bg};
+        padding: {pad}px;
+        border-radius: {THEME.RADIUS_LG};
+        {border}
+        box-shadow: {shadow_map.get(shadow, THEME.SHADOW_MD)};
+        transition: transform {THEME.TRANSITION_FAST}, box-shadow {THEME.TRANSITION_FAST};
+        margin-bottom: {THEME.SPACE_8}px;
+    ">
+        {content}
+    </div>
+    """
+
+def progress_bar(
+    percentage: float,
+    color: str = None,
+    height: int = 6,
+    background: str = None,
+    rounded: bool = True
+) -> str:
+    """
+    Build a consistent progress bar.
+    
+    Args:
+        percentage: Progress value (0-100)
+        color: Bar color
+        height: Bar height in pixels
+        background: Background color
+        rounded: Whether to use rounded corners
+    
+    Returns:
+        HTML string for the progress bar
+    """
+    pct = validate_percentage(percentage)
+    bar_color = color or THEME.SUCCESS
+    bg = background or THEME.GRAY_100
+    radius = THEME.RADIUS_FULL if rounded else THEME.RADIUS_SM
+    
+    return f"""
+    <div style="
+        width: 100%;
+        background: {bg};
+        border-radius: {radius};
+        height: {height}px;
+        overflow: hidden;
+    ">
+        <div style="
+            width: {pct:.1f}%;
+            background: {bar_color};
+            height: {height}px;
+            border-radius: {radius};
+            transition: width {THEME.TRANSITION_SLOW};
+        ">
+        </div>
+    </div>
+    """
+
+def metric_display(
+    value: Union[int, float],
+    label: str,
+    emoji: str = "",
+    color: str = None,
+    subtitle: str = "",
+    size: str = "large"
+) -> str:
+    """
+    Build a consistent metric display.
+    
+    Args:
+        value: The metric value
+        label: Label text
+        emoji: Optional emoji icon
+        color: Value color
+        subtitle: Optional subtitle
+        size: Size variant (small, medium, large)
+    """
+    font_size_map = {
+        "small": THEME.FONT_XL,
+        "medium": THEME.FONT_2XL,
+        "large": THEME.FONT_3XL,
+    }
+    fs = font_size_map.get(size, THEME.FONT_2XL)
+    color_style = f"color: {color};" if color else ""
+    
+    return f"""
+    <div style="display: flex; align-items: center; gap: {THEME.SPACE_12}px;">
+        {f'<span style="font-size: {THEME.FONT_3XL}; line-height: 1;">{escape(emoji)}</span>' if emoji else ''}
+        <div>
+            <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500}; font-weight: 500;">
+                {escape(label)}
+            </div>
+            <div style="font-size: {fs}; font-weight: 700; {color_style}">
+                {format_number(value)}
+            </div>
+            {f'<div style="font-size: {THEME.FONT_XS}; color: {THEME.GRAY_400}; margin-top: {THEME.SPACE_4}px;">{escape(subtitle)}</div>' if subtitle else ''}
+        </div>
+    </div>
+    """
+
+def status_badge(
+    status: Union[str, StatusType],
+    label: str = None,
+    show_icon: bool = True
+) -> str:
+    """
+    Build an accessible status badge.
+    
+    Args:
+        status: Status value or StatusType enum
+        label: Optional custom label
+        show_icon: Whether to show the icon
+    
+    Returns:
+        HTML string for the status badge
+    """
+    if isinstance(status, StatusType):
+        status_obj = status
+    else:
+        # Try to match string to StatusType
+        try:
+            status_obj = StatusType[status.upper()]
+        except KeyError:
+            status_obj = StatusType.INACTIVE
+    
+    display_label = label or status_obj.label
+    color = status_obj.color
+    emoji = status_obj.emoji if show_icon else ""
+    
+    return f"""
+    <div style="
+        display: inline-flex;
+        align-items: center;
+        gap: {THEME.SPACE_6}px;
+        background: {THEME.GRAY_50};
+        padding: {THEME.SPACE_4}px {THEME.SPACE_12}px;
+        border-radius: {THEME.RADIUS_FULL};
+        border: 1px solid {color};
+    ">
+        {f'<span aria-hidden="true">{emoji}</span>' if show_icon else ''}
+        <span style="color: {color}; font-weight: 500; font-size: {THEME.FONT_SM};">
+            {escape(display_label)}
+        </span>
+    </div>
+    """
+
+# ============================================================
+# SECTION 6: COMPONENT CLASSES (OOP Design)
+# ============================================================
+
+@dataclass
+class MetricCard:
+    """
+    A metric card with consistent styling.
+    
+    Example:
+        card = MetricCard(
+            value=187928,
+            label="Total Population",
+            emoji="👥",
+            subtitle="Greater Accra Region"
+        )
+        card.render()
+    """
+    value: float
+    label: str
+    emoji: str = ""
+    color: str = None
+    subtitle: str = ""
+    size: str = "large"
+    shadow: str = "md"
+    
+    def render(self) -> None:
+        """Render the metric card."""
+        content = metric_display(
+            value=self.value,
+            label=self.label,
+            emoji=self.emoji,
+            color=self.color,
+            subtitle=self.subtitle,
+            size=self.size
+        )
+        st.markdown(
+            card(content, accent=self.color, shadow=self.shadow),
+            unsafe_allow_html=True
+        )
+
+@dataclass
+class ProgressCard:
+    """
+    A progress card with label and bar.
+    
+    Example:
+        card = ProgressCard(
+            value=78,
+            max_value=100,
+            label="Soil Saturation",
+            color=THEME.SUCCESS
+        )
+        card.render()
+    """
+    value: float
+    max_value: float = 100
+    label: str = ""
+    emoji: str = ""
+    color: str = None
+    subtitle: str = ""
+    height: int = 6
+    
+    def render(self) -> None:
+        """Render the progress card."""
+        pct = validate_percentage(self.value, self.max_value)
+        bar_color = self.color or THEME.SUCCESS
+        
+        content = f"""
+        <div>
+            <div style="display: flex; align-items: center; gap: {THEME.SPACE_12}px; margin-bottom: {THEME.SPACE_8}px;">
+                {f'<span style="font-size: {THEME.FONT_2XL};">{escape(self.emoji)}</span>' if self.emoji else ''}
+                <div>
+                    <div style="font-size: {THEME.FONT_MD}; font-weight: 600; color: {THEME.GRAY_800};">
+                        {escape(self.label)}
+                    </div>
+                    <div style="font-size: {THEME.FONT_LG}; font-weight: 700; color: {bar_color};">
+                        {pct:.0f}%
+                    </div>
+                </div>
+            </div>
+            {progress_bar(pct, bar_color, self.height)}
+            {f'<div style="font-size: {THEME.FONT_XS}; color: {THEME.GRAY_400}; margin-top: {THEME.SPACE_4}px;">{escape(self.subtitle)}</div>' if self.subtitle else ''}
+        </div>
+        """
+        st.markdown(card(content), unsafe_allow_html=True)
+
+@dataclass
+class RiskIndicator:
+    """
+    A risk indicator with color, label, and progress.
+    
+    Example:
+        indicator = RiskIndicator(
+            score=72,
+            category="HIGH",
+            show_progress=True
+        )
+        indicator.render()
+    """
+    score: float
+    category: str = None
+    show_progress: bool = True
+    shadow: str = "md"
+    
+    def _get_risk_level(self) -> RiskLevel:
+        """Get risk level based on score."""
+        if self.score >= 80:
+            return RiskLevel.CRITICAL
+        if self.score >= 60:
+            return RiskLevel.HIGH
+        if self.score >= 40:
+            return RiskLevel.MODERATE
+        return RiskLevel.LOW
+    
+    def render(self) -> None:
+        """Render the risk indicator."""
+        level = self._get_risk_level()
+        color = level.color
+        emoji = level.emoji
+        label = self.category or level.label
+        
+        content = f"""
+        <div>
+            <div style="display: flex; align-items: center; gap: {THEME.SPACE_16}px;">
+                <span style="font-size: {THEME.FONT_4XL}; line-height: 1;">{emoji}</span>
+                <div style="flex: 1;">
+                    <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500}; font-weight: 500;">
+                        Current Risk Level
+                    </div>
+                    <div style="font-size: {THEME.FONT_2XL}; font-weight: 700; color: {color};">
+                        {self.score:.0f}% • {escape(label)}
+                    </div>
+                </div>
+            </div>
+            {f'<div style="margin-top: {THEME.SPACE_12}px;">{progress_bar(self.score, color)}</div>' if self.show_progress else ''}
+        </div>
+        """
+        st.markdown(
+            card(content, accent=color, shadow=self.shadow),
+            unsafe_allow_html=True
+        )
+
+@dataclass
+class ShelterStatus:
+    """A shelter status card."""
+    name: str
+    status: Union[str, StatusType]
+    capacity: int
+    available: int
+    
+    def render(self) -> None:
+        """Render the shelter status card."""
+        occupied = self.capacity - self.available
+        pct = (occupied / self.capacity) * 100 if self.capacity > 0 else 0
+        
+        if isinstance(self.status, StatusType):
+            status_obj = self.status
+        else:
+            try:
+                status_obj = StatusType[self.status.upper()]
+            except KeyError:
+                status_obj = StatusType.INACTIVE
+        
+        color = status_obj.color
+        icon = status_obj.emoji
+        label = status_obj.label
+        
+        content = f"""
+        <div style="display: flex; align-items: center; gap: {THEME.SPACE_8}px; margin-bottom: {THEME.SPACE_8}px;">
+            <span style="font-size: {THEME.FONT_MD};">{icon}</span>
+            <span style="font-weight: 600; font-size: {THEME.FONT_MD}; color: {THEME.GRAY_900};">
+                {escape(self.name)}
+            </span>
+            <span style="font-size: {THEME.FONT_SM}; color: {color}; font-weight: 500; margin-left: auto;">
+                {escape(label)}
+            </span>
+        </div>
+        <div style="display: flex; gap: {THEME.SPACE_16}px; font-size: {THEME.FONT_SM}; color: {THEME.GRAY_600}; margin-bottom: {THEME.SPACE_8}px;">
+            <span>👤 <span style="color: {THEME.GRAY_900}; font-weight: 600;">{occupied:,}</span> occupied</span>
+            <span>🏠 <span style="color: {THEME.GRAY_900}; font-weight: 600;">{self.available:,}</span> available</span>
+            <span>📊 <span style="color: {THEME.GRAY_900}; font-weight: 600;">{pct:.0f}%</span> full</span>
+        </div>
+        {progress_bar(pct, color, 4)}
+        """
+        st.markdown(
+            card(content, accent=color, shadow="sm", padding=THEME.SPACE_12),
+            unsafe_allow_html=True
+        )
+
+@dataclass
+class EvacuationRoute:
+    """An evacuation route display."""
+    from_place: str
+    to_place: str
+    time: str
+    color: str = "#4299e1"
+    
+    def render(self) -> None:
+        """Render the evacuation route."""
+        content = f"""
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: {THEME.SPACE_12}px;
+            padding: {THEME.SPACE_10}px {THEME.SPACE_16}px;
+            background: {THEME.WHITE};
+            border-radius: {THEME.RADIUS_LG};
+            border-left: 3px solid {self.color};
+            box-shadow: {THEME.SHADOW_SM};
+            font-size: {THEME.FONT_MD};
+        ">
+            <span style="font-size: {THEME.FONT_LG};">🚗</span>
+            <span style="font-weight: 600; color: {THEME.GRAY_900};">{escape(self.from_place)}</span>
+            <span style="color: {THEME.GRAY_400};">→</span>
+            <span style="font-weight: 600; color: {THEME.GRAY_900};">{escape(self.to_place)}</span>
+            <span style="margin-left: auto; color: {THEME.GRAY_600}; font-weight: 500; font-size: {THEME.FONT_SM};">
+                ⏱️ {escape(self.time)}
+            </span>
+        </div>
+        """
+        st.markdown(content, unsafe_allow_html=True)
+
+@dataclass
+class AffectedCommunity:
+    """An affected community display."""
+    name: str
+    severity: str = "MODERATE"
+    
+    def render(self) -> None:
+        """Render the affected community."""
+        severity_map = {
+            "CRITICAL": ("#DC2626", "🔴"),
+            "HIGH": ("#EA580C", "🟠"),
+            "MODERATE": ("#F59E0B", "🟡"),
+            "LOW": ("#16A34A", "🟢"),
+        }
+        color, emoji = severity_map.get(self.severity.upper(), ("#6B7280", "⚪"))
+        
+        content = f"""
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: {THEME.SPACE_8}px;
+            background: {THEME.GRAY_50};
+            padding: {THEME.SPACE_8}px {THEME.SPACE_12}px;
+            border-radius: {THEME.RADIUS_LG};
+            margin-bottom: {THEME.SPACE_4}px;
+            border-left: 3px solid {color};
+        ">
+            <span style="font-size: {THEME.FONT_MD};">{emoji}</span>
+            <span style="font-size: {THEME.FONT_MD}; font-weight: 600; color: {THEME.GRAY_900};">
+                {escape(self.name)}
+            </span>
+            <span style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500}; margin-left: auto;">
+                Affected
+            </span>
+        </div>
+        """
+        st.markdown(content, unsafe_allow_html=True)
+
+# ============================================================
+# SECTION 7: BACKWARD COMPATIBILITY WRAPPERS
+# ============================================================
+
+# These wrapper functions maintain backward compatibility
+# while using the new enterprise components
+
+def render_visual_metric_card(
+    value: float,
+    label: str,
+    emoji: str = "",
+    color: str = None,
+    max_value: float = 100,
+    subtitle: str = "",
+    show_bar: bool = True
+) -> None:
+    """Backward compatibility wrapper for render_visual_metric_card."""
+    if not color:
+        # Determine color based on percentage
+        pct = (value / max_value) * 100 if max_value > 0 else 0
+        if pct >= 70:
+            color = THEME.SUCCESS
+        elif pct >= 40:
+            color = THEME.WARNING
+        else:
+            color = THEME.DANGER
+    
+    if show_bar:
+        card = ProgressCard(
+            value=value,
+            max_value=max_value,
+            label=label,
+            emoji=emoji,
+            color=color,
+            subtitle=subtitle
+        )
+        card.render()
+    else:
+        card = MetricCard(
+            value=value,
+            label=label,
+            emoji=emoji,
+            color=color,
+            subtitle=subtitle,
+            size="large"
+        )
+        card.render()
+
+def render_risk_indicator(
+    risk_score: float,
+    risk_category: str,
+    show_progress: bool = True
+) -> None:
+    """Backward compatibility wrapper for render_risk_indicator."""
+    indicator = RiskIndicator(
+        score=risk_score,
+        category=risk_category,
+        show_progress=show_progress
+    )
+    indicator.render()
+
+def render_shelter_status(
+    shelters: List[Dict[str, Any]]
+) -> None:
+    """Backward compatibility wrapper for render_shelter_status."""
+    for shelter in shelters:
+        status = shelter.get('status', 'OPEN')
+        shelter_card = ShelterStatus(
+            name=shelter.get('name', 'Unknown'),
+            status=status,
+            capacity=shelter.get('capacity', 0),
+            available=shelter.get('available', 0)
+        )
+        shelter_card.render()
+
+def render_evacuation_routes(
+    routes: List[Dict[str, str]]
+) -> None:
+    """Backward compatibility wrapper for render_evacuation_routes."""
+    for route in routes:
+        route_card = EvacuationRoute(
+            from_place=route.get('from', 'Unknown'),
+            to_place=route.get('to', 'Unknown'),
+            time=route.get('time', 'N/A')
+        )
+        route_card.render()
+
+def render_affected_communities(
+    communities: List[str],
+    max_display: int = 5
+) -> None:
+    """Backward compatibility wrapper for render_affected_communities."""
+    if not communities:
+        st.info("No affected communities reported.")
+        return
+    
+    # Simple severity distribution (alternating for visual variety)
+    severity_pattern = ["MODERATE", "HIGH", "CRITICAL", "MODERATE", "LOW"]
+    
+    for i, community in enumerate(communities[:max_display]):
+        severity = severity_pattern[i % len(severity_pattern)]
+        community_card = AffectedCommunity(
+            name=community,
+            severity=severity
+        )
+        community_card.render()
+    
+    if len(communities) > max_display:
+        st.caption(f"And {len(communities) - max_display} more communities affected...")
+
+def render_risk_timeline_visual(
+    hours: List[str],
+    risks: List[float],
+    current_risk: float
+) -> None:
+    """Backward compatibility wrapper for render_risk_timeline_visual."""
+    for hour, risk in zip(hours, risks):
+        level = RiskLevel.CRITICAL if risk >= 80 else RiskLevel.HIGH if risk >= 60 else RiskLevel.MODERATE if risk >= 40 else RiskLevel.LOW
+        is_peak = risk == max(risks)
+        is_current = risk == current_risk
+        
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.markdown(
+                f"<span style='color: {THEME.GRAY_900}; font-weight: bold;'>{escape(hour)}</span>",
+                unsafe_allow_html=True
+            )
+        with col2:
+            st.markdown(f"""
+            <div style="display: flex; align-items: center; gap: {THEME.SPACE_8}px;">
+                <span style="font-size: {THEME.FONT_MD};">{level.emoji}</span>
+                {progress_bar(risk, level.color, 10)}
+                <span style="font-size: {THEME.FONT_SM}; font-weight: {'700' if is_peak else '500'}; color: {level.color};">
+                    {risk:.0f}%
+                    {f' ⭐' if is_peak else ''}
+                    {f' 👈' if is_current else ''}
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+def render_quick_stats(stats: List[Dict[str, Any]], columns: int = 4) -> None:
+    """Backward compatibility wrapper for render_quick_stats."""
+    cols = st.columns(columns)
+    for i, stat in enumerate(stats):
+        with cols[i % columns]:
+            color = stat.get('color', THEME.GRAY_700)
+            value = stat.get('value', 'N/A')
+            label = stat.get('label', '')
+            emoji = stat.get('emoji', '')
+            subtitle = stat.get('subtitle', '')
+            
+            st.markdown(f"""
+            <div style="
+                background: {THEME.WHITE};
+                padding: {THEME.SPACE_12}px {THEME.SPACE_16}px;
+                border-radius: {THEME.RADIUS_LG};
+                box-shadow: {THEME.SHADOW_SM};
+                text-align: center;
+                border-bottom: 3px solid {color};
+                height: 100%;
+            ">
+                <div style="font-size: {THEME.FONT_2XL}; margin-bottom: {THEME.SPACE_4}px;">{escape(emoji)}</div>
+                <div style="font-size: {THEME.FONT_LG}; font-weight: 700; color: {color};">
+                    {escape(str(value))}
+                </div>
+                <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_600}; font-weight: 500;">
+                    {escape(label)}
+                </div>
+                {f'<div style="font-size: {THEME.FONT_XS}; color: {THEME.GRAY_400}; margin-top: {THEME.SPACE_4}px;">{escape(subtitle)}</div>' if subtitle else ''}
+            </div>
+            """, unsafe_allow_html=True)
+
+# ============================================================
+# SECTION 8: EXPORT ALL COMPONENTS
+# ============================================================
+
+__all__ = [
+    # Theme
+    'THEME',
+    'Theme',
+    
+    # Enums
+    'RiskLevel',
+    'StatusType',
+    
+    # Formatters
+    'format_number',
+    'format_currency',
+    'format_percentage',
+    'format_compact',
+    
+    # Validators
+    'validate_percentage',
+    'validate_risk_score',
+    'validate_positive',
+    
+    # Builders
+    'card',
+    'progress_bar',
+    'metric_display',
+    'status_badge',
+    
+    # Components
+    'MetricCard',
+    'ProgressCard',
+    'RiskIndicator',
+    'ShelterStatus',
+    'EvacuationRoute',
+    'AffectedCommunity',
+    
+    # Backward Compatibility
+    'render_visual_metric_card',
+    'render_risk_indicator',
+    'render_shelter_status',
+    'render_evacuation_routes',
+    'render_affected_communities',
+    'render_risk_timeline_visual',
+    'render_quick_stats',
+]
+
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - ECONOMIC IMPACT
+# ============================================================
+
+def render_economic_impact(
+    residential: float,
+    infrastructure: float,
+    total: float,
+    agriculture: float = None,
+    currency: str = "GH₵"
+) -> None:
+    """
+    Render a visual economic impact summary.
+    Backward compatibility wrapper.
+    """
+    if agriculture is None:
+        agriculture = 0
+    
+    max_value = max(residential, infrastructure, agriculture, 1)
+    colors = {
+        "Residential": THEME.DANGER,
+        "Infrastructure": "#EA580C",
+        "Agriculture": THEME.SUCCESS
+    }
+    
+    st.markdown("### 💰 Estimated Economic Impact")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        percentage = (residential / max_value) * 100 if max_value > 0 else 0
+        display = format_currency(residential, currency)
+        st.markdown(f"""
+        <div style="background: {THEME.WHITE}; padding: {THEME.SPACE_12}px {THEME.SPACE_16}px; border-radius: {THEME.RADIUS_LG}; border-left: 4px solid {colors['Residential']};">
+            <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500};">🏠 Residential</div>
+            <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {colors['Residential']};">{display}</div>
+            {progress_bar(percentage, colors['Residential'], 4)}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        percentage = (infrastructure / max_value) * 100 if max_value > 0 else 0
+        display = format_currency(infrastructure, currency)
+        st.markdown(f"""
+        <div style="background: {THEME.WHITE}; padding: {THEME.SPACE_12}px {THEME.SPACE_16}px; border-radius: {THEME.RADIUS_LG}; border-left: 4px solid {colors['Infrastructure']};">
+            <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500};">🏗️ Infrastructure</div>
+            <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {colors['Infrastructure']};">{display}</div>
+            {progress_bar(percentage, colors['Infrastructure'], 4)}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        if agriculture > 0:
+            percentage = (agriculture / max_value) * 100 if max_value > 0 else 0
+            display = format_currency(agriculture, currency)
+        else:
+            percentage = 0
+            display = f"{currency} 0"
+        st.markdown(f"""
+        <div style="background: {THEME.WHITE}; padding: {THEME.SPACE_12}px {THEME.SPACE_16}px; border-radius: {THEME.RADIUS_LG}; border-left: 4px solid {colors['Agriculture']};">
+            <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500};">🌾 Agriculture</div>
+            <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {colors['Agriculture']};">{display}</div>
+            {progress_bar(percentage, colors['Agriculture'], 4)}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    total_display = format_currency(total, currency)
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); padding: {THEME.SPACE_16}px {THEME.SPACE_24}px; border-radius: {THEME.RADIUS_LG}; text-align: center;">
+        <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_400};">Total Estimated Impact</div>
+        <div style="font-size: {THEME.FONT_3XL}; font-weight: 700; color: {THEME.WHITE};">{total_display}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - POPULATION VISUAL
+# ============================================================
+
+def render_population_visual(
+    total: int,
+    children: int = 0,
+    elderly: int = 0,
+    households: int = 0
+) -> None:
+    """Render a visual population summary."""
+    if total > 500000:
+        emoji = "🏙️"
+        color = THEME.DANGER
+    elif total > 200000:
+        emoji = "🏘️"
+        color = "#EA580C"
+    elif total > 100000:
+        emoji = "🏠"
+        color = THEME.WARNING
+    else:
+        emoji = "🏡"
+        color = THEME.SUCCESS
+    
+    st.markdown("### 👥 Population Overview")
+    st.markdown(f"""
+    <div style="background: {THEME.WHITE}; padding: {THEME.SPACE_16}px {THEME.SPACE_20}px; border-radius: {THEME.RADIUS_XL}; box-shadow: {THEME.SHADOW_MD}; margin-bottom: {THEME.SPACE_12}px;">
+        <div style="display: flex; align-items: center; gap: {THEME.SPACE_16}px;">
+            <span style="font-size: {THEME.FONT_4XL};">{emoji}</span>
+            <div style="flex: 1;">
+                <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500}; font-weight: 500;">Total Population</div>
+                <div style="font-size: {THEME.FONT_2XL}; font-weight: 700; color: {color};">{format_number(total)}</div>
+            </div>
+        </div>
+        {progress_bar(100, color, 8)}
+        <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_600}; margin-top: {THEME.SPACE_8}px;">
+            <span>👶 <span style="color: {THEME.GRAY_900}; font-weight: 500;">{format_number(children)}</span> Children</span>
+            <span style="margin-left: {THEME.SPACE_20}px;">👴 <span style="color: {THEME.GRAY_900}; font-weight: 500;">{format_number(elderly)}</span> Elderly</span>
+            <span style="margin-left: {THEME.SPACE_20}px;">🏠 <span style="color: {THEME.GRAY_900}; font-weight: 500;">{format_number(households)}</span> Households</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - EVIDENCE CONFIDENCE
+# ============================================================
+
+def render_evidence_confidence(
+    evidence_items: List[Dict[str, Any]]
+) -> None:
+    """Render visual evidence confidence bars with star ratings."""
+    for item in evidence_items:
+        name = item.get('name', 'Unknown')
+        score = item.get('score', 0)
+        stars = item.get('stars', '★★★☆☆')
+        confidence = item.get('confidence', 50)
+        
+        if score >= 70:
+            color = THEME.SUCCESS
+        elif score >= 40:
+            color = THEME.WARNING
+        else:
+            color = THEME.DANGER
+        
+        st.markdown(f"""
+        <div style="margin-bottom: {THEME.SPACE_12}px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 600; font-size: {THEME.FONT_MD}; color: {THEME.GRAY_900};">{escape(name)}</span>
+                <span style="font-size: {THEME.FONT_MD}; color: #f59e0b;">{stars}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: {THEME.SPACE_12}px;">
+                {progress_bar(score, color, 6)}
+                <span style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_600}; font-weight: 500; min-width: 40px; text-align: right;">
+                    {score:.0f}%
+                </span>
+            </div>
+            <div style="font-size: {THEME.FONT_XS}; color: {THEME.GRAY_400}; margin-top: {THEME.SPACE_2}px;">
+                Confidence: {confidence:.0f}%
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - RESOURCE STATUS
+# ============================================================
+
+def render_resource_status(
+    resources: List[Dict[str, Any]]
+) -> None:
+    """Render visual resource status indicators."""
+    cols = st.columns(len(resources))
+    for i, resource in enumerate(resources):
+        with cols[i]:
+            name = resource.get('name', 'Unknown')
+            value = resource.get('value', 0)
+            emoji = resource.get('emoji', '📦')
+            status = resource.get('status', 'Available')
+            
+            if status.lower() in ['ready', 'available']:
+                color = THEME.SUCCESS
+                icon = '✅'
+            elif status.lower() in ['deployed', 'active']:
+                color = THEME.WARNING
+                icon = '🟡'
+            else:
+                color = THEME.DANGER
+                icon = '❌'
+            
+            st.markdown(f"""
+            <div style="
+                background: {THEME.WHITE};
+                padding: {THEME.SPACE_12}px {THEME.SPACE_16}px;
+                border-radius: {THEME.RADIUS_LG};
+                box-shadow: {THEME.SHADOW_SM};
+                text-align: center;
+                border-top: 4px solid {color};
+                height: 100%;
+            ">
+                <div style="font-size: {THEME.FONT_2XL}; margin-bottom: {THEME.SPACE_4}px;">{emoji}</div>
+                <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {color};">
+                    {value}
+                </div>
+                <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_600}; font-weight: 500;">
+                    {escape(name)}
+                </div>
+                <div style="font-size: {THEME.FONT_XS}; color: {color}; margin-top: {THEME.SPACE_4}px;">
+                    {icon} {escape(status)}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - STATUS INDICATOR
+# ============================================================
+
+def render_status_indicator(
+    status: str,
+    label: str = "",
+    show_icon: bool = True
+) -> None:
+    """Render a visual status indicator."""
+    try:
+        status_obj = StatusType[status.upper()]
+    except KeyError:
+        status_obj = StatusType.INACTIVE
+    
+    st.markdown(
+        status_badge(status_obj, label or status, show_icon),
+        unsafe_allow_html=True
+    )
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - METRIC CARD
+# ============================================================
+
+def render_metric_card(
+    value: Any,
+    label: str,
+    emoji: str = "",
+    change: Optional[float] = None,
+    change_label: str = "",
+    color: str = None,
+    size: str = "medium"
+) -> None:
+    """Backward compatibility wrapper for render_metric_card."""
+    if color is None:
+        color = THEME.GRAY_700
+    
+    if change is not None:
+        change_color = THEME.SUCCESS if change >= 0 else THEME.DANGER
+        arrow = "↑" if change >= 0 else "↓"
+        change_html = f"""
+            <div style="text-align: right;">
+                <span style="color: {change_color}; font-weight: 600; font-size: {THEME.FONT_MD};">
+                    {arrow} {abs(change):.1f}%
+                </span>
+                <div style="font-size: {THEME.FONT_XS}; color: {THEME.GRAY_500};">{escape(change_label)}</div>
+            </div>
+        """
+    else:
+        change_html = ""
+    
+    display_value = format_number(value) if isinstance(value, (int, float)) else str(value)
+    
+    st.markdown(f"""
+    <div style="
+        background: {THEME.WHITE};
+        padding: {THEME.SPACE_16}px;
+        border-radius: {THEME.RADIUS_LG};
+        box-shadow: {THEME.SHADOW_MD};
+        border-left: 4px solid {color};
+        margin-bottom: {THEME.SPACE_8}px;
+    ">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <span style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500}; font-weight: 500;">{escape(label)}</span>
+                <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {color};">
+                    {escape(emoji)} {display_value}
+                </div>
+            </div>
+            {change_html}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - IMPACT CARD
+# ============================================================
+
+def render_impact_card(
+    value: float,
+    label: str,
+    emoji: str = "",
+    color: str = None,
+    detail: str = ""
+) -> None:
+    """Backward compatibility wrapper for render_impact_card."""
+    if color is None or color == "auto":
+        if value > 1000000:
+            color = THEME.DANGER
+        elif value > 500000:
+            color = "#EA580C"
+        else:
+            color = THEME.SUCCESS
+    
+    display = format_currency(value)
+    
+    st.markdown(f"""
+    <div style="
+        background: {THEME.WHITE};
+        padding: {THEME.SPACE_16}px;
+        border-radius: {THEME.RADIUS_LG};
+        box-shadow: {THEME.SHADOW_MD};
+        border-bottom: 3px solid {color};
+        margin-bottom: {THEME.SPACE_8}px;
+    ">
+        <div style="display: flex; align-items: center; gap: {THEME.SPACE_12}px;">
+            <span style="font-size: {THEME.FONT_2XL};">{escape(emoji)}</span>
+            <div>
+                <div style="font-size: {THEME.FONT_SM}; color: {THEME.GRAY_500}; font-weight: 500;">{escape(label)}</div>
+                <div style="font-size: {THEME.FONT_XL}; font-weight: 700; color: {color};">
+                    {display}
+                </div>
+                {f'<div style="font-size: {THEME.FONT_XS}; color: {THEME.GRAY_500};">{escape(detail)}</div>' if detail else ''}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ============================================================
+# BACKWARD COMPATIBILITY - HORIZONTAL PROGRESS BAR
+# ============================================================
+
+def render_horizontal_progress_bar(
+    value: float,
+    max_value: float = 100,
+    label: str = "",
+    color: str = None,
+    height: int = 8,
+    show_percentage: bool = True,
+    show_emoji: bool = True
+) -> None:
+    """Backward compatibility wrapper for render_horizontal_progress_bar."""
+    if color is None:
+        color = THEME.SUCCESS
+    
+    pct = validate_percentage(value, max_value)
+    emoji = "🟢" if pct >= 70 else "🟡" if pct >= 40 else "🔴"
+    
+    if label:
+        if show_emoji:
+            st.markdown(f"{emoji} **{escape(label)}**", unsafe_allow_html=True)
+        else:
+            st.markdown(f"**{escape(label)}**", unsafe_allow_html=True)
+    
+    st.markdown(progress_bar(pct, color, height), unsafe_allow_html=True)
+    
+    if show_percentage:
+        st.caption(f"{pct:.0f}%")
+
+
+# ============================================================
+# UPDATE __all__ WITH ALL FUNCTIONS
+# ============================================================
+
+__all__ = [
+    # Theme
+    'THEME',
+    'Theme',
+    
+    # Enums
+    'RiskLevel',
+    'StatusType',
+    
+    # Formatters
+    'format_number',
+    'format_currency',
+    'format_percentage',
+    'format_compact',
+    
+    # Validators
+    'validate_percentage',
+    'validate_risk_score',
+    'validate_positive',
+    
+    # Builders
+    'card',
+    'progress_bar',
+    'metric_display',
+    'status_badge',
+    
+    # Components
+    'MetricCard',
+    'ProgressCard',
+    'RiskIndicator',
+    'ShelterStatus',
+    'EvacuationRoute',
+    'AffectedCommunity',
+    
+    # All Backward Compatibility
+    'render_visual_metric_card',
+    'render_risk_indicator',
+    'render_shelter_status',
+    'render_evacuation_routes',
+    'render_affected_communities',
+    'render_risk_timeline_visual',
+    'render_quick_stats',
+    'render_economic_impact',
+    'render_population_visual',
+    'render_evidence_confidence',
+    'render_resource_status',
+    'render_status_indicator',
+    'render_metric_card',
+    'render_impact_card',
+    'render_horizontal_progress_bar',
+]

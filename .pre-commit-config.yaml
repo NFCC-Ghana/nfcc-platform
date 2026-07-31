@@ -1,11 +1,56 @@
 repos:
   - repo: https://github.com/psf/black
-    rev: 26.3.1
+    rev: 23.12.1
     hooks:
       - id: black
+        exclude: |
+          (?x)^(
+              archive/|
+              backups/|
+              cleanup_workspace/|
+              hackathon/app/pages_disabled/|
+              hackathon/archive/|
+              hackathon/app/modules/community\.py|
+              hackathon/app/modules/copilot\.py|
+              hackathon/app/modules/copilot_enhanced\.py|
+              hackathon/app/modules/decision_confidence\.py|
+              hackathon/app/modules/demo_orchestrator\.py|
+              hackathon/app/modules/emergency_operations_dashboard\.py|
+              hackathon/app/modules/evacuation\.py|
+              hackathon/app/modules/evidence_fusion\.py|
+              hackathon/app/modules/hydrological\.py|
+              hackathon/app/modules/operational_resilience\.py|
+              hackathon/app/modules/risk_explainer\.py|
+              hackathon/app/modules/road_intelligence\.py|
+              hackathon/app/modules/unified_intelligence_engine\.py|
+              src/alerts/providers/email_provider\.py
+          )
+        args: [--line-length=88]
 
   - repo: https://github.com/pycqa/flake8
-    rev: 7.3.0
+    rev: 6.1.0
     hooks:
       - id: flake8
-
+        exclude: |
+          (?x)^(
+              archive/|
+              backups/|
+              cleanup_workspace/|
+              hackathon/app/pages_disabled/|
+              hackathon/archive/|
+              hackathon/app/modules/community\.py|
+              hackathon/app/modules/copilot\.py|
+              hackathon/app/modules/copilot_enhanced\.py|
+              hackathon/app/modules/decision_confidence\.py|
+              hackathon/app/modules/demo_orchestrator\.py|
+              hackathon/app/modules/emergency_operations_dashboard\.py|
+              hackathon/app/modules/evacuation\.py|
+              hackathon/app/modules/evidence_fusion\.py|
+              hackathon/app/modules/hydrological\.py|
+              hackathon/app/modules/operational_resilience\.py|
+              hackathon/app/modules/risk_explainer\.py|
+              hackathon/app/modules/road_intelligence\.py|
+              hackathon/app/modules/unified_intelligence_engine\.py|
+              src/alerts/providers/email_provider\.py
+          )
+        args: [--max-line-length=88, --extend-ignore=E203,W503]

@@ -75,7 +75,7 @@ class CommunityMemoryEngine:
             """
             INSERT INTO reports (
                 report_id, district, community, report_type, description,
-                flood_depth_m, photo_url, reporter_name, reporter_phone, 
+                flood_depth_m, photo_url, reporter_name, reporter_phone,
                 reporter_email, report_time
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -144,7 +144,7 @@ class CommunityMemoryEngine:
 
         cursor.execute(
             """
-            UPDATE reports 
+            UPDATE reports
             SET validated = 1, validation_confidence = ?
             WHERE report_id = ?
         """,

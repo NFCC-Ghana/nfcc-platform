@@ -67,7 +67,7 @@ class FloodExplainer:
         for level, (low, high) in self.risk_thresholds.items():
             if low <= score < high:
                 return level
-        return "LOW"
+        return "UNKNOWN"
 
     def _calculate_confidence(self, score: float, features: Dict[str, float]) -> float:
         """Calculate confidence based on feature agreement."""
@@ -139,8 +139,7 @@ class FloodExplainer:
             "LOW": "🟢",
         }
 
-        return f"""
-{emoji_map.get(explanation.risk_level, '⚠️')} *FLOOD ALERT*
+        return f"""{emoji_map.get(explanation.risk_level, '⚠️')} *FLOOD ALERT*
 
 *Risk Level:* {explanation.risk_level}
 *Confidence:* {int(explanation.confidence * 100)}%
@@ -150,8 +149,7 @@ class FloodExplainer:
 
 *Action:* {explanation.action_required}
 
-Stay safe. Report flooding via WhatsApp.
-"""
+Stay safe. Report flooding via WhatsApp."""
 
     def format_for_dashboard(self, explanation: ExplanationResult) -> Dict[str, Any]:
         """Format explanation for dashboard display."""

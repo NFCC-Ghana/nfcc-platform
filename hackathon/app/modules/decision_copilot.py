@@ -11,7 +11,7 @@ import streamlit as st
 def get_operational_briefing(district: str, risk_score: float) -> str:
     """Generate concise operational briefing."""
 
-    return f"""
+    return """
 ┌─────────────────────────────────────────────────────────────────┐
 │           OPERATIONAL BRIEFING • {district.upper()}           │
 │                     {datetime.now().strftime('%d %b %Y, %H:%M')}      │
@@ -72,7 +72,7 @@ def render_decision_copilot(district: str, risk_score: float) -> None:
     with col2:
         if st.button("📢 Generate Alert", use_container_width=True):
             st.success("✅ Alert generated:")
-            st.code(f"""
+            st.code("""
 🚨 FLOOD ALERT: {district}
 Risk: {risk_score:.0f}% ({'EXTREME' if risk_score >= 80 else 'HIGH'})
 Action: IMMEDIATE EVACUATION
@@ -96,7 +96,7 @@ Confidence: 92%
 
     if query:
         with st.spinner("🧠 Orchestrating all intelligence sources..."):
-            response = f"""
+            response = """
 🤖 **Decision Copilot Response**
 
 **Query:** {query}

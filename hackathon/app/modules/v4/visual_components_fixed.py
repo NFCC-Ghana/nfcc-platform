@@ -1,0 +1,549 @@
+"""
+Visual Storytelling Components for CivicFlood AI
+Phase 4: International-standard visual storytelling
+FIXED: Added explicit text colors for all components
+"""
+
+import streamlit as st
+from typing import List, Dict, Any, Optional, Tuple
+
+# ============================================================
+# AFFECTED COMMUNITIES - FIXED TEXT COLOR
+# ============================================================
+
+
+def render_affected_communities(communities: List[str], max_display: int = 5) -> None:
+    """Render visual list of affected communities with severity indicators."""
+    if not communities:
+        st.info("No affected communities reported.")
+        return
+
+    display_communities = communities[:max_display]
+    remaining = len(communities) - max_display
+
+    for community in display_communities:
+        color_hash = hash(community) % 3
+        colors = ["#e53e3e", "#ed8936", "#ecc94b"]
+        emojis = ["🔴", "🟠", "🟡"]
+
+        st.markdown(
+            f"""
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8f9fa;
+            padding: 8px 14px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border-left: 3px solid {colors[color_hash]};
+        ">
+            <span style="font-size: 16px;">{emojis[color_hash]}</span>
+            <span style="font-size: 14px; font-weight: 500; color: #1a1a2e;">{community}</span>
+            <span style="font-size: 11px; color: #6b7280; margin-left: auto;">Affected</span>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    if remaining > 0:
+        st.caption(f"And {remaining} more communities affected...")
+
+
+# ============================================================
+# SHELTER STATUS - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_shelter_status(shelters: List[Dict[str, Any]]) -> None:
+    """Render visual shelter status cards with explicit text colors."""
+    for shelter in shelters:
+        name = shelter.get("name", "Unknown")
+        status = shelter.get("status", "UNKNOWN")
+        capacity = shelter.get("capacity", 0)
+        available = shelter.get("available", 0)
+        occupied = capacity - available
+
+        if status.upper() == "OPEN":
+            color = "#00cc00"
+            icon = "🟢"
+        elif status.upper() == "PREPARING":
+            color = "#ffaa00"
+            icon = "🟡"
+        else:
+            color = "#ff0000"
+            icon = "🔴"
+
+        occupancy_percent = (occupied / capacity) * 100 if capacity > 0 else 0
+
+        st.markdown(
+            f"""
+        <div style="
+            background: #ffffff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border-left: 4px solid {color};
+            margin-bottom: 8px;
+        ">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 16px;">{icon}</span>
+                <span style="font-weight: 600; font-size: 14px; color: #1a1a2e;">{name}</span>
+                <span style="font-size: 12px; color: {color}; font-weight: 500; margin-left: auto;">
+                    {status}
+                </span>
+            </div>
+            <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 13px; color: #374151;">
+                <span>👤 <span style="color: #1a1a2e;">{occupied:,}</span> occupied</span>
+                <span>🏠 <span style="color: #1a1a2e;">{available:,}</span> available</span>
+                <span>📊 <span style="color: #1a1a2e;">{occupancy_percent:.0f}%</span> full</span>
+            </div>
+            <div style="width: 100%; background-color: #f0f0f0; border-radius: 4px; height: 4px; margin-top: 4px;">
+                <div style="width: {occupancy_percent}%; background-color: {color}; height: 4px; border-radius: 4px;"></div>
+            </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# RESOURCE STATUS - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_resource_status(resources: List[Dict[str, Any]]) -> None:
+    """Render visual resource status indicators with explicit text colors."""
+    cols = st.columns(len(resources))
+
+    for i, resource in enumerate(resources):
+        with cols[i]:
+            name = resource.get("name", "Unknown")
+            value = resource.get("value", 0)
+            emoji = resource.get("emoji", "📦")
+            status = resource.get("status", "Available")
+
+            if status.lower() == "ready" or status.lower() == "available":
+                color = "#00cc00"
+                icon = "✅"
+            elif status.lower() == "deployed" or status.lower() == "active":
+                color = "#ffaa00"
+                icon = "🟡"
+            else:
+                color = "#ff0000"
+                icon = "❌"
+
+            st.markdown(
+                f"""
+            <div style="
+                background: #ffffff;
+                padding: 12px 16px;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                text-align: center;
+                border-top: 4px solid {color};
+                height: 100%;
+            ">
+                <div style="font-size: 28px; margin-bottom: 4px;">{emoji}</div>
+                <div style="font-size: 22px; font-weight: 700; color: {color};">
+                    {value}
+                </div>
+                <div style="font-size: 12px; color: #374151; font-weight: 500;">
+                    {name}
+                </div>
+                <div style="font-size: 11px; color: {color}; margin-top: 4px;">
+                    {icon} {status}
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+
+# ============================================================
+# EVACUATION ROUTES - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_evacuation_routes(routes: List[Dict[str, str]]) -> None:
+    """Render visual evacuation routes with explicit text colors."""
+    for route in routes:
+        from_place = route.get("from", "Unknown")
+        to_place = route.get("to", "Unknown")
+        time = route.get("time", "N/A")
+
+        st.markdown(
+            f"""
+        <div style="
+            background: #ffffff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 3px solid #4299e1;
+            font-size: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        ">
+            <span style="font-size: 16px;">🚗</span>
+            <span style="font-weight: 600; color: #1a1a2e;">{from_place}</span>
+            <span style="color: #9ca3af;">→</span>
+            <span style="font-weight: 500; color: #1a1a2e;">{to_place}</span>
+            <span style="margin-left: auto; color: #6b7280; font-size: 12px;">⏱️ {time}</span>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# POPULATION VISUAL - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_population_visual(
+    total: int, children: int = 0, elderly: int = 0, households: int = 0
+) -> None:
+    """Render a visual population summary with explicit text colors."""
+    if total > 500000:
+        emoji = "🏙️"
+        color = "#e53e3e"
+    elif total > 200000:
+        emoji = "🏘️"
+        color = "#ed8936"
+    elif total > 100000:
+        emoji = "🏠"
+        color = "#38a169"
+    else:
+        emoji = "🏡"
+        color = "#48bb78"
+
+    st.markdown("### 👥 Population Overview")
+
+    st.markdown(
+        f"""
+    <div style="background: #ffffff; padding: 16px 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="font-size: 36px;">{emoji}</span>
+            <div style="flex: 1;">
+                <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Total Population</div>
+                <div style="font-size: 28px; font-weight: 700; color: {color};">{total:,.0f}</div>
+            </div>
+        </div>
+        <div style="margin-top: 8px;">
+            <div style="width: 100%; background-color: #f0f0f0; border-radius: 6px; height: 8px; overflow: hidden;">
+                <div style="width: 100%; background-color: {color}; height: 8px; border-radius: 6px;"></div>
+            </div>
+        </div>
+        <div style="font-size: 13px; color: #374151; margin-top: 8px;">
+            <span>👶 <span style="color: #1a1a2e; font-weight: 500;">{children:,.0f}</span> Children</span>
+            <span style="margin-left: 20px;">👴 <span style="color: #1a1a2e; font-weight: 500;">{elderly:,.0f}</span> Elderly</span>
+            <span style="margin-left: 20px;">🏠 <span style="color: #1a1a2e; font-weight: 500;">{households:,.0f}</span> Households</span>
+        </div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# QUICK STATS - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_quick_stats(stats: List[Dict[str, Any]], columns: int = 4) -> None:
+    """Render a row of quick visual statistics with explicit text colors."""
+    cols = st.columns(columns)
+
+    for i, stat in enumerate(stats):
+        with cols[i % columns]:
+            color = stat.get("color", "#333")
+            value = stat.get("value", "N/A")
+            label = stat.get("label", "")
+            emoji = stat.get("emoji", "")
+            subtitle = stat.get("subtitle", "")
+
+            if isinstance(value, (int, float)):
+                if value >= 1_000_000:
+                    display_value = f"{value/1_000_000:.1f}M"
+                elif value >= 1_000:
+                    display_value = f"{value/1_000:.1f}K"
+                else:
+                    display_value = f"{value:,.0f}"
+            else:
+                display_value = str(value)
+
+            st.markdown(
+                f"""
+            <div style="
+                background: #ffffff;
+                padding: 12px 16px;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                text-align: center;
+                border-bottom: 3px solid {color};
+                height: 100%;
+            ">
+                <div style="font-size: 28px; margin-bottom: 4px;">{emoji}</div>
+                <div style="font-size: 20px; font-weight: 700; color: {color};">
+                    {display_value}
+                </div>
+                <div style="font-size: 12px; color: #374151; font-weight: 500;">
+                    {label}
+                </div>
+                {f'<div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">{subtitle}</div>' if subtitle else ''}
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+
+# ============================================================
+# VISUAL METRIC CARD - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_visual_metric_card(
+    value: float,
+    label: str,
+    emoji: str = "",
+    color: str = "#333",
+    max_value: float = 100,
+    subtitle: str = "",
+    show_bar: bool = True,
+) -> None:
+    """Render a visual metric card with integrated progress visualization."""
+    percentage = min(100, (value / max_value) * 100)
+
+    if not emoji:
+        if percentage >= 70:
+            emoji = "🟢"
+        elif percentage >= 40:
+            emoji = "🟡"
+        else:
+            emoji = "🔴"
+
+    if isinstance(value, (int, float)):
+        if value >= 1_000_000:
+            display_value = f"{value/1_000_000:.2f}M"
+        elif value >= 1_000:
+            display_value = f"{value/1_000:.1f}K"
+        else:
+            display_value = f"{value:,.0f}"
+    else:
+        display_value = str(value)
+
+    html = f"""
+    <div style="
+        background: #ffffff;
+        padding: 16px 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #f0f0f0;
+        margin-bottom: 10px;
+    ">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+            <span style="font-size: 28px; line-height: 1;">{emoji}</span>
+            <div style="flex: 1;">
+                <div style="font-size: 14px; font-weight: 600; color: #374151;">
+                    {label}
+                </div>
+                <div style="font-size: 22px; font-weight: 700; color: {color};">
+                    {display_value}
+                </div>
+            </div>
+        </div>
+    """
+
+    if show_bar:
+        html += f"""
+        <div style="margin-top: 4px;">
+            <div style="width: 100%; background-color: #f0f0f0; border-radius: 6px; height: 6px; overflow: hidden;">
+                <div style="width: {percentage}%; background-color: {color}; height: 6px; border-radius: 6px; transition: width 0.5s ease;">
+                </div>
+            </div>
+        </div>
+        """
+
+    if subtitle:
+        html += f"""
+        <div style="font-size: 12px; color: #9ca3af; margin-top: 6px;">
+            {subtitle}
+        </div>
+        """
+
+    html += "</div>"
+
+    st.markdown(html, unsafe_allow_html=True)
+
+
+# ============================================================
+# RISK INDICATOR - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_risk_indicator(
+    risk_score: float, risk_category: str, show_progress: bool = True
+) -> None:
+    """Render a visual risk indicator with explicit text colors."""
+    if risk_score >= 80:
+        color = "#ff0000"
+        emoji = "🔴"
+    elif risk_score >= 60:
+        color = "#ff6600"
+        emoji = "🟠"
+    elif risk_score >= 40:
+        color = "#ffaa00"
+        emoji = "🟡"
+    else:
+        color = "#00cc00"
+        emoji = "🟢"
+
+    st.markdown(f"""
+    <div style="
+        background: #ffffff;
+        padding: 16px 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border-left: 6px solid {color};
+    ">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 36px;">{emoji}</span>
+            <div style="flex: 1;">
+                <div style="font-size: 14px; color: #6b7280; font-weight: 500;">Current Risk Level</div>
+                <div style="font-size: 28px; font-weight: 700; color: {color};">
+                    {risk_score:.0f}% • {risk_category}
+                </div>
+            </div>
+        </div>
+    """)
+
+    if show_progress:
+        st.markdown(
+            f"""
+        <div style="margin-top: 8px;">
+            <div style="width: 100%; background-color: #f0f0f0; border-radius: 6px; height: 8px; overflow: hidden;">
+                <div style="width: {risk_score}%; background: linear-gradient(to right, #00cc00, #ffaa00, #ff6600, #ff0000); height: 8px; border-radius: 6px; transition: width 0.5s ease;">
+                </div>
+            </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ============================================================
+# EVIDENCE CONFIDENCE - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_evidence_confidence(evidence_items: List[Dict[str, Any]]) -> None:
+    """Render visual evidence confidence bars with star ratings."""
+    for item in evidence_items:
+        name = item.get("name", "Unknown")
+        score = item.get("score", 0)
+        stars = item.get("stars", "★★★☆☆")
+        confidence = item.get("confidence", 50)
+
+        if score >= 70:
+            color = "#00cc00"
+        elif score >= 40:
+            color = "#ffaa00"
+        else:
+            color = "#ff0000"
+
+        st.markdown(
+            f"""
+        <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 500; font-size: 14px; color: #1a1a2e;">{name}</span>
+                <span style="font-size: 14px; color: #f59e0b;">{stars}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="flex: 1; width: 100%; background-color: #f0f0f0; border-radius: 4px; height: 6px; overflow: hidden;">
+                    <div style="width: {score}%; background-color: {color}; height: 6px; border-radius: 4px; transition: width 0.5s ease;"></div>
+                </div>
+                <span style="font-size: 12px; color: #6b7280; min-width: 40px; text-align: right;">
+                    {score:.0f}%
+                </span>
+            </div>
+            <div style="font-size: 11px; color: #9ca3af; margin-top: 2px;">
+                Confidence: {confidence:.0f}%
+            </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# RISK TIMELINE VISUAL - FIXED TEXT COLORS
+# ============================================================
+
+
+def render_risk_timeline_visual(
+    hours: List[str], risks: List[float], current_risk: float
+) -> None:
+    """Render a visual risk timeline with gradient bars."""
+    for hour, risk in zip(hours, risks):
+        if risk >= 80:
+            color = "#ff0000"
+            emoji = "🔴"
+        elif risk >= 60:
+            color = "#ff6600"
+            emoji = "🟠"
+        elif risk >= 40:
+            color = "#ffaa00"
+            emoji = "🟡"
+        else:
+            color = "#00cc00"
+            emoji = "🟢"
+
+        is_peak = risk == max(risks)
+        is_current = risk == current_risk
+
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.markdown(
+                f"**<span style='color: #1a1a2e;'>{hour}</span>**",
+                unsafe_allow_html=True,
+            )
+        with col2:
+            st.markdown(
+                f"""
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 16px;">{emoji}</span>
+                <div style="flex: 1; width: 100%; background-color: #f0f0f0; border-radius: 6px; height: 10px; overflow: hidden;">
+                    <div style="width: {risk}%; background: {color}; height: 10px; border-radius: 6px; transition: width 0.5s ease;">
+                    </div>
+                </div>
+                <span style="font-size: 12px; font-weight: {'700' if is_peak else '400'}; color: {color};">
+                    {risk:.0f}%
+                    {f' ⭐' if is_peak else ''}
+                    {f' 👈' if is_current else ''}
+                </span>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+
+# ============================================================
+# EXPORT ALL COMPONENTS
+# ============================================================
+
+__all__ = [
+    "render_affected_communities",
+    "render_shelter_status",
+    "render_resource_status",
+    "render_evacuation_routes",
+    "render_population_visual",
+    "render_quick_stats",
+    "render_visual_metric_card",
+    "render_risk_indicator",
+    "render_evidence_confidence",
+    "render_risk_timeline_visual",
+]

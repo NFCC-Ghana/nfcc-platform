@@ -57,7 +57,7 @@ def render_community_reports(district: str) -> None:
         )
 
         st.markdown(
-            f"""
+            "
         <div style="background: {'#e8f5e9' if report['verified'] else '#fff3e0'}; padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid {'#4caf50' if report['verified'] else '#ff9800'};">
             <b>{report['community']}</b> <span style="font-size: 0.8rem; color: #666;">{report['time'].strftime('%H:%M')}</span><br>
             <b>{report['type']}</b><br>

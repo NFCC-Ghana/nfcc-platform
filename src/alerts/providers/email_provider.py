@@ -59,7 +59,7 @@ class EmailAlertProvider(BaseAlertProvider):
             )
 
     def _format_html_message(self, alert: AlertPayload) -> str:
-        return f"""
+        return "
         <!DOCTYPE html>
         <html>
         <head>
@@ -84,7 +84,7 @@ class EmailAlertProvider(BaseAlertProvider):
         """
 
     def _format_text_message(self, alert: AlertPayload) -> str:
-        return f"""
+        return "
 🚨 FLOOD ALERT: {alert.location}
 Risk: {alert.risk_tier} ({alert.score:.1f}/100)
 

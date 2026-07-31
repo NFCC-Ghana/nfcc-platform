@@ -127,7 +127,7 @@ class FailureAnalyzer:
 
     def _generate_html_report(self, report: Dict[str, Any]) -> str:
         """Generate HTML dashboard."""
-        return f"""
+        return "
         <!DOCTYPE html>
         <html>
         <head>

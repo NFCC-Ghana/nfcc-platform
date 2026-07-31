@@ -1,18 +1,18 @@
 [theme]
-base = "dark"
-primaryColor = "#00b4d8"
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#262730"
-textColor = "#fafafa"
+# Inherit from the light theme base
+base = "light"
+
+# Your primary accent color (keeps your orange theme)
+primaryColor = "#ffaa00"
+
+# White background (keeps your existing design)
+backgroundColor = "#ffffff"
+
+# Light gray for interactive elements
+secondaryBackgroundColor = "#f0f2f6"
+
+# 🔑 KEY FIX: BLACK text - this makes all text visible!
+textColor = "#000000"
+
+# Font
 font = "sans serif"
-
-[server]
-enableCORS = false
-enableXsrfProtection = false
-maxUploadSize = 200
-port = 8501
-address = "0.0.0.0"
-
-[browser]
-gatherUsageStats = false
-serverAddress = "0.0.0.0"

@@ -42,12 +42,12 @@ class SubscriptionManager:
         """)
 
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_subscriptions_phone 
+            CREATE INDEX IF NOT EXISTS idx_subscriptions_phone
             ON subscriptions(phone_number)
         """)
 
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_subscriptions_district 
+            CREATE INDEX IF NOT EXISTS idx_subscriptions_district
             ON subscriptions(district)
         """)
 
@@ -66,7 +66,7 @@ class SubscriptionManager:
         if existing:
             cursor.execute(
                 """
-                UPDATE subscriptions 
+                UPDATE subscriptions
                 SET district = ?,
                     updated_at = CURRENT_TIMESTAMP,
                     active = TRUE
@@ -113,7 +113,7 @@ class SubscriptionManager:
         cursor = conn.cursor()
 
         query = """
-            SELECT phone_number FROM subscriptions 
+            SELECT phone_number FROM subscriptions
             WHERE active = TRUE AND district = ?
         """
         params = [district]
@@ -147,11 +147,11 @@ class SubscriptionManager:
         sms = cursor.fetchone()[0]
 
         cursor.execute("""
-            SELECT district, COUNT(*) as count 
-            FROM subscriptions 
-            WHERE active = TRUE 
-            GROUP BY district 
-            ORDER BY count DESC 
+            SELECT district, COUNT(*) as count
+            FROM subscriptions
+            WHERE active = TRUE
+            GROUP BY district
+            ORDER BY count DESC
             LIMIT 5
         """)
         top_districts = cursor.fetchall()

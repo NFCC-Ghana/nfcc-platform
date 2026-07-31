@@ -1,0 +1,963 @@
+.
+├── .coverage
+├── .dockerignore
+├── .env.example
+├── .env.production
+├── .env.production.template
+├── .env.template
+├── .flake8
+├── .github
+│   └── workflows
+│       ├── ci.yml
+│       ├── daily_chirps.yml
+│       ├── elite-resilience.yml
+│       └── hackathon.yml
+├── .gitignore
+├── .pre-commit-config.yaml
+├── .pytest_cache
+│   ├── .gitignore
+│   ├── CACHEDIR.TAG
+│   ├── README.md
+│   └── v
+│       ├── cache
+│       │   ├── lastfailed
+│       │   ├── nodeids
+│       │   └── stepwise
+│       └── randomly_seed
+├── .streamlit
+│   └── config.toml
+├── 20260524_results.json
+├── Dockerfile
+├── Dockerfile.prod
+├── FORCE_REBUILD.md
+├── PROJECT_STRUCTURE.txt
+├── README.md
+├── alerts.log
+├── backups
+│   ├── pre_enhancement_20260617_022640
+│   │   ├── alerts
+│   │   │   ├── __init__.py
+│   │   │   ├── circuit_breaker.py
+│   │   │   ├── cooldown.py
+│   │   │   ├── district_risk.py
+│   │   │   ├── engine.py
+│   │   │   ├── formatter.py
+│   │   │   ├── geographic.py
+│   │   │   ├── logger_config.py
+│   │   │   ├── models.py
+│   │   │   ├── provider_factory.py
+│   │   │   ├── providers
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── base.py
+│   │   │   │   ├── email_provider.py
+│   │   │   │   ├── mock_provider.py
+│   │   │   │   ├── sms_provider.py
+│   │   │   │   └── whatsapp_provider.py
+│   │   │   ├── rate_limit.py
+│   │   │   └── structured_logger.py
+│   │   ├── dashboard_enhanced.py
+│   │   ├── exposure
+│   │   └── hydrology
+│   │       ├── __init__.py
+│   │       ├── flood_polygons.py
+│   │       ├── rainfall_history.py
+│   │       ├── rainfall_history.py.bak
+│   │       ├── reservoir_intelligence.py
+│   │       ├── reservoir_intelligence.py.bak
+│   │       ├── river_intelligence.py
+│   │       ├── soil_moisture.py
+│   │       └── unified_intelligence.py
+│   ├── pre_enhancement_20260617_025651
+│   │   ├── .gitignore
+│   │   ├── data
+│   │   │   ├── alerts.db
+│   │   │   ├── climate
+│   │   │   ├── community_reports.db
+│   │   │   ├── dams
+│   │   │   ├── events
+│   │   │   │   └── flood_events.json
+│   │   │   ├── flood_polygons
+│   │   │   ├── processed
+│   │   │   │   ├── accra_anomaly_detection_2024.png
+│   │   │   │   ├── accra_cumulative_rainfall_2024.png
+│   │   │   │   ├── accra_feature_importance_2024.png
+│   │   │   │   ├── accra_features_2024.parquet
+│   │   │   │   ├── accra_flood_risk_score_2024.png
+│   │   │   │   ├── accra_monthly_rainfall_2024.png
+│   │   │   │   ├── accra_rainfall_2024.png
+│   │   │   │   ├── accra_rainfall_classes_2024.png
+│   │   │   │   ├── accra_rainfall_histogram_2024.png
+│   │   │   │   ├── accra_rolling_avg_2024.png
+│   │   │   │   ├── accra_xgb_predictions_2024.png
+│   │   │   │   ├── accra_zscore_anomaly_2024.png
+│   │   │   │   └── chirps_accra_2024.csv
+│   │   │   ├── raw
+│   │   │   │   └── chirps
+│   │   │   └── rivers
+│   │   ├── hackathon
+│   │   │   ├── README.md
+│   │   │   ├── ai
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── community_classifier.py
+│   │   │   │   ├── flood_explainer.py
+│   │   │   │   ├── hydrological_intelligence.py
+│   │   │   │   ├── impact_estimator.py
+│   │   │   │   └── timeline_predictor.py
+│   │   │   ├── app
+│   │   │   │   └── pages
+│   │   │   │       ├── 00_home.py
+│   │   │   │       ├── 01_dashboard.py
+│   │   │   │       ├── 04_community_report.py
+│   │   │   │       ├── backups
+│   │   │   │       │   └── 20260617_010823
+│   │   │   │       │       ├── manifest.txt
+│   │   │   │       │       └── restore.sh
+│   │   │   │       ├── dashboard.py
+│   │   │   │       ├── dashboard_enhanced.py
+│   │   │   │       ├── dashboard_enhanced_v2.py
+│   │   │   │       └── switch_dashboard.sh
+│   │   │   ├── datasets
+│   │   │   │   ├── demo_events.csv
+│   │   │   │   ├── district_population.csv
+│   │   │   │   ├── health_facilities.csv
+│   │   │   │   └── schools.csv
+│   │   │   ├── docs
+│   │   │   │   ├── architecture.md
+│   │   │   │   ├── dataset_sources.md
+│   │   │   │   ├── pitch_deck.md
+│   │   │   │   └── poster.md
+│   │   │   └── tests
+│   │   │       └── test_ai_modules.py
+│   │   ├── requirements.txt
+│   │   ├── scripts
+│   │   │   ├── convert_model.py
+│   │   │   ├── coverage_dashboard.py
+│   │   │   ├── create_test_alerts.py
+│   │   │   ├── create_test_alerts_complete.py
+│   │   │   ├── daily_chirps_pull.py
+│   │   │   ├── deploy_production.sh
+│   │   │   ├── generate_openapi.py
+│   │   │   ├── generate_ssl.sh
+│   │   │   ├── improve_coverage.sh
+│   │   │   ├── resave_model.py
+│   │   │   ├── run_complete_enhancement.sh
+│   │   │   ├── run_elite_tests.sh
+│   │   │   ├── setup_directories.sh
+│   │   │   ├── setup_redis.sh
+│   │   │   ├── standardize_model.py
+│   │   │   ├── start_production.sh
+│   │   │   ├── test_credentials.py
+│   │   │   └── validate_env.py
+│   │   └── src
+│   │       ├── __init__.py
+│   │       ├── alerts
+│   │       │   ├── __init__.py
+│   │       │   ├── circuit_breaker.py
+│   │       │   ├── cooldown.py
+│   │       │   ├── district_risk.py
+│   │       │   ├── engine.py
+│   │       │   ├── formatter.py
+│   │       │   ├── geographic.py
+│   │       │   ├── logger_config.py
+│   │       │   ├── models.py
+│   │       │   ├── provider_factory.py
+│   │       │   ├── providers
+│   │       │   │   ├── __init__.py
+│   │       │   │   ├── base.py
+│   │       │   │   ├── email_provider.py
+│   │       │   │   ├── mock_provider.py
+│   │       │   │   ├── sms_provider.py
+│   │       │   │   └── whatsapp_provider.py
+│   │       │   ├── rate_limit.py
+│   │       │   └── structured_logger.py
+│   │       ├── api
+│   │       │   ├── __init__.py
+│   │       │   ├── auth.py
+│   │       │   ├── dam_router.py
+│   │       │   ├── dam_spillage.py
+│   │       │   ├── explain.py
+│   │       │   ├── health.py
+│   │       │   ├── main.py
+│   │       │   ├── metrics.py
+│   │       │   ├── metrics_endpoint.py
+│   │       │   └── routes
+│   │       │       ├── __init__.py
+│   │       │       └── alerts.py
+│   │       ├── celery_app.py
+│   │       ├── community
+│   │       │   ├── __init__.py
+│   │       │   └── community_memory.py
+│   │       ├── config
+│   │       │   ├── __init__.py
+│   │       │   ├── dams.py
+│   │       │   └── settings.py
+│   │       ├── data
+│   │       │   └── ingestion
+│   │       │       └── download_chirps.py
+│   │       ├── database
+│   │       │   ├── __init__.py
+│   │       │   └── alert_db.py
+│   │       ├── explainability
+│   │       ├── exposure
+│   │       │   ├── __init__.py
+│   │       │   └── impact_estimator.py
+│   │       ├── features
+│   │       ├── forecast
+│   │       ├── hydrology
+│   │       │   ├── __init__.py
+│   │       │   ├── flood_polygons.py
+│   │       │   ├── rainfall_history.py
+│   │       │   ├── rainfall_history.py.bak
+│   │       │   ├── reservoir_intelligence.py
+│   │       │   ├── reservoir_intelligence.py.bak
+│   │       │   ├── river_intelligence.py
+│   │       │   ├── soil_moisture.py
+│   │       │   └── unified_intelligence.py
+│   │       ├── labels
+│   │       ├── models
+│   │       │   ├── dam_spillage.py
+│   │       │   └── train_model.py
+│   │       ├── monitoring
+│   │       ├── optimization
+│   │       └── tasks.py
+│   ├── pre_migration_20260705_015553
+│   │   ├── app_backup
+│   │   │   ├── modules
+│   │   │   │   ├── community.py
+│   │   │   │   ├── copilot.py
+│   │   │   │   ├── copilot_enhanced.py
+│   │   │   │   ├── decision_confidence.py
+│   │   │   │   ├── decision_copilot.py
+│   │   │   │   ├── demo_orchestrator.py
+│   │   │   │   ├── emergency_operations_dashboard.py
+│   │   │   │   ├── evacuation.py
+│   │   │   │   ├── evidence_fusion.py
+│   │   │   │   ├── explainability.py
+│   │   │   │   ├── forecast.py
+│   │   │   │   ├── hydrological.py
+│   │   │   │   ├── impact.py
+│   │   │   │   ├── national_center.py
+│   │   │   │   ├── operational_resilience.py
+│   │   │   │   ├── ranking.py
+│   │   │   │   ├── risk_explainer.py
+│   │   │   │   ├── road_intelligence.py
+│   │   │   │   ├── timeline.py
+│   │   │   │   ├── unified_intelligence_engine.py
+│   │   │   │   └── v4
+│   │   │   │       ├── __init__.py
+│   │   │   │       ├── ai_copilot.py
+│   │   │   │       ├── community_intelligence.py
+│   │   │   │       ├── decision_support.py
+│   │   │   │       ├── forecast_timeline.py
+│   │   │   │       ├── header.py
+│   │   │   │       ├── impact_assessment.py
+│   │   │   │       ├── operations.py
+│   │   │   │       ├── risk_display.py
+│   │   │   │       ├── situation_brief.py
+│   │   │   │       ├── situation_map.py
+│   │   │   │       └── state.py
+│   │   │   ├── pages
+│   │   │   │   └── dashboard.py
+│   │   │   ├── pages_disabled
+│   │   │   │   ├── 00_home.py
+│   │   │   │   ├── 01_dashboard.py
+│   │   │   │   ├── 04_community_report.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── backups
+│   │   │   │   │   └── 20260617_010823
+│   │   │   │   │       ├── manifest.txt
+│   │   │   │   │       └── restore.sh
+│   │   │   │   ├── gis_map.py
+│   │   │   │   └── switch_dashboard.sh
+│   │   │   └── streamlit_app.py
+│   │   └── archive_backup
+│   │       ├── dashboard.py
+│   │       ├── dashboard_enhanced.py
+│   │       ├── dashboard_enhanced_v2.py
+│   │       ├── dashboard_enhanced_v3.py
+│   │       ├── dashboard_v4.py
+│   │       ├── pages
+│   │       └── v4_legacy
+│   │           ├── ai_copilot_v4.py
+│   │           ├── control_panel.py
+│   │           ├── evidence_panel.py
+│   │           ├── impact_panel.py
+│   │           ├── mission_control_header.py
+│   │           ├── national_briefing.py
+│   │           └── operations_panel.py
+│   ├── pre_migration_20260705_020250
+│   │   ├── app_backup
+│   │   │   ├── modules
+│   │   │   │   ├── community.py
+│   │   │   │   ├── copilot.py
+│   │   │   │   ├── copilot_enhanced.py
+│   │   │   │   ├── decision_confidence.py
+│   │   │   │   ├── decision_copilot.py
+│   │   │   │   ├── demo_orchestrator.py
+│   │   │   │   ├── emergency_operations_dashboard.py
+│   │   │   │   ├── evacuation.py
+│   │   │   │   ├── evidence_fusion.py
+│   │   │   │   ├── explainability.py
+│   │   │   │   ├── forecast.py
+│   │   │   │   ├── hydrological.py
+│   │   │   │   ├── impact.py
+│   │   │   │   ├── national_center.py
+│   │   │   │   ├── operational_resilience.py
+│   │   │   │   ├── ranking.py
+│   │   │   │   ├── risk_explainer.py
+│   │   │   │   ├── road_intelligence.py
+│   │   │   │   ├── timeline.py
+│   │   │   │   ├── unified_intelligence_engine.py
+│   │   │   │   └── v4
+│   │   │   │       ├── __init__.py
+│   │   │   │       ├── ai_copilot.py
+│   │   │   │       ├── community_intelligence.py
+│   │   │   │       ├── control_panel.py
+│   │   │   │       ├── decision_support.py
+│   │   │   │       ├── evidence_panel.py
+│   │   │   │       ├── forecast_timeline.py
+│   │   │   │       ├── header.py
+│   │   │   │       ├── impact_assessment.py
+│   │   │   │       ├── operations.py
+│   │   │   │       ├── risk_display.py
+│   │   │   │       ├── situation_brief.py
+│   │   │   │       ├── situation_map.py
+│   │   │   │       └── state.py
+│   │   │   ├── pages
+│   │   │   │   └── dashboard.py
+│   │   │   ├── pages_disabled
+│   │   │   │   ├── 00_home.py
+│   │   │   │   ├── 01_dashboard.py
+│   │   │   │   ├── 04_community_report.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── backups
+│   │   │   │   │   └── 20260617_010823
+│   │   │   │   │       ├── manifest.txt
+│   │   │   │   │       └── restore.sh
+│   │   │   │   ├── gis_map.py
+│   │   │   │   └── switch_dashboard.sh
+│   │   │   └── streamlit_app.py
+│   │   └── archive_backup
+│   │       ├── dashboard.py
+│   │       ├── dashboard_enhanced.py
+│   │       ├── dashboard_enhanced_v2.py
+│   │       ├── dashboard_enhanced_v3.py
+│   │       ├── dashboard_v4.py
+│   │       ├── pages
+│   │       └── v4_legacy
+│   │           ├── ai_copilot_v4.py
+│   │           ├── control_panel.py
+│   │           ├── evidence_panel.py
+│   │           ├── impact_panel.py
+│   │           ├── mission_control_header.py
+│   │           ├── national_briefing.py
+│   │           └── operations_panel.py
+│   ├── pre_migration_20260705_020526
+│   │   └── app_backup
+│   │       ├── modules
+│   │       │   ├── community.py
+│   │       │   ├── copilot.py
+│   │       │   ├── copilot_enhanced.py
+│   │       │   ├── decision_confidence.py
+│   │       │   ├── decision_copilot.py
+│   │       │   ├── demo_orchestrator.py
+│   │       │   ├── emergency_operations_dashboard.py
+│   │       │   ├── evacuation.py
+│   │       │   ├── evidence_fusion.py
+│   │       │   ├── explainability.py
+│   │       │   ├── forecast.py
+│   │       │   ├── hydrological.py
+│   │       │   ├── impact.py
+│   │       │   ├── national_center.py
+│   │       │   ├── operational_resilience.py
+│   │       │   ├── ranking.py
+│   │       │   ├── risk_explainer.py
+│   │       │   ├── road_intelligence.py
+│   │       │   ├── timeline.py
+│   │       │   ├── unified_intelligence_engine.py
+│   │       │   └── v4
+│   │       │       ├── __init__.py
+│   │       │       ├── ai_copilot.py
+│   │       │       ├── community_intelligence.py
+│   │       │       ├── decision_support.py
+│   │       │       ├── forecast_timeline.py
+│   │       │       ├── header.py
+│   │       │       ├── impact_assessment.py
+│   │       │       ├── operations.py
+│   │       │       ├── risk_display.py
+│   │       │       ├── situation_brief.py
+│   │       │       ├── situation_map.py
+│   │       │       └── state.py
+│   │       ├── pages
+│   │       │   └── dashboard.py
+│   │       ├── pages_disabled
+│   │       │   ├── 00_home.py
+│   │       │   ├── 01_dashboard.py
+│   │       │   ├── 04_community_report.py
+│   │       │   ├── __init__.py
+│   │       │   ├── backups
+│   │       │   │   └── 20260617_010823
+│   │       │   │       ├── manifest.txt
+│   │       │   │       └── restore.sh
+│   │       │   ├── gis_map.py
+│   │       │   └── switch_dashboard.sh
+│   │       └── streamlit_app.py
+│   ├── pre_migration_20260705_020932
+│   │   └── app_backup
+│   │       ├── modules
+│   │       │   ├── community.py
+│   │       │   ├── copilot.py
+│   │       │   ├── copilot_enhanced.py
+│   │       │   ├── decision_confidence.py
+│   │       │   ├── decision_copilot.py
+│   │       │   ├── demo_orchestrator.py
+│   │       │   ├── emergency_operations_dashboard.py
+│   │       │   ├── evacuation.py
+│   │       │   ├── evidence_fusion.py
+│   │       │   ├── explainability.py
+│   │       │   ├── forecast.py
+│   │       │   ├── hydrological.py
+│   │       │   ├── impact.py
+│   │       │   ├── national_center.py
+│   │       │   ├── operational_resilience.py
+│   │       │   ├── ranking.py
+│   │       │   ├── risk_explainer.py
+│   │       │   ├── road_intelligence.py
+│   │       │   ├── timeline.py
+│   │       │   ├── unified_intelligence_engine.py
+│   │       │   └── v4
+│   │       │       ├── __init__.py
+│   │       │       ├── ai_copilot.py
+│   │       │       ├── community_intelligence.py
+│   │       │       ├── decision_support.py
+│   │       │       ├── forecast_timeline.py
+│   │       │       ├── header.py
+│   │       │       ├── impact_assessment.py
+│   │       │       ├── operations.py
+│   │       │       ├── risk_display.py
+│   │       │       ├── situation_brief.py
+│   │       │       ├── situation_map.py
+│   │       │       └── state.py
+│   │       ├── pages
+│   │       │   └── dashboard.py
+│   │       ├── pages_disabled
+│   │       │   ├── 00_home.py
+│   │       │   ├── 01_dashboard.py
+│   │       │   ├── 04_community_report.py
+│   │       │   ├── __init__.py
+│   │       │   ├── backups
+│   │       │   │   └── 20260617_010823
+│   │       │   │       ├── manifest.txt
+│   │       │   │       └── restore.sh
+│   │       │   ├── gis_map.py
+│   │       │   └── switch_dashboard.sh
+│   │       └── streamlit_app.py
+│   └── state_update_20260714
+│       ├── dashboard.py.backup
+│       └── state.py.backup
+├── check_env.py
+├── daily_report.html
+├── dashboard
+│   ├── app.py
+│   └── requirements.txt
+├── dashboard.html
+├── data
+│   ├── alert_history.json
+│   ├── alerts.db
+│   ├── climate
+│   ├── community_reports.db
+│   ├── dams
+│   │   └── telemetry
+│   │       └── akosombo.json
+│   ├── events
+│   │   └── flood_events.json
+│   ├── flood_polygons
+│   │   └── sentinel
+│   ├── processed
+│   │   ├── accra_anomaly_detection_2024.png
+│   │   ├── accra_cumulative_rainfall_2024.png
+│   │   ├── accra_feature_importance_2024.png
+│   │   ├── accra_features_2024.parquet
+│   │   ├── accra_flood_risk_score_2024.png
+│   │   ├── accra_monthly_rainfall_2024.png
+│   │   ├── accra_rainfall_2024.png
+│   │   ├── accra_rainfall_classes_2024.png
+│   │   ├── accra_rainfall_histogram_2024.png
+│   │   ├── accra_rolling_avg_2024.png
+│   │   ├── accra_xgb_predictions_2024.png
+│   │   ├── accra_zscore_anomaly_2024.png
+│   │   └── chirps_accra_2024.csv
+│   ├── raw
+│   │   └── chirps
+│   ├── rivers
+│   │   └── cache
+│   │       └── odaw_accra.json
+│   ├── subscriptions.db
+│   └── urban
+│       └── drainage
+├── demo_backup_20260619_005625
+│   ├── README.txt
+│   └── dashboard.html
+├── deploy.sh
+├── docker-compose.yml
+├── docs
+│   └── ONBOARDING.md
+├── environment.yml.backup
+├── environment.yml.bak
+├── fix_map_versions.sh
+├── hackathon
+│   ├── README.md
+│   ├── ai
+│   │   ├── __init__.py
+│   │   ├── community_classifier.py
+│   │   ├── flood_explainer.py
+│   │   ├── hydrological_intelligence.py
+│   │   ├── impact_estimator.py
+│   │   └── timeline_predictor.py
+│   ├── app
+│   │   ├── modules
+│   │   │   ├── community.py
+│   │   │   ├── copilot.py
+│   │   │   ├── copilot_enhanced.py
+│   │   │   ├── decision_confidence.py
+│   │   │   ├── decision_copilot.py
+│   │   │   ├── demo_orchestrator.py
+│   │   │   ├── emergency_operations_dashboard.py
+│   │   │   ├── evacuation.py
+│   │   │   ├── evidence_fusion.py
+│   │   │   ├── explainability.py
+│   │   │   ├── forecast.py
+│   │   │   ├── hydrological.py
+│   │   │   ├── impact.py
+│   │   │   ├── national_center.py
+│   │   │   ├── operational_resilience.py
+│   │   │   ├── ranking.py
+│   │   │   ├── risk_explainer.py
+│   │   │   ├── road_intelligence.py
+│   │   │   ├── timeline.py
+│   │   │   ├── unified_intelligence_engine.py
+│   │   │   └── v4
+│   │   │       ├── __init__.py
+│   │   │       ├── ai_copilot.py
+│   │   │       ├── community_intelligence.py
+│   │   │       ├── control_panel.py
+│   │   │       ├── decision_support.py
+│   │   │       ├── evidence_panel.py
+│   │   │       ├── forecast_timeline.py
+│   │   │       ├── header.py
+│   │   │       ├── impact_assessment.py
+│   │   │       ├── operations.py
+│   │   │       ├── risk_display.py
+│   │   │       ├── situation_brief.py
+│   │   │       ├── situation_map.py
+│   │   │       ├── state.py
+│   │   │       ├── state_fallback.py
+│   │   │       ├── visual_components.py
+│   │   │       ├── visual_components.py.backup_black_fix
+│   │   │       ├── visual_components.py.backup_broken
+│   │   │       ├── visual_components.py.backup_clean
+│   │   │       ├── visual_components.py.backup_duplicate
+│   │   │       ├── visual_components.py.backup_enterprise
+│   │   │       ├── visual_components.py.backup_final
+│   │   │       ├── visual_components.py.backup_test
+│   │   │       ├── visual_components.py.bak_env_fix
+│   │   │       ├── visual_components.py.bak_final_fix
+│   │   │       ├── visual_components.py.bak_manual
+│   │   │       ├── visual_components.py.before_html_fix
+│   │   │       └── visual_components_fixed.py
+│   │   ├── pages
+│   │   │   ├── dashboard.py
+│   │   │   ├── dashboard.py.backup
+│   │   │   ├── dashboard.py.backup_before_route_fix
+│   │   │   ├── dashboard.py.backup_black_fix
+│   │   │   ├── dashboard.py.backup_clean
+│   │   │   ├── dashboard.py.backup_final
+│   │   │   ├── dashboard.py.backup_final_fix
+│   │   │   ├── dashboard.py.backup_final_v2
+│   │   │   ├── dashboard.py.backup_import_fix
+│   │   │   ├── dashboard.py.backup_test
+│   │   │   ├── dashboard.py.before_html_fix
+│   │   │   ├── dashboard.py.full
+│   │   │   ├── dashboard.py.original
+│   │   │   ├── dashboard.py.render
+│   │   │   ├── dashboard.py.working_backup
+│   │   │   └── dashboard_fixed.py
+│   │   ├── pages_disabled
+│   │   │   ├── 00_home.py
+│   │   │   ├── 01_dashboard.py
+│   │   │   ├── 04_community_report.py
+│   │   │   ├── __init__.py
+│   │   │   ├── backups
+│   │   │   │   └── 20260617_010823
+│   │   │   │       ├── manifest.txt
+│   │   │   │       └── restore.sh
+│   │   │   ├── gis_map.py
+│   │   │   └── switch_dashboard.sh
+│   │   ├── streamlit_app.py
+│   │   └── streamlit_app.py.full
+│   ├── archive
+│   │   ├── dashboard.py
+│   │   ├── dashboard_enhanced.py
+│   │   ├── dashboard_enhanced_v2.py
+│   │   ├── dashboard_enhanced_v3.py
+│   │   ├── dashboard_v4.py
+│   │   ├── pages
+│   │   └── v4_legacy
+│   │       ├── ai_copilot_v4.py
+│   │       ├── control_panel.py
+│   │       ├── evidence_panel.py
+│   │       ├── impact_panel.py
+│   │       ├── mission_control_header.py
+│   │       ├── national_briefing.py
+│   │       └── operations_panel.py
+│   ├── datasets
+│   │   ├── demo_events.csv
+│   │   ├── district_population.csv
+│   │   ├── health_facilities.csv
+│   │   └── schools.csv
+│   ├── docs
+│   │   ├── architecture.md
+│   │   ├── dataset_sources.md
+│   │   ├── pitch_deck.md
+│   │   └── poster.md
+│   └── tests
+│       └── test_ai_modules.py
+├── hackathon_tree.txt
+├── htmlcov
+│   ├── .gitignore
+│   ├── class_index.html
+│   ├── coverage_html_cb_dd2e7eb5.js
+│   ├── favicon_32_cb_c827f16f.png
+│   ├── function_index.html
+│   ├── index.html
+│   ├── keybd_closed_cb_900cfef5.png
+│   ├── status.json
+│   ├── style_cb_9ff733b0.css
+│   ├── z_24ba73a9a3f27651___init___py.html
+│   ├── z_24ba73a9a3f27651_engine_py.html
+│   ├── z_24ba73a9a3f27651_formatter_py.html
+│   ├── z_24ba73a9a3f27651_logger_config_py.html
+│   ├── z_24ba73a9a3f27651_models_py.html
+│   ├── z_24ba73a9a3f27651_rate_limit_py.html
+│   ├── z_ecd0a644d057b051___init___py.html
+│   ├── z_ecd0a644d057b051_base_py.html
+│   ├── z_ecd0a644d057b051_email_provider_py.html
+│   ├── z_ecd0a644d057b051_mock_provider_py.html
+│   ├── z_ecd0a644d057b051_sms_provider_py.html
+│   ├── z_ecd0a644d057b051_whatsapp_provider_py.html
+│   ├── z_f0e24b7f04f99860___init___py.html
+│   └── z_f0e24b7f04f99860_main_py.html
+├── logs
+│   ├── alert_engine.jsonl
+│   ├── alert_log.jsonl
+│   ├── api.log
+│   └── nfcc.log
+├── models
+│   ├── xgboost_flood_risk.joblib
+│   └── xgboost_flood_risk.pkl
+├── nginx.conf
+├── nohup.out
+├── notebooks
+│   ├── .ipynb_checkpoints
+│   │   ├── 04_flood_risk_model-checkpoint.ipynb
+│   │   └── chirps_analysis-checkpoint.ipynb
+│   ├── 04_flood_risk_model.ipynb
+│   └── chirps_analysis.ipynb
+├── prometheus.yml
+├── pyproject.toml
+├── pytest.ini
+├── python_files.txt
+├── railway.json
+├── render.yaml
+├── repo_tree.txt
+├── reports
+│   └── coverage
+│       ├── .gitignore
+│       ├── class_index.html
+│       ├── coverage_html_cb_dd2e7eb5.js
+│       ├── favicon_32_cb_c827f16f.png
+│       ├── function_index.html
+│       ├── index.html
+│       ├── keybd_closed_cb_900cfef5.png
+│       ├── status.json
+│       ├── style_cb_9ff733b0.css
+│       ├── z_04ee3d945ea3e237___init___py.html
+│       ├── z_04ee3d945ea3e237_exposure_mapper_py.html
+│       ├── z_145eef247bfb46b6___init___py.html
+│       ├── z_145eef247bfb46b6_celery_app_py.html
+│       ├── z_145eef247bfb46b6_tasks_py.html
+│       ├── z_24ba73a9a3f27651___init___py.html
+│       ├── z_24ba73a9a3f27651_circuit_breaker_py.html
+│       ├── z_24ba73a9a3f27651_cooldown_py.html
+│       ├── z_24ba73a9a3f27651_district_risk_py.html
+│       ├── z_24ba73a9a3f27651_engine_py.html
+│       ├── z_24ba73a9a3f27651_formatter_py.html
+│       ├── z_24ba73a9a3f27651_geographic_py.html
+│       ├── z_24ba73a9a3f27651_logger_config_py.html
+│       ├── z_24ba73a9a3f27651_logger_py.html
+│       ├── z_24ba73a9a3f27651_models_py.html
+│       ├── z_24ba73a9a3f27651_provider_factory_py.html
+│       ├── z_24ba73a9a3f27651_rate_limit_py.html
+│       ├── z_24ba73a9a3f27651_structured_logger_py.html
+│       ├── z_26587ac33cd389b8___init___py.html
+│       ├── z_26587ac33cd389b8_forecast_engine_py.html
+│       ├── z_42e4620a1ab18ccc___init___py.html
+│       ├── z_42e4620a1ab18ccc_resource_optimizer_py.html
+│       ├── z_6f57f923ae69d111___init___py.html
+│       ├── z_6f57f923ae69d111_explain_fusion_py.html
+│       ├── z_6f57f923ae69d111_forecast_py.html
+│       ├── z_728217a82b4537cc___init___py.html
+│       ├── z_728217a82b4537cc_flood_labels_py.html
+│       ├── z_7530dad8cd1eb93b___init___py.html
+│       ├── z_7530dad8cd1eb93b_data_health_py.html
+│       ├── z_77d70a5ed3be051c___init___py.html
+│       ├── z_77d70a5ed3be051c_shap_explainer_py.html
+│       ├── z_defad1a87623d8bf_confidence_scoring_py.html
+│       ├── z_defad1a87623d8bf_dam_spillage_py.html
+│       ├── z_defad1a87623d8bf_forecast_fusion_py.html
+│       ├── z_defad1a87623d8bf_fusion_explain_py.html
+│       ├── z_e3d496e5189f5be2___init___py.html
+│       ├── z_e3d496e5189f5be2_rainfall_features_py.html
+│       ├── z_ecd0a644d057b051___init___py.html
+│       ├── z_ecd0a644d057b051_base_py.html
+│       ├── z_ecd0a644d057b051_email_provider_py.html
+│       ├── z_ecd0a644d057b051_mock_provider_py.html
+│       ├── z_ecd0a644d057b051_mock_py.html
+│       ├── z_ecd0a644d057b051_sms_provider_py.html
+│       ├── z_ecd0a644d057b051_whatsapp_provider_py.html
+│       ├── z_f0e24b7f04f99860___init___py.html
+│       ├── z_f0e24b7f04f99860_auth_py.html
+│       ├── z_f0e24b7f04f99860_dam_spillage_py.html
+│       ├── z_f0e24b7f04f99860_explain_py.html
+│       ├── z_f0e24b7f04f99860_health_py.html
+│       ├── z_f0e24b7f04f99860_main_py.html
+│       ├── z_f0e24b7f04f99860_metrics_endpoint_py.html
+│       ├── z_f0e24b7f04f99860_metrics_py.html
+│       ├── z_f954cdf8d5380f57___init___py.html
+│       ├── z_f954cdf8d5380f57_dams_py.html
+│       └── z_f954cdf8d5380f57_settings_py.html
+├── repository_inventory.txt
+├── requirements-dev.txt
+├── requirements.txt
+├── requirements_dashboard.txt
+├── requirements_fixed.txt
+├── requirements_streamlit.txt
+├── results.json
+├── run_demo.sh
+├── scripts
+│   ├── complete_production_check.sh
+│   ├── convert_model.py
+│   ├── coverage_dashboard.py
+│   ├── create_demo_backup.sh
+│   ├── create_test_alerts.py
+│   ├── create_test_alerts_complete.py
+│   ├── daily_chirps_pull.py
+│   ├── deploy_production.sh
+│   ├── generate_openapi.py
+│   ├── generate_ssl.sh
+│   ├── improve_coverage.sh
+│   ├── migrate_to_canonical.sh
+│   ├── resave_model.py
+│   ├── run_complete_enhancement.sh
+│   ├── run_elite_tests.sh
+│   ├── setup_directories.sh
+│   ├── setup_redis.sh
+│   ├── standardize_model.py
+│   ├── start_production.sh
+│   ├── test_credentials.py
+│   ├── update_v4_modules.sh
+│   ├── validate_env.py
+│   ├── verify_railway_production.sh
+│   └── verify_v4_modules.sh
+├── sql
+│   └── init_hydrology.sql
+├── src
+│   ├── __init__.py
+│   ├── alerts
+│   │   ├── __init__.py
+│   │   ├── circuit_breaker.py
+│   │   ├── cooldown.py
+│   │   ├── district_risk.py
+│   │   ├── engine.py
+│   │   ├── enhanced_alert_network.py
+│   │   ├── formatter.py
+│   │   ├── geographic.py
+│   │   ├── logger_config.py
+│   │   ├── models.py
+│   │   ├── provider_factory.py
+│   │   ├── providers
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py
+│   │   │   ├── email_provider.py
+│   │   │   ├── mock_provider.py
+│   │   │   ├── sms_provider.py
+│   │   │   └── whatsapp_provider.py
+│   │   ├── rate_limit.py
+│   │   ├── structured_logger.py
+│   │   └── subscriptions.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── dam_router.py
+│   │   ├── dam_spillage.py
+│   │   ├── explain.py
+│   │   ├── health.py
+│   │   ├── main.py
+│   │   ├── metrics.py
+│   │   ├── metrics_endpoint.py
+│   │   └── routes
+│   │       ├── __init__.py
+│   │       ├── alerts.py
+│   │       ├── community_reports.py
+│   │       └── subscriptions.py
+│   ├── celery_app.py
+│   ├── community
+│   │   ├── __init__.py
+│   │   └── community_memory.py
+│   ├── config
+│   │   ├── __init__.py
+│   │   ├── dams.py
+│   │   └── settings.py
+│   ├── data
+│   │   └── ingestion
+│   │       └── download_chirps.py
+│   ├── database
+│   │   ├── __init__.py
+│   │   └── alert_db.py
+│   ├── explainability
+│   ├── exposure
+│   │   ├── __init__.py
+│   │   └── impact_estimator.py
+│   ├── features
+│   ├── forecast
+│   ├── hydrology
+│   │   ├── __init__.py
+│   │   ├── flood_polygons.py
+│   │   ├── rainfall_history.py
+│   │   ├── rainfall_history.py.bak
+│   │   ├── reservoir_intelligence.py
+│   │   ├── reservoir_intelligence.py.bak
+│   │   ├── river_gauge_api.py
+│   │   ├── river_intelligence.py
+│   │   ├── sentinel_processor.py
+│   │   ├── soil_moisture.py
+│   │   ├── unified_intelligence.py
+│   │   ├── urban_drainage.py
+│   │   ├── vra_telemetry.py
+│   │   └── weather_forecast.py
+│   ├── labels
+│   ├── models
+│   │   ├── dam_spillage.py
+│   │   └── train_model.py
+│   ├── monitoring
+│   ├── optimization
+│   └── tasks.py
+├── src_inventory.txt
+├── src_tree.txt
+├── ssl
+│   ├── cert.pem
+│   └── key.pem
+├── streamlit_error.log
+├── submission_package
+│   └── models
+│       ├── xgboost_flood_risk.joblib
+│       └── xgboost_flood_risk.pkl
+├── test.txt
+├── test_email.py
+├── test_email_sms.py
+├── test_environment.py
+├── test_map_safe.py
+├── tests
+│   ├── __init__.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── test_endpoints.py
+│   │   └── test_explain.py
+│   ├── conftest.py
+│   ├── contract
+│   │   └── test_openapi_contract.py
+│   ├── fixtures
+│   │   ├── __init__.py
+│   │   ├── payloads
+│   │   │   ├── __init__.py
+│   │   │   └── payloads.py
+│   │   ├── provider_fixtures.py
+│   │   └── scenarios
+│   │       └── __init__.py
+│   ├── framework
+│   │   ├── __init__.py
+│   │   ├── analytics
+│   │   │   ├── __init__.py
+│   │   │   └── vector_similarity.py
+│   │   ├── analytics.py
+│   │   ├── assertions.py
+│   │   ├── chaos
+│   │   │   ├── __init__.py
+│   │   │   ├── engine.py
+│   │   │   ├── latency.py
+│   │   │   └── state.py
+│   │   ├── ci
+│   │   │   ├── __init__.py
+│   │   │   └── enforcer.py
+│   │   ├── contracts
+│   │   │   └── __init__.py
+│   │   ├── determinism.py
+│   │   ├── fuzz
+│   │   │   ├── __init__.py
+│   │   │   ├── property_tests.py
+│   │   │   └── schema_fuzzer.py
+│   │   ├── observability
+│   │   │   ├── __init__.py
+│   │   │   ├── logs.py
+│   │   │   ├── metrics.py
+│   │   │   └── tracing.py
+│   │   ├── orchestrator
+│   │   │   ├── __init__.py
+│   │   │   └── graph.py
+│   │   ├── orchestrator.py
+│   │   ├── plugin
+│   │   │   ├── __init__.py
+│   │   │   └── isolation.py
+│   │   ├── plugin.py
+│   │   ├── replay
+│   │   │   ├── __init__.py
+│   │   │   └── event_sourcing.py
+│   │   ├── security
+│   │   │   ├── __init__.py
+│   │   │   ├── abuse.py
+│   │   │   ├── dos.py
+│   │   │   └── injection.py
+│   │   └── stress
+│   │       ├── __init__.py
+│   │       └── async_engine.py
+│   ├── integration
+│   │   ├── __init__.py
+│   │   ├── test_model_performance.py
+│   │   └── test_pipeline.py
+│   ├── mocks
+│   │   ├── __init__.py
+│   │   ├── provider_factory.py
+│   │   ├── smtp_mock.py
+│   │   └── twilio_mock.py
+│   ├── test_alert_api.py
+│   ├── test_dam_spillage.py
+│   ├── test_elite_complete.py
+│   ├── test_elite_simple.py
+│   ├── test_hydrological_intelligence.py
+│   ├── test_imports.py
+│   └── unit
+│       ├── __init__.py
+│       ├── test_email_provider_comprehensive.py
+│       ├── test_email_provider_fixed.py
+│       ├── test_engine_edge_cases.py
+│       ├── test_feature_engineering.py
+│       ├── test_flood_risk_scoring.py
+│       ├── test_formatter.py
+│       ├── test_providers_complete.py
+│       ├── test_providers_mock.py
+│       ├── test_rainfall_classification.py
+│       ├── test_rate_limit.py
+│       └── test_sms_provider_comprehensive.py
+└── update_system.sh
+
+175 directories, 786 files

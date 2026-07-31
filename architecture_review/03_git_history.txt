@@ -1,0 +1,265 @@
+* 9fa4967 (HEAD -> architecture-cleanup, origin/feature/ghana-ai-challenge, feature/ghana-ai-challenge) feat: Complete dashboard visual fixes and improvements
+* 6743ef6 fix: Risk Timeline - render_risk_timeline_visual with simple string concatenation
+* b6b7487 feat: Add fallback data for API zeros
+* 53d06a7 feat: Phase 4 - Complete visual storytelling implementation
+* cc5167a fix: Add working map to Render dashboard, remove duplicate stats
+* cbca392 diagnostic: Minimal map to test st_folium rendering
+* eaae762 🐛 Fix: Add get_db() alias for test compatibility
+* e0a3244 fix: Dynamic import handling for Render deployment
+* ed8e298 feat: Enterprise Command Center - Single authoritative dashboard
+* 7a3dfe1 fix: Correct indentation and add backward compatibility properties
+* a7850bc fix: Add backward compatibility properties to DashboardState
+* c88ff69 feat: Complete enterprise-grade state management
+* e0fa6a6 chore: Remove diagnostic output, restore clean entry point
+* c6cdd26 fix: Map serialization - plain text popups only
+* affd798 debug: Add diagnostic output to identify import issue
+* f83894a fix: Correct render.yaml configuration
+* e647af8 fix: Render deployment dependencies
+* 93db830 fix: Python path issue for Streamlit imports
+* 0db7400 chore: Force Render rebuild with map fix
+* f7826cc fix: Restore all V4 modules after accidental deletion
+* 2f487de chore: Complete canonical dashboard migration
+* 7eb594a fix: Fully populate dashboard state with all data
+* 2aa84fc fix: Folium map serialization error - plain text popups
+* ebeb652 fix: Remove ALL duplicate set_page_config() calls
+* 37a45c5 chore: Archive legacy V4 modules
+* 2617612 chore: Clean up legacy dashboard files and update .gitignore
+* 5775b29 feat: Complete V4 modules with full functionality
+* f48f2f8 fix: Correct Python path for Render deployment
+* a94f722 refactor: Single canonical dashboard architecture
+* c7ece22 fix: Add missing V4 module imports and correct signatures
+* 002b28d fix: Resolve V4 dashboard errors
+* ffbd9b2 feat: Complete V4 professional dashboard
+* 49efb60 feat: Complete V4 professional dashboard
+* 1d4709f feat: V4 Enhancement - Decision Support & Visual Polish
+* 34320c7 fix: Restore dashboard_v4.py with main() function
+* 012bf12 fix: Switch Render to v4 National EOC dashboard
+* c3c4cef feat: Complete v4 National Emergency Operations Center
+* 1692db6 feat: Add 7 winning features - Complete National Flood Decision Intelligence Platform
+* 76dc79f fix: Add data source transparency to all modules
+* d202e2e fix: Use ENHANCED COPILOT instead of old generic copilot
+* d8e391b feat: Complete integration of all 4 new intelligence modules
+* 8d43149 feat: Add 4 new intelligence modules
+* 788a914 feat: Complete AI Flood Copilot upgrade - Context-aware decision support
+* d9356e4 feat: Switch to Enhanced Dashboard v3
+* e2b3f77 feat: Add 4 new modules (NO breaking changes)
+* 8eeb93e feat: Add modules for enhanced dashboard v3
+* 132e4cf chore: Force rebuild after cache clear
+* 923465d fix: GIS map NameError - render_gis_panel now called inside main()
+* 821653a fix: GIS map NameError - moved render_gis_panel() inside main() - render_gis_panel() now called inside main() where district and risk_tier are defined - Added proper GIS map with folium - Included legend
+* bf7c7ca feat: Add interactive GIS flood risk map
+* 102472d chore: Force Render rebuild after set_page_config fix
+* 3ccac8f fix: Remove duplicate set_page_config from dashboard_enhanced.py
+* 5d52165 feat: Professional dashboard design with Railway API integration
+* 22c00a5 fix: Split dependencies - remove heavy ML training packages from dashboard
+* 2463333 fix: Complete Render deployment fixes
+* f342831 chore: Clean working tree for deployment
+* c25ce35 fix: Add plotly and improve error visibility
+* 58fea74 fix: Use requirements_streamlit.txt for Streamlit Cloud
+* 64407e1 fix: Reset environment with Python 3.10 and explicit versions
+* 1752c48 fix: Force cache invalidation with timestamp Sun Jun 21 04:24:47 UTC 2026
+* dec0d90 fix: Set Python 3.10 in environment.yml
+* bd7fb21 chore: Remove corrupted files from repository
+* 8f40621 fix: Complete Streamlit deployment fix
+* 2e42c52 fix: Disable Streamlit multipage navigation
+* 3bd26e5 fix: Add minimal requirements for Streamlit Cloud
+* 2734fb8 fix: Point Streamlit Cloud to the complete dashboard
+* 3b28947 test: Add minimal test app for Streamlit Cloud debugging
+* d4ea292 fix: Clean up streamlit_app.py - only one page config
+* 58f1d64 fix: Streamlit navigation error fix
+* 98c6670 feat: Add Streamlit Cloud entry point
+* ee8192d feat: Add Streamlit Cloud config (force add)
+* a85afec fix: Complete database schema and alert system fixes
+* b246930 feat: Complete hydrological intelligence platform
+* cc7205c feat: Complete hydrological intelligence fixes
+*   e0d592d Merge branch 'feature/ghana-ai-challenge' of github.com:NFCC-Ghana/nfcc-platform into feature/ghana-ai-challenge merge: Synchronize feature/ghana-ai-challenge with remote changes
+|\  
+| * d01aece (tag: v3.0.0-hackathon) fix: Remove unused pytest import in test_ai_modules.py
+* | 6f76cca fix: Remove unused pytest import in test_ai_modules.py
+|/  
+*   0b09e3b Merge feature/justice-dam-spillage into develop - Add dam spillage prediction model for Akosombo and Bagre - Add API endpoints: /api/dam/spillage, /api/dam/spillage/all, /api/dam/spillage/validate - Add historical validation (100% accuracy on 3 events) - 9 unit tests passing
+|\  
+| | *   4154210 (origin/develop, develop) Merge pull request #30 from NFCC-Ghana/feature/kalkidan-realtime-ingestion
+| | |\  
+| | | *   cdbc92c (origin/feature/kalkidan-realtime-ingestion) Merge develop into feature/kalkidan-realtime-ingestion
+| | | |\  
+| | | |/  
+| | |/|   
+| | * |   a41346f Merge pull request #29 from NFCC-Ghana/feature/adobea-civisenti
+| | |\ \  
+| | | * \   dadbf2a (origin/feature/adobea-civisenti) Merge develop into feature/adobea-civisenti Resolved conflicts in test fixtures
+| | | |\ \  
+| | | |/ /  
+| | |/| |   
+| | | * | 4a06a32 test: add pipeline fixture implementations
+| | | * | 0c18b5f test: add missing pytest fixture modules
+| | | * | 3d88c4e feat: add CiviSenti WhatsApp flood reporting
+| | | | * 2f548a7 Harden ingestion modules for CI test collection without earthengine-api.
+| | | | * f2dc340 Fix CI test collection by lazy-loading Earth Engine in ingestion modules.
+| | | | * 8bbf90a Fix elite resilience CI by using tracked model artifact in tests.
+| | | | * f220264 Add live data ingestion pipelines for CHIRPS, GPM IMERG, and river gauges.
+| | | |/  
+| | | | *-.   460e939 (refs/stash) On backup/dashboard-20260617-011109: WIP: Hydrological intelligence fixes
+| | | | |\ \  
+| | | | | | * 4e711b5 untracked files on backup/dashboard-20260617-011109: 0405054 feat: Complete hydrological intelligence fixes
+| | | | | * a827df1 index on backup/dashboard-20260617-011109: 0405054 feat: Complete hydrological intelligence fixes
+| | | | |/  
+| | | | * 0405054 (backup/dashboard-20260617-011109) feat: Complete hydrological intelligence fixes
+| | | |/  
+| | |/|   
+| | * | 61a4318 docs: clarify two projects in repository
+| | * |   e74a9de Merge feature/joan-subscriber-management into develop
+| | |\ \  
+| | | |/  
+| | |/|   
+| | | * 40c00f3 chore: add test fixtures for model and dataframe
+| | | * d45067a test: use file-based SQLite for thread-safe subscription tests
+| | | * 8c7e873 fix: add get_alert_history alias for backward compatibility
+| | | * 2008b90 feat: add subscriptions API with POST and DELETE endpoints plus in-memory tests
+| | * | 8db1b7e (tag: v2.6.0) Merge feature/justice-dam-spillage into develop - Add dam spillage prediction model for Akosombo and Bagre - Add API endpoints: /api/dam/spillage, /api/dam/spillage/all, /api/dam/spillage/validate - Add historical validation (100% accuracy on 3 events) - 9 unit tests passing
+| |/| | 
+|/|/ /  
+| | | * 8adaf20 (tag: v2.4.0) Merge feature/justice-dam-spillage into develop - Add dam spillage prediction model for Akosombo and Bagre - Add API endpoints: /api/dam/spillage, /api/dam/spillage/all, /api/dam/spillage/validate - Add historical validation (100% accuracy on 3 events) - 9 unit tests passing
+| |_|/| 
+|/| |/  
+| |/|   
+| * | 218971e feat: add dam spillage prediction model (Akosombo/Bagre)
+| * | dc65181 feat: dam spillage prediction with validation and tests
+* | | 4332d61 (tag: v2.3.0) feat: add total_available to alert history endpoint
+| |/  
+|/|   
+* | 61e865f test: add comprehensive pytest tests for alert API endpoints
+* | 6b5f818 feat: integrate SQLite persistence into AlertEngine
+* | 8691dd2 feat: add FastAPI alerts router with history and stats endpoints
+* |   af89b75 Merge branch 'main' of https://github.com/NFCC-Ghana/nfcc-platform into feature/joan-alert-service-api
+|\ \  
+* | | c20a574 feat: add SQLite persistence layer for flood alerts
+| |/  
+|/|   
+| | * a0fc1ef (origin/feature/kalkidan-forecast-fusion, feature/kalkidan-forecast-fusion) Fixed error on deprecated version of actions/upload-artifact: v3
+| | * 66ff718 fix(ci): install app requirements for Elite Resilience workflow
+| | * d66c098 Introduce an additive forecast-fusion layer on top of the existing API: normalize CHIRPS-, GloFAS-, and Flood-Hub-style risks (0–100), fuse with env-tunable weights and presence masks, expose unified risk plus heuristic confidence on POST /forecast/confidence, and per-source SHAP attribution on POST /explain/forecast.
+| |/  
+|/|   
+* | bfab867 chore: add .streamlit/ to .gitignore
+| | * 94de25d (origin/main, origin/HEAD, main) ci: improve GitHub Actions pipeline and test configuration
+| |/  
+| * 1e4ac3c fix: clamp negative precipitation in explain endpoint
+| * dabc2fe fix: resolve repository-wide lint and import issues
+| * cddfbd2 SHAP explainability API endpoint (#13)
+| *   a5bf9f1 (tag: v2.2.0) Merge develop into main: Add production Dockerfiles and 4 workers
+| |\  
+| * \   8b4aa2b Merge develop into main: v2.2.0 with simplified API
+| |\ \  
+| | | | *   6a76748 (origin/feature/kalkidan-shap-api) Merge develop into feature/kalkidan-shap-api
+| | | | |\  
+| |_|_|_|/  
+|/| | | |   
+* | | | | 049cefb feat: automate daily CHIRPS rainfall ingestion (#10)
+| |_|/ /  
+|/| | |   
+* | | | 461f8c4 feat: Comprehensive production Dockerfiles with multi-stage build and 4 workers
+| |/ /  
+|/| |   
+* | | d2aaf01 chore: Commit all local changes before switching branches
+* | | 7e27319 chore: Force Railway to rebuild with latest v2.2.0 code
+* | | 2a01f5d fix: Resolve all test failures - email provider empty recipients, engine provider instances, factory reset
+* | | 958b0e3 fix: Update existing files for production hardening
+* | | 0bcf6f3 feat: Add new production hardening files
+* | | ff2bec4 Merge main into develop: Production hardening v2.1.0
+|\| | 
+| * |   142a9d6 Merge develop into main: Update Dockerfile for v2.1.0 with simplified API
+| |\ \  
+| |/ /  
+|/| |   
+* | | 6e8e181 (origin/feature/production-hardening, feature/production-hardening) fix: Update Dockerfile for v2.1.0 with simplified API (location + precipitation only)
+* | | 7e38416 Merge main into develop: Sync production hardening v2.1.0
+|\| | 
+* | | 2dd66a7 chore: force Railway rebuild without cache
+* | | 8deee6f chore: force fresh Railway build
+* | | 6dcb1bc feat: deploy real XGBoost production model (remove dummy generation)
+| | * 7ecc433 restoring optional model
+| | * a1b30ae included the missing packages
+| | * c68c2bf Restore optional model startup + lazy load in require_model().
+| | * 5ad61e1 -Created  using FastAPI and SHAP/XGBoost integration.- Added comprehensive unit tests in  using the  fixture.- Enabled auto-generation of API documentation accessible via
+| | | * b5b939a (tag: v2.1.0, backup/production-hardening-main) BACKUP: Complete production hardening changes from main branch MAJOR FEATURES ADDED: - Lazy provider initialization (no startup network calls) - Singleton provider factory pattern - Redis cooldown with memory fallback - DRY RUN mode for testing without Twilio quota - District risk profiles for Ghana - Temporal rainfall analysis (rolling averages) - Geographic intelligence (elevation, rivers, drainage) - Structured JSON logging - Deep health metrics endpoint - Celery async queue support (optional)
+| | |/  
+| |/|   
+| * | f06888e feat: Production-ready alert system
+| * | 1499c19 feat: Production-ready alert system with unified score contract
+| * | fb47e7a feat: Add enterprise elite resilience components
+| * | 56370aa chore: Update flake8 config and fix linting issues
+| * | 53a3ec9 (tag: v2.0.0) feat: Production-ready alert system with unified score contract
+| * | 5aa1b6d feat: deploy real XGBoost production model (remove dummy generation)
+| | | * 12365f9 (origin/fix/score-contract-migration) feat: Production-ready alert system with unified score contract
+| | | * 1036075 feat: Production-ready alert system with unified score contract
+| | | * 50076ea test: Comprehensive formatter tests (35 tests)
+| | | * f762f3b feat: Production-ready alert system with comprehensive tests
+| | | * 4f2228a feat: Production-ready RateLimiter with thread safety
+| | | * a8cb4a7 fix: Core functionality working with 39 passing tests
+| | | *   c33d549 (origin/feature/testing-infrastructure, feature/testing-infrastructure) merge: resolve conflicts with main and integrate latest changes
+| | | |\  
+| | |_|/  
+| |/| |   
+| * | | 9a88d7d fix: remove Railway startCommand override
+| * | | a70b367 fix: correct Railway Dockerfile build syntax
+|/ / /  
+* | | 611d06c chore: trigger Railway rebuild
+* | |   611967e Merge pull request #14 from NFCC-Ghana/feature/railway-deployment
+|\ \ \  
+| * | | 8b49c84 (origin/feature/railway-deployment) fix: include production ML model for Railway deployment
+|/ / /  
+| | * 6e64395 test: Add comprehensive provider tests with full coverage
+| | * 9e68dbc fix: Resolve all merge blockers - 37/37 tests passing
+| | * 453e471 fix: Add missing alert engine core modules
+| | * 13188c0 fix: Restore provider files, fix mock import, restore .env.template
+| | | * 5e9ab0d (origin/feature/adobea-chirps-automation) fix: format CHIRPS ingestion script
+| | | * 3459a54 feat: automate daily CHIRPS ingestion
+| |_|/  
+|/| |   
+* | | d1e724a fix: add explicit dummy model generation step to Dockerfile
+* | | 1f41df6 fix: generate dummy model and feature data during Docker build for Railway
+* | | 23abc6c chore: update railway.json for production deployment
+* | | 69502aa chore: clean and standardize gitignore
+* | | 5c57c8c fix: add all required directories and dummy data for Railway deployment
+* | | 7d797aa fix: add verification step for dummy model creation
+* | | 494d9b2 fix: create dummy model directly in Dockerfile (no data files required)
+* | | deb0089 fix: generate model during Docker build to prevent missing file error
+* | |   43e357e Merge pull request #12 from NFCC-Ghana/feature/railway-deployment
+|\ \ \  
+| |/ /  
+|/| |   
+| * | 300af9e chore: add Railway deployment configuration
+| * | 863ad16 security: harden gitignore for deployment secrets
+|/ /  
+* |   76a1a6f Merge pull request #11 from NFCC-Ghana/feature/docker-production
+|\ \  
+| * | a9daf4f (origin/feature/docker-production) chore: add Docker production configuration
+| * | d6cf70d fix: restore alert engine compatibility and passing integration pipeline - Updated engine.py for compatibility - Added train_model.py to generate model locally - Fixed test_pipeline.py imports and formatting - All 37 tests passing
+| * | 015d3f9 fix: correct mock_provider import paths
+| * |   3b1d3f7 Merge pull request #8 from NFCC-Ghana/feature/alert-engine-core
+| |\ \  
+| | * | 5b0b6e2 (origin/feature/alert-engine-core, feature/alert-engine-core) feat: Phase 3D — Modular Alert Engine (Corrected)
+| |/ /  
+| * | 458f145 Merge pull request #7 from NFCC-Ghana/feature/testing-infrastructure
+| |\| 
+| | * 1dc0861 (review/testing) feat: Phase 3E — complete testing infrastructure
+| |/  
+* | 60508d0 (tag: v1.0.0) Merge branch 'develop'
+|\| 
+| *   949ecf1 (origin/feature/twilio-alerts, feature/twilio-alerts, feature/techlead-phase3d-planning) Phase 3C — Dashboard + API Integration
+| |\  
+| | * abd1374 feat: add FastAPI flood-risk scoring API (Phase 3C)
+| | * d89cfa6 fix: add .flake8 config to set max-line-length=88
+| | * 26f0a4f fix: stabilize environment, linting, tests, and GEE auth
+| | * 1a9306c chore: remove accidental onboarding typo file
+| | * 1f4bc66 test: verify CI pipeline
+| * | d19435d Add engineer onboarding documentation
+| |/  
+| * aa40e1a Add GitHub Actions CI workflow
+* | 453f283 test branch protection
+|/  
+* b3c5c33 Clean environment.yml for team reproducibility
+* 99a6664 Add environment.yml for team reproduction
+* 5e8e7ff NFCC: add base project structure and environment test
+* 1e5cdfc NFCC: initial project setup with .gitignore

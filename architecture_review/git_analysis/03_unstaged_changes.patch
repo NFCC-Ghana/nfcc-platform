@@ -1,0 +1,1417 @@
+diff --git a/.streamlit/config.toml b/.streamlit/config.toml
+index 49e2f65..4d84fe7 100644
+--- a/.streamlit/config.toml
++++ b/.streamlit/config.toml
+@@ -1,18 +1,18 @@
+ [theme]
+-base = "dark"
+-primaryColor = "#00b4d8"
+-backgroundColor = "#0e1117"
+-secondaryBackgroundColor = "#262730"
+-textColor = "#fafafa"
+-font = "sans serif"
++# Inherit from the light theme base
++base = "light"
++
++# Your primary accent color (keeps your orange theme)
++primaryColor = "#ffaa00"
++
++# White background (keeps your existing design)
++backgroundColor = "#ffffff"
+ 
+-[server]
+-enableCORS = false
+-enableXsrfProtection = false
+-maxUploadSize = 200
+-port = 8501
+-address = "0.0.0.0"
++# Light gray for interactive elements
++secondaryBackgroundColor = "#f0f2f6"
+ 
+-[browser]
+-gatherUsageStats = false
+-serverAddress = "0.0.0.0"
++# 🔑 KEY FIX: BLACK text - this makes all text visible!
++textColor = "#000000"
++
++# Font
++font = "sans serif"
+diff --git a/hackathon/ai/flood_explainer.py b/hackathon/ai/flood_explainer.py
+index 0b9d655..af8c17a 100644
+--- a/hackathon/ai/flood_explainer.py
++++ b/hackathon/ai/flood_explainer.py
+@@ -139,7 +139,7 @@ class FloodExplainer:
+             "LOW": "🟢",
+         }
+ 
+-        return f"""
++        return "
+ {emoji_map.get(explanation.risk_level, '⚠️')} *FLOOD ALERT*
+ 
+ *Risk Level:* {explanation.risk_level}
+diff --git a/hackathon/ai/hydrological_intelligence.py b/hackathon/ai/hydrological_intelligence.py
+index 07303b2..327a1d8 100644
+--- a/hackathon/ai/hydrological_intelligence.py
++++ b/hackathon/ai/hydrological_intelligence.py
+@@ -1,126 +1,37 @@
+-"""CivicFlood AI - Hydrological Intelligence Module.
+-
+-This module provides the complete hydrological intelligence integration
+-for the CivicFlood AI hackathon dashboard.
++"""
++Hydrological Intelligence Module
+ """
+ 
+-import sys
+-from datetime import datetime
+-from pathlib import Path
+-from typing import Dict, Optional
++import json
++import logging
++from datetime import datetime, timedelta
++from typing import Any, Dict, List, Optional
+ 
+-# Add src to path for hydrology modules
+-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
++import pandas as pd
+ 
+-from src.hydrology.flood_polygons import flood_polygons
+-from src.hydrology.rainfall_history import rainfall_history
+-from src.hydrology.reservoir_intelligence import reservoir_intelligence
+-from src.hydrology.river_intelligence import river_intelligence
+-from src.hydrology.soil_moisture import soil_moisture
+-from src.hydrology.unified_intelligence import unified_intelligence
++from hackathon.ai.engines.rainfall_engine import RainfallEngine
++from hackathon.ai.engines.river_engine import RiverEngine
++from hackathon.ai.engines.soil_engine import SoilEngine
+ 
++logger = logging.getLogger(__name__)
+ 
+-class CivicFloodHydrologicalIntelligence:
+-    """
+-    CivicFlood AI wrapper for hydrological intelligence.
+ 
+-    Provides clean API for the hackathon dashboard.
+-    """
++class HydrologicalIntelligence:
++    """Hydrological Intelligence Engine."""
+ 
+     def __init__(self):
+-        self.unified = unified_intelligence
+-
+-    def get_community_risk(self, district: str, rainfall_mm: float = None) -> Dict:
+-        """Get complete flood risk for a community."""
+-        return self.unified.get_complete_risk_assessment(district, rainfall_mm)
+-
+-    def get_historical_context(self, district: str) -> Dict:
+-        """Get historical flood context for a community."""
+-        history = flood_polygons.get_flood_risk_summary(district)
+-        similar = flood_polygons.get_similar_events(district, 50)
+-
+-        return {
+-            "district": district,
+-            "total_events": history.get("total_events", 0),
+-            "risk_level": history.get("risk_level", "LOW"),
+-            "similar_events": similar[:3],
+-            "primary_causes": history.get("primary_causes", []),
+-        }
+-
+-    def get_river_alert(self, district: str) -> Dict:
+-        """Get river alert for a community."""
+-        river = river_intelligence.get_river_status(district)
+-        return {
+-            "river": river.get("river", "Unknown"),
+-            "level_m": river.get("current_level_m", 0),
+-            "status": river.get("status", "NORMAL"),
+-            "trend": river.get("trend", "STABLE"),
+-            "hours_to_flood": river.get("hours_to_flood"),
+-        }
+-
+-    def get_dam_alert(self, district: str) -> Dict:
+-        """Get dam alert for a community."""
+-        dam = reservoir_intelligence.get_downstream_risk(district)
+-        return {
+-            "total_risk": dam.get("total_risk", "LOW"),
+-            "dams_at_risk": len(dam.get("dams_at_risk", [])),
+-            "details": dam.get("dams_at_risk", []),
+-        }
+-
+-    def get_soil_status(self, district: str) -> Dict:
+-        """Get soil moisture status for a community."""
+-        soil = soil_moisture.get_soil_moisture(district)
+-        return {
+-            "saturation_index": soil.get("saturation_index", 0.5),
+-            "runoff_potential": soil.get("runoff_potential", "LOW"),
+-            "flash_flood_risk": soil.get("flash_flood_risk", "LOW"),
+-        }
+-
+-    def get_rainfall_analysis(self, district: str, rainfall_mm: float) -> Dict:
+-        """Get rainfall analysis with historical context."""
+-        features = rainfall_history.get_district_rainfall_features(district)
+-        features["current_rainfall"] = rainfall_mm
+-        features["is_extreme"] = rainfall_mm > 50
+-        return features
+-
+-    def get_complete_dashboard_data(
+-        self, district: str, rainfall_mm: float = None
+-    ) -> Dict:
+-        """Get complete dashboard data."""
+-        if rainfall_mm is None:
+-            features = rainfall_history.get_district_rainfall_features(district)
+-            rainfall_mm = features.get("rainfall_mm", 0)
+-
+-        risk = self.get_community_risk(district, rainfall_mm)
+-        river = self.get_river_alert(district)
+-        dam = self.get_dam_alert(district)
+-        soil = self.get_soil_status(district)
+-        history = self.get_historical_context(district)
+-
+-        return {
+-            "district": district,
++        self.rainfall_engine = RainfallEngine()
++        self.river_engine = RiverEngine()
++        self.soil_engine = SoilEngine()
++        self.logger = logging.getLogger(__name__)
++
++    def analyze(self, location: str, data: Dict[str, Any]) -> Dict[str, Any]:
++        """Analyze hydrological conditions."""
++        result = {
++            "location": location,
+             "timestamp": datetime.now().isoformat(),
+-            "risk": {
+-                "score": risk.get("composite_risk", {}).get("score", 50),
+-                "category": risk.get("composite_risk", {}).get("category", "LOW"),
+-                "confidence": risk.get("composite_risk", {}).get("confidence", 0.5),
+-            },
+-            "rainfall": {
+-                "current_mm": rainfall_mm,
+-                "rain_3d": risk.get("rainfall", {}).get("rain_3d_mm", 0),
+-                "rain_7d": risk.get("rainfall", {}).get("rain_7d_mm", 0),
+-                "rain_30d": risk.get("rainfall", {}).get("rain_30d_mm", 0),
+-                "percentile": risk.get("rainfall", {}).get("percentile_rank", 50),
+-                "is_extreme": risk.get("rainfall", {}).get("is_extreme", False),
+-            },
+-            "river": river,
+-            "dam": dam,
+-            "soil": soil,
+-            "history": history,
+-            "recommendations": risk.get("recommendations", []),
+-            "risk_factors": risk.get("details", {}).get("risk_factors", {}),
++            "rainfall": self.rainfall_engine.analyze(data.get("rainfall", {})),
++            "river": self.river_engine.analyze(data.get("river", {})),
++            "soil": self.soil_engine.analyze(data.get("soil", {})),
+         }
+-
+-
+-# Singleton instance
+-civicflood_hydrological = CivicFloodHydrologicalIntelligence()
++        return result
+diff --git a/hackathon/ai/impact_estimator.py b/hackathon/ai/impact_estimator.py
+index fa386b3..511ba61 100644
+--- a/hackathon/ai/impact_estimator.py
++++ b/hackathon/ai/impact_estimator.py
+@@ -95,7 +95,7 @@ class ImpactEstimator:
+ 
+     def format_for_whatsapp(self, estimate: ImpactEstimate, district: str) -> str:
+         """Format impact estimate for WhatsApp message."""
+-        return f"""
++        return "
+ *Impact Estimate for {district}*
+ 
+ 👥 Population at risk: {estimate.population_exposed:,}
+diff --git a/hackathon/app/modules/community.py b/hackathon/app/modules/community.py
+index 95b2e9c..2a67ce4 100644
+--- a/hackathon/app/modules/community.py
++++ b/hackathon/app/modules/community.py
+@@ -57,7 +57,7 @@ def render_community_reports(district: str) -> None:
+         )
+ 
+         st.markdown(
+-            f"""
++            "
+         <div style="background: {'#e8f5e9' if report['verified'] else '#fff3e0'}; padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid {'#4caf50' if report['verified'] else '#ff9800'};">
+             <b>{report['community']}</b> <span style="font-size: 0.8rem; color: #666;">{report['time'].strftime('%H:%M')}</span><br>
+             <b>{report['type']}</b><br>
+diff --git a/hackathon/app/modules/copilot.py b/hackathon/app/modules/copilot.py
+index f78ef67..31910c8 100644
+--- a/hackathon/app/modules/copilot.py
++++ b/hackathon/app/modules/copilot.py
+@@ -158,20 +158,20 @@ def generate_copilot_response(
+     ):
+         roads = get_high_risk_roads(context["district"])
+         if roads:
+-            response = f"""
++            response = "
+ 🚗 **HIGH-RISK ROADS IN {context['district'].upper()}**
+ 
+ Based on current conditions (Risk: {context['risk_score']:.0f}%):
+ """
+             for road in roads:
+                 emoji = "🔴" if road["risk"] == "HIGH" else "🟡"
+-                response += f"""
++                response += "
+ {emoji} **{road['name']}**
+    Risk: {road['risk']}
+    Why: {road['reason']}
+ """
+ 
+-            response += f"""
++            response += "
+ 
+ 📊 **Evidence:**
+ • Rainfall: {context['rainfall']}mm (24h)
+@@ -198,7 +198,7 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
+         schools = get_affected_schools(context["district"])
+         if schools:
+             total_students = sum(s["students"] for s in schools)
+-            response = f"""
++            response = "
+ 🏫 **SCHOOL CLOSURE RECOMMENDATION: {context['district'].upper()}**
+ 
+ **Current Situation:**
+@@ -209,13 +209,13 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
+ **Schools at Risk:**
+ """
+             for school in schools:
+-                response += f"""
++                response += "
+ • {school['name']}
+   - Students: {school['students']}
+   - Distance to flood zone: {school['distance']}km
+ """
+ 
+-            response += f"""
++            response += "
+ 
+ 📋 **Recommendation: SUSPEND IN-PERSON INSTRUCTION**
+ 
+@@ -234,7 +234,7 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
+     # ============================================================
+     if any(word in question_lower for word in ["why", "reason", "explain", "cause"]):
+         drivers = context["risk_drivers"]
+-        response = f"""
++        response = "
+ 📊 **WHY IS {context['district'].upper()} AT {context['risk_score']:.0f}% RISK?**
+ 
+ **Risk Drivers:**
+@@ -244,7 +244,7 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
+             bar = "█" * int(contribution / 5)
+             response += f"   {driver}: {bar} {contribution}%\n"
+ 
+-        response += f"""
++        response += "
+ 
+ **Current Conditions:**
+ 
+@@ -257,7 +257,7 @@ Based on current conditions (Risk: {context['risk_score']:.0f}%):
+ • Pending: {len([r for r in context['reports'] if not r['verified']])}
+ 
+ **Conclusion:**
+-River levels remain normal, but soil saturation is extremely high, 
++River levels remain normal, but soil saturation is extremely high,
+ rainfall accumulation is significant, and multiple community reports are active.
+ Therefore overall flood risk remains EXTREME.
+ 
+@@ -273,7 +273,7 @@ Therefore overall flood risk remains EXTREME.
+         for word in ["evacuate", "evacuation", "people", "population", "impact"]
+     ):
+         impact = context["impact"]
+-        response = f"""
++        response = "
+ 👥 **POPULATION IMPACT ASSESSMENT: {context['district'].upper()}**
+ 
+ **Exposure Summary:**
+@@ -291,7 +291,7 @@ Therefore overall flood risk remains EXTREME.
+         for community in context["communities_at_risk"][:5]:
+             response += f"• {community}\n"
+ 
+-        response += f"""
++        response += "
+ 
+ **Evacuation Recommendations:**
+ 
+@@ -315,7 +315,7 @@ Therefore overall flood risk remains EXTREME.
+     # SITUATION REPORT GENERATOR
+     # ============================================================
+     if "situation" in question_lower or "sitrep" in question_lower:
+-        response = f"""
++        response = "
+ 📋 **CIVICFLOOD SITUATION REPORT (SITREP)**
+ 
+ **Generated:** {datetime.now().strftime('%d %b %Y, %H:%M')}
+@@ -360,7 +360,7 @@ Therefore overall flood risk remains EXTREME.
+         for driver, contrib in context["risk_drivers"].items():
+             response += f"• {driver}: {contrib}%\n"
+ 
+-        response += f"""
++        response += "
+ ---
+ 
+ **RECOMMENDED ACTIONS:**
+@@ -383,7 +383,7 @@ Therefore overall flood risk remains EXTREME.
+     # RIVER AND DAM QUESTIONS
+     # ============================================================
+     if any(word in question_lower for word in ["river", "dam", "overflow", "spill"]):
+-        response = f"""
++        response = "
+ 🌊 **RIVER & DAM STATUS: {context['district'].upper()}**
+ 
+ **River Status:**
+@@ -406,7 +406,7 @@ Therefore overall flood risk remains EXTREME.
+             )
+             response += f"• {dam['name']}: {dam['capacity']}% full {risk_emoji} ({dam['risk']} risk)\n"
+ 
+-        response += f"""
++        response += "
+ **Risk of Overflow:** {'HIGH' if context['river']['level'] > context['river']['warning_level'] * 0.8 else 'LOW'}
+ 
+ **Recommended Actions:**
+@@ -424,7 +424,7 @@ Therefore overall flood risk remains EXTREME.
+         for word in ["forecast", "prediction", "future", "next", "timeline"]
+     ):
+         forecast = context["forecast"]
+-        response = f"""
++        response = "
+ 📈 **FLOOD FORECAST: {context['district'].upper()}**
+ 
+ **Risk Timeline:**
+@@ -462,7 +462,7 @@ Implement immediate evacuation measures for high-risk areas.
+         for word in ["vulnerable", "elderly", "children", "disabled"]
+     ):
+         impact = context["impact"]
+-        response = f"""
++        response = "
+ 👥 **VULNERABLE POPULATIONS: {context['district'].upper()}**
+ 
+ **Exposed Vulnerable Groups:**
+@@ -476,7 +476,7 @@ Implement immediate evacuation measures for high-risk areas.
+         for community in context["communities_at_risk"][:5]:
+             response += f"• {community}\n"
+ 
+-        response += f"""
++        response += "
+ 
+ **Priority Actions:**
+ 1. 🚨 Evacuate elderly and children first
+@@ -495,7 +495,7 @@ Implement immediate evacuation measures for high-risk areas.
+     # ============================================================
+     # DEFAULT RESPONSE
+     # ============================================================
+-    return f"""
++    return "
+ 📋 **CIVICFLOOD AI: {context['district'].upper()}**
+ 
+ **Current Status:**
+diff --git a/hackathon/app/modules/copilot_enhanced.py b/hackathon/app/modules/copilot_enhanced.py
+index 9324e71..9366425 100644
+--- a/hackathon/app/modules/copilot_enhanced.py
++++ b/hackathon/app/modules/copilot_enhanced.py
+@@ -32,13 +32,13 @@ def get_enhanced_response(
+         roads = get_road_flooding_data(district, rainfall, soil_saturation)
+ 
+         if roads["high_risk"]:
+-            response = f"""
++            response = "
+ 🛣️ **HIGH-RISK ROADS: {district.upper()}**
+ 
+ Based on current flood intelligence:
+ """
+             for road in roads["high_risk"]:
+-                response += f"""
++                response += "
+ 🔴 **{road['name']}**
+    Expected depth: {road['depth']:.1f}m
+    Confidence: {road['confidence']}%
+@@ -46,20 +46,20 @@ Based on current flood intelligence:
+ """
+ 
+             if roads["moderate_risk"]:
+-                response += f"""
++                response += "
+ 🟡 **Moderate Risk Roads:**
+ """
+                 for road in roads["moderate_risk"]:
+                     response += f"   • {road['name']} ({road['depth']:.1f}m)\n"
+ 
+             if roads["safe_routes"]:
+-                response += f"""
++                response += "
+ 🟢 **Recommended Safe Routes:**
+ """
+                 for route in roads["safe_routes"]:
+                     response += f"   • {route['name']}\n"
+ 
+-            response += f"""
++            response += "
+ 📊 **Confidence:** 78% based on {len(roads['high_risk'])} verified reports
+ 
+ ⏰ **Expected Timeline:**
+@@ -76,7 +76,7 @@ Based on current flood intelligence:
+     if any(word in question_lower for word in ["why", "reason", "explain", "cause"]):
+         breakdown = get_risk_breakdown(district, rainfall, soil_saturation, river_level)
+ 
+-        response = f"""
++        response = "
+ 📊 **RISK BREAKDOWN: {district.upper()}**
+ 
+ Total Risk: {breakdown['total_risk']:.1f}%
+@@ -93,7 +93,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
+                     else "🟡" if info["status"] == "MODERATE" else "🟢"
+                 )
+             )
+-            response += f"""
++            response += "
+ {status_emoji} **{name}**: {info['weight']}%
+    • Current: {info['value']}
+    • Threshold: {info['threshold']}
+@@ -101,7 +101,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
+    • Why: {info['description']}
+ """
+ 
+-        response += f"""
++        response += "
+ **Conclusion:**
+ {breakdown['drivers']['Rainfall Intensity']['status']} rainfall + {breakdown['drivers']['Soil Saturation']['status']} soil saturation = {breakdown['total_risk']:.1f}% risk
+ 
+@@ -115,7 +115,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
+     if any(
+         word in question_lower for word in ["farm", "crop", "livestock", "agriculture"]
+     ):
+-        return f"""
++        return "
+ 🌾 **FARMER ADVISORY: {district.upper()}**
+ 
+ **Current Conditions:**
+@@ -149,7 +149,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
+     # SCHOOLS RESPONSE
+     # ============================================================
+     if any(word in question_lower for word in ["school", "student", "class"]):
+-        return f"""
++        return "
+ 🏫 **SCHOOL ADVISORY: {district.upper()}**
+ 
+ **Risk Assessment:**
+@@ -176,7 +176,7 @@ Total Risk: {breakdown['total_risk']:.1f}%
+     # ============================================================
+     # DEFAULT
+     # ============================================================
+-    return f"""
++    return "
+ 📋 **CIVICFLOOD AI: {district.upper()}**
+ 
+ **Current Status:**
+diff --git a/hackathon/app/modules/decision_confidence.py b/hackathon/app/modules/decision_confidence.py
+index eaf3afa..65712dd 100644
+--- a/hackathon/app/modules/decision_confidence.py
++++ b/hackathon/app/modules/decision_confidence.py
+@@ -52,7 +52,7 @@ def render_decision_confidence(district: str, risk_score: float) -> None:
+     )
+ 
+     st.markdown(
+-        f"""
++        "
+     <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); margin-bottom: 1rem;">
+         <div style="display: flex; align-items: center; gap: 2rem;">
+             <div>
+diff --git a/hackathon/app/modules/decision_copilot.py b/hackathon/app/modules/decision_copilot.py
+index 9b4e1ff..58436d6 100644
+--- a/hackathon/app/modules/decision_copilot.py
++++ b/hackathon/app/modules/decision_copilot.py
+@@ -11,7 +11,7 @@ import streamlit as st
+ def get_operational_briefing(district: str, risk_score: float) -> str:
+     """Generate concise operational briefing."""
+ 
+-    return f"""
++    return "
+ ┌─────────────────────────────────────────────────────────────────┐
+ │           OPERATIONAL BRIEFING • {district.upper()}           │
+ │                     {datetime.now().strftime('%d %b %Y, %H:%M')}      │
+@@ -72,7 +72,7 @@ def render_decision_copilot(district: str, risk_score: float) -> None:
+     with col2:
+         if st.button("📢 Generate Alert", use_container_width=True):
+             st.success("✅ Alert generated:")
+-            st.code(f"""
++            st.code("
+ 🚨 FLOOD ALERT: {district}
+ Risk: {risk_score:.0f}% ({'EXTREME' if risk_score >= 80 else 'HIGH'})
+ Action: IMMEDIATE EVACUATION
+@@ -96,7 +96,7 @@ Confidence: 92%
+ 
+     if query:
+         with st.spinner("🧠 Orchestrating all intelligence sources..."):
+-            response = f"""
++            response = "
+ 🤖 **Decision Copilot Response**
+ 
+ **Query:** {query}
+diff --git a/hackathon/app/modules/demo_orchestrator.py b/hackathon/app/modules/demo_orchestrator.py
+index cf303ed..4886629 100644
+--- a/hackathon/app/modules/demo_orchestrator.py
++++ b/hackathon/app/modules/demo_orchestrator.py
+@@ -33,7 +33,7 @@ class DemoOrchestrator:
+ 
+         st.markdown(
+             """
+-        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); 
++        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                     padding: 1.5rem; border-radius: 12px; color: white; margin-bottom: 1rem;">
+             <h2 style="color: white; margin: 0;">🎬 Live Emergency Scenario</h2>
+             <p style="color: #a8d8ea; margin: 0;">Walk through a realistic flood response</p>
+@@ -74,7 +74,7 @@ class DemoOrchestrator:
+ 
+             # Show final briefing
+             st.markdown("#### 📋 Final Assessment")
+-            st.code(f"""
++            st.code("
+ ┌─────────────────────────────────────────────────────────────────┐
+ │                    SCENARIO COMPLETE                             │
+ │                     {datetime.now().strftime('%d %b %Y, %H:%M')}                │
+@@ -108,9 +108,9 @@ class DemoOrchestrator:
+ 
+         with placeholder.container():
+             st.markdown(
+-                f"""
+-            <div style="background: {'#fff3e0' if step['status'] == 'active' else '#f8f9fa' if step['status'] == 'completed' else '#f0f0f0'}; 
+-                        padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; 
++                "
++            <div style="background: {'#fff3e0' if step['status'] == 'active' else '#f8f9fa' if step['status'] == 'completed' else '#f0f0f0'};
++                        padding: 0.8rem 1rem; border-radius: 8px; margin-bottom: 0.5rem;
+                         border-left: 4px solid {'#ff9800' if step['status'] == 'active' else '#4caf50' if step['status'] == 'completed' else '#ccc'};">
+                 <span style="font-weight: 600;">{step['name']}</span>
+                 <span style="float: right; font-size: 0.85rem; color: #666;">
+diff --git a/hackathon/app/modules/emergency_operations_dashboard.py b/hackathon/app/modules/emergency_operations_dashboard.py
+index c5e3e59..e157e2a 100644
+--- a/hackathon/app/modules/emergency_operations_dashboard.py
++++ b/hackathon/app/modules/emergency_operations_dashboard.py
+@@ -14,7 +14,7 @@ def render_emergency_operations_dashboard(district: str, risk_score: float) -> N
+ 
+     st.markdown(
+         """
+-    <div style="background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%); 
++    <div style="background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
+                 padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid #2a2a4e;">
+         <div style="display: flex; justify-content: space-between; align-items: center;">
+             <div>
+@@ -53,7 +53,7 @@ def render_emergency_operations_dashboard(district: str, risk_score: float) -> N
+ 
+     with col1:
+         st.markdown(
+-            f"""
++            "
+         <div style="background: white; padding: 1rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+             <div style="font-size: 0.8rem; color: #666;">CURRENT RISK</div>
+             <div style="font-size: 1.8rem; font-weight: 700;">{risk_color} {risk_score:.0f}%</div>
+@@ -65,7 +65,7 @@ def render_emergency_operations_dashboard(district: str, risk_score: float) -> N
+ 
+     with col2:
+         st.markdown(
+-            f"""
++            "
+         <div style="background: white; padding: 1rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+             <div style="font-size: 0.8rem; color: #666;">CONFIDENCE</div>
+             <div style="font-size: 1.8rem; font-weight: 700;">92%</div>
+@@ -77,7 +77,7 @@ def render_emergency_operations_dashboard(district: str, risk_score: float) -> N
+ 
+     with col3:
+         st.markdown(
+-            f"""
++            "
+         <div style="background: white; padding: 1rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+             <div style="font-size: 0.8rem; color: #666;">POPULATION AT RISK</div>
+             <div style="font-size: 1.8rem; font-weight: 700;">102,157</div>
+@@ -89,7 +89,7 @@ def render_emergency_operations_dashboard(district: str, risk_score: float) -> N
+ 
+     with col4:
+         st.markdown(
+-            f"""
++            "
+         <div style="background: white; padding: 1rem; border-radius: 8px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+             <div style="font-size: 0.8rem; color: #666;">RESPONSE STATUS</div>
+             <div style="font-size: 1.8rem; font-weight: 700;">🚨</div>
+diff --git a/hackathon/app/modules/evacuation.py b/hackathon/app/modules/evacuation.py
+index fca0574..c0addbe 100644
+--- a/hackathon/app/modules/evacuation.py
++++ b/hackathon/app/modules/evacuation.py
+@@ -30,7 +30,7 @@ def render_evacuation_info(district: str) -> None:
+     for i, shelter in enumerate(district_shelters[:3]):
+         with cols[i]:
+             st.markdown(
+-                f"""
++                "
+             <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 8px;">
+                 <b>{shelter['name']}</b><br>
+                 📍 {shelter['distance']}km away<br>
+@@ -65,7 +65,7 @@ def render_evacuation_info(district: str) -> None:
+ 
+     for route in routes:
+         st.markdown(
+-            f"""
++            "
+         <div style="background: #e8f5e9; padding: 0.5rem 1rem; border-radius: 8px; margin-bottom: 0.3rem; border-left: 4px solid #4caf50;">
+             <b>{route['from']}</b> → {route['to']}<br>
+             Via: {route['via']} • Estimated: {route['time']}
+diff --git a/hackathon/app/modules/evidence_fusion.py b/hackathon/app/modules/evidence_fusion.py
+index 4f25075..a360325 100644
+--- a/hackathon/app/modules/evidence_fusion.py
++++ b/hackathon/app/modules/evidence_fusion.py
+@@ -144,7 +144,7 @@ def render_evidence_fusion() -> None:
+         )
+ 
+         st.markdown(
+-            f"""
++            "
+         <div style="background: #f8f9fa; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid {'#4caf50' if item['status'] == 'active' else '#ff9800'};">
+             <div style="display: flex; justify-content: space-between; align-items: center;">
+                 <div>
+@@ -154,7 +154,7 @@ def render_evidence_fusion() -> None:
+                     </span>
+                 </div>
+                 <div>
+-                    <span style="background: {'#4caf50' if item['confidence'] >= 80 else '#ff9800' if item['confidence'] >= 60 else '#f44336'}; 
++                    <span style="background: {'#4caf50' if item['confidence'] >= 80 else '#ff9800' if item['confidence'] >= 60 else '#f44336'};
+                                  color: white; padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.8rem;">
+                         {item['confidence']}% confidence
+                     </span>
+@@ -172,7 +172,7 @@ def render_evidence_fusion() -> None:
+         )
+ 
+     # Fusion explanation
+-    st.info(f"""
++    st.info("
+     💡 **Fusion Logic:**
+     • {assessment['active_sources']} active data sources
+     • Overall confidence: {assessment['overall_confidence']:.0f}%
+diff --git a/hackathon/app/modules/hydrological.py b/hackathon/app/modules/hydrological.py
+index abe26d3..9c65785 100644
+--- a/hackathon/app/modules/hydrological.py
++++ b/hackathon/app/modules/hydrological.py
+@@ -37,7 +37,7 @@ def render_hydrological_intelligence(district: str) -> None:
+                 else "🟡" if river["status"] == "WARNING" else "🔴"
+             )
+             st.markdown(
+-                f"""
++                "
+             <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                 <b>{status_color} {river['name']}</b><br>
+                 Level: {river['level']}m<br>
+@@ -66,7 +66,7 @@ def render_hydrological_intelligence(district: str) -> None:
+                 else "🟡" if dam["risk"] == "MEDIUM" else "🔴"
+             )
+             st.markdown(
+-                f"""
++                "
+             <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 8px;">
+                 <b>{dam['name']}</b><br>
+                 {dam['capacity']}% full<br>
+diff --git a/hackathon/app/modules/operational_resilience.py b/hackathon/app/modules/operational_resilience.py
+index 4ea7bc1..a8a7d06 100644
+--- a/hackathon/app/modules/operational_resilience.py
++++ b/hackathon/app/modules/operational_resilience.py
+@@ -103,7 +103,7 @@ def render_operational_resilience() -> None:
+         )
+ 
+         st.markdown(
+-            f"""
++            "
+         <div style="background: #f8f9fa; padding: 0.7rem 1rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid {'#4caf50' if source['status'] == 'active' else '#ff9800' if source['status'] == 'warning' else '#f44336'};">
+             <div style="display: flex; justify-content: space-between; align-items: center;">
+                 <div>
+@@ -143,12 +143,12 @@ def render_operational_resilience() -> None:
+         - Missing Sentinel-1 → Community reports are used
+         - Missing River Gauges → Simulated levels based on rainfall
+         - Missing Weather Forecast → Persistence forecast
+-        
++
+         **Data Freshness:**
+         - All data sources show last update time
+         - Fallback sources automatically activated
+         - Confidence scores adjust based on data availability
+-        
++
+         **Operational Continuity:**
+         - System continues running with partial data
+         - Clear indication of which sources are active
+diff --git a/hackathon/app/modules/risk_explainer.py b/hackathon/app/modules/risk_explainer.py
+index aca8603..05fa143 100644
+--- a/hackathon/app/modules/risk_explainer.py
++++ b/hackathon/app/modules/risk_explainer.py
+@@ -97,7 +97,7 @@ def render_risk_explainer(
+     for _, row in df.iterrows():
+         color = get_color(row["Status"])
+         st.markdown(
+-            f"""
++            "
+         <div style="background: #f8f9fa; padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid {color};">
+             <b>{row['Driver']}</b> <span style="font-size: 0.8rem; color: #666;">({row['Weight']}%)</span><br>
+             Value: {row['Value']} • Threshold: {row['Threshold']} • Status: <span style="color: {color};"><b>{row['Status']}</b></span><br>
+diff --git a/hackathon/app/modules/road_intelligence.py b/hackathon/app/modules/road_intelligence.py
+index 4f1a19d..663b15f 100644
+--- a/hackathon/app/modules/road_intelligence.py
++++ b/hackathon/app/modules/road_intelligence.py
+@@ -87,7 +87,7 @@ def render_road_intelligence(
+ 
+         for road in data["high_risk"]:
+             st.markdown(
+-                f"""
++                "
+             <div style="background: #ffebee; padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid #ff0000;">
+                 <b>{road['name']}</b><br>
+                 🌊 Expected depth: {road['depth']:.1f}m • Confidence: {road['confidence']}%<br>
+@@ -102,7 +102,7 @@ def render_road_intelligence(
+ 
+         for road in data["moderate_risk"]:
+             st.markdown(
+-                f"""
++                "
+             <div style="background: #fff3e0; padding: 0.8rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid #ff9800;">
+                 <b>{road['name']}</b><br>
+                 🌊 Expected depth: {road['depth']:.1f}m • Confidence: {road['confidence']}%<br>
+@@ -116,7 +116,7 @@ def render_road_intelligence(
+         st.markdown("#### 🟢 Recommended Safe Routes")
+         for route in data["safe_routes"]:
+             st.markdown(
+-                f"""
++                "
+             <div style="background: #e8f5e9; padding: 0.5rem 1rem; border-radius: 8px; margin-bottom: 0.3rem; border-left: 4px solid #4caf50;">
+                 ✅ {route['name']} - {route['reason']}
+             </div>
+diff --git a/hackathon/app/modules/unified_intelligence_engine.py b/hackathon/app/modules/unified_intelligence_engine.py
+index 6baec12..546dab7 100644
+--- a/hackathon/app/modules/unified_intelligence_engine.py
++++ b/hackathon/app/modules/unified_intelligence_engine.py
+@@ -99,7 +99,7 @@ def render_unified_intelligence(district: str) -> None:
+ 
+     st.markdown(
+         """
+-    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); 
++    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                 padding: 1.5rem; border-radius: 12px; color: white; margin-bottom: 1rem;">
+         <div style="display: flex; justify-content: space-between; align-items: center;">
+             <div>
+@@ -158,7 +158,7 @@ def render_unified_intelligence(district: str) -> None:
+             else "🟡" if data["status"] == "warning" else "🔴"
+         )
+         st.markdown(
+-            f"""
++            "
+         <div style="background: #f8f9fa; padding: 0.5rem 1rem; border-radius: 8px; margin-bottom: 0.3rem; border-left: 4px solid {'#4caf50' if data['status'] == 'active' else '#ff9800'};">
+             <span style="font-weight: 600;">{status} {source.title()}</span>
+             <span style="float: right;">Confidence: {data['confidence']}% • Weight: {data['weight']*100:.0f}%</span>
+diff --git a/hackathon/app/modules/v4/__init__.py b/hackathon/app/modules/v4/__init__.py
+index e69de29..7cf9e83 100644
+--- a/hackathon/app/modules/v4/__init__.py
++++ b/hackathon/app/modules/v4/__init__.py
+@@ -0,0 +1,18 @@
++"""
++V4 modules for the NFCC Platform
++"""
++
++try:
++    from .situation_map import (
++        render_situation_map,
++        render_minimal_map,
++        render_map_fallback,
++    )
++
++    __all__ = ["render_situation_map", "render_minimal_map", "render_map_fallback"]
++except ImportError:
++    # If situation_map doesn't exist yet, define empty functions
++    def render_situation_map(*args, **kwargs):
++        return None
++
++    __all__ = ["render_situation_map"]
+diff --git a/hackathon/app/modules/v4/ai_copilot.py b/hackathon/app/modules/v4/ai_copilot.py
+index c5bd42c..97feca1 100644
+--- a/hackathon/app/modules/v4/ai_copilot.py
++++ b/hackathon/app/modules/v4/ai_copilot.py
+@@ -77,18 +77,18 @@ def generate_copilot_response(query: str, state) -> str:
+ 
+     # River related questions
+     if any(word in query_lower for word in ["river", "odaw", "overflow", "level"]):
+-        return f"""
++        return "
+         **🌊 Odaw River Status**
+-        
++
+         Current level: **{state.river_level_m:.2f}m**
+         Status: **{state.river_status}**
+-        
++
+         - Warning level: 2.0m
+         - Danger level: 2.8m
+         - Flood stage: 3.2m
+-        
+-        The river is currently {state.river_status.lower()}. 
+-        Based on current rainfall of {state.rainfall_mm}mm, 
++
++        The river is currently {state.river_status.lower()}.
++        Based on current rainfall of {state.rainfall_mm}mm,
+         the river is expected to { "rise" if state.risk_score > 50 else "remain stable" }.
+         """
+ 
+@@ -96,17 +96,17 @@ def generate_copilot_response(query: str, state) -> str:
+     elif any(
+         word in query_lower for word in ["evacuate", "evacuation", "shelter", "safe"]
+     ):
+-        return f"""
++        return "
+         **🚨 Evacuation Information**
+-        
++
+         Current Risk Level: **{state.risk_category}**
+         Lead Time: **{state.lead_time_hours} hours**
+-        
++
+         **Nearest Shelters:**
+         1. Accra High School (1.2 km) - {850} spaces available
+         2. Community Center (2.5 km) - {320} spaces available
+         3. Trade Fair Centre (4.0 km) - {2000} spaces available
+-        
++
+         **Evacuation Routes:**
+         - Alajo → Accra High School (15 min)
+         - Kaneshie → Community Center (20 min)
+@@ -117,19 +117,19 @@ def generate_copilot_response(query: str, state) -> str:
+     elif any(
+         word in query_lower for word in ["impact", "affected", "people", "population"]
+     ):
+-        return f"""
++        return "
+         **👥 Impact Assessment for {state.district}**
+-        
++
+         **Population at Risk:** {state.population_exposed:,} people
+         - Children under 18: {state.children_exposed:,}
+         - Elderly over 60: {state.elderly_exposed:,}
+         - Disabled: {state.disabled_exposed:,}
+-        
++
+         **Infrastructure at Risk:**
+         - {state.schools_exposed} schools
+         - {state.hospitals_exposed} hospitals
+         - {state.markets_exposed} markets
+-        
++
+         **Estimated Economic Impact:** GH₵ {state.total_loss_ghs:,.0f}
+         Estimated Recovery Time: {state.recovery_weeks:.0f} weeks
+         """
+@@ -138,32 +138,32 @@ def generate_copilot_response(query: str, state) -> str:
+     elif any(
+         word in query_lower for word in ["forecast", "rain", "weather", "tomorrow"]
+     ):
+-        return f"""
++        return "
+         **🌤️ Weather Forecast**
+-        
++
+         Current rainfall: **{state.rainfall_mm}mm**
+-        
++
+         **Forecast:**
+         - 6 hours: {min(100, state.risk_score + 10):.0f}% risk
+         - 12 hours: {min(100, state.risk_score + 15):.0f}% risk
+         - 24 hours: {min(100, state.risk_score + 5):.0f}% risk
+-        
++
+         **Risk Trend:** {"Increasing" if state.risk_score > 50 else "Stable"}
+         Peak risk expected in {6} hours.
+         """
+ 
+     # General questions
+     else:
+-        return f"""
++        return "
+         **🤖 CivicFlood AI Assistant**
+-        
++
+         I can help you with:
+         - 🌊 **River conditions** (levels, overflow risk)
+         - 🚨 **Evacuation** (routes, shelters, timing)
+         - 👥 **Impact** (people affected, infrastructure risk)
+         - 🌤️ **Forecast** (rainfall, risk trends)
+-        
++
+         Current Status: **{state.risk_category}** ({state.risk_score:.1f}% risk)
+-        
++
+         What would you like to know more about?
+         """
+diff --git a/hackathon/app/modules/v4/situation_map.py b/hackathon/app/modules/v4/situation_map.py
+index 0f3c108..4607d93 100644
+--- a/hackathon/app/modules/v4/situation_map.py
++++ b/hackathon/app/modules/v4/situation_map.py
+@@ -161,24 +161,41 @@ def render_situation_map(state):
+         )
+         st.dataframe(risk_df, use_container_width=True)
+ 
++
+ def render_map_fallback():
+     """Fallback function when map fails to load."""
+     st.warning("⚠️ Map unavailable - showing data instead")
+     st.markdown("### 📍 Affected Areas")
+     risk_data = [
+         {"name": "Alajo", "lat": 5.565, "lon": -0.218, "risk": "EXTREME", "pop": 18750},
+-        {"name": "Kaneshie", "lat": 5.555, "lon": -0.228, "risk": "EXTREME", "pop": 22340},
++        {
++            "name": "Kaneshie",
++            "lat": 5.555,
++            "lon": -0.228,
++            "risk": "EXTREME",
++            "pop": 22340,
++        },
+         {"name": "Circle", "lat": 5.575, "lon": -0.225, "risk": "HIGH", "pop": 15620},
+         {"name": "Nima", "lat": 5.555, "lon": -0.215, "risk": "HIGH", "pop": 48230},
+-        {"name": "Mamobi", "lat": 5.545, "lon": -0.212, "risk": "MODERATE", "pop": 34320},
++        {
++            "name": "Mamobi",
++            "lat": 5.545,
++            "lon": -0.212,
++            "risk": "MODERATE",
++            "pop": 34320,
++        },
+     ]
+     import pandas as pd
+-    risk_df = pd.DataFrame([
+-        {"Community": r["name"], "Risk": r["risk"], "Population": f"{r['pop']:,}"}
+-        for r in risk_data
+-    ])
++
++    risk_df = pd.DataFrame(
++        [
++            {"Community": r["name"], "Risk": r["risk"], "Population": f"{r['pop']:,}"}
++            for r in risk_data
++        ]
++    )
+     st.dataframe(risk_df, use_container_width=True)
+ 
++
+ def render_minimal_map():
+     """Minimal map for testing."""
+     try:
+@@ -186,10 +203,7 @@ def render_minimal_map():
+             location=[5.6037, -0.1870],
+             zoom_start=10,
+         )
+-        folium.Marker(
+-            [5.6037, -0.1870],
+-            popup="Test Marker"
+-        ).add_to(m)
++        folium.Marker([5.6037, -0.1870], popup="Test Marker").add_to(m)
+         st_folium(m, width=700, height=500, key="minimal_map_test")
+         return True
+     except Exception as e:
+diff --git a/hackathon/app/pages_disabled/04_community_report.py b/hackathon/app/pages_disabled/04_community_report.py
+index 86701fb..6e0f50c 100644
+--- a/hackathon/app/pages_disabled/04_community_report.py
++++ b/hackathon/app/pages_disabled/04_community_report.py
+@@ -260,7 +260,7 @@ def main():
+             )
+ 
+             st.markdown(
+-                f"""
++                "
+             <div class="report-item">
+                 <div class="community">📍 {report['community']}</div>
+                 <div>{report['report_type']} • {depth_text}</div>
+diff --git a/hackathon/app/pages_disabled/gis_map.py b/hackathon/app/pages_disabled/gis_map.py
+index 49a7cb0..fe09665 100644
+--- a/hackathon/app/pages_disabled/gis_map.py
++++ b/hackathon/app/pages_disabled/gis_map.py
+@@ -93,7 +93,7 @@ def create_flood_risk_map(
+         folium.Circle(
+             location=coords,
+             radius=radius * 1000,  # Convert to meters
+-            popup=f"""
++            popup="
+             <b>{zone_name}</b><br>
+             Risk: {risk}<br>
+             Communities: {', '.join(zone_data['communities'])}
+@@ -182,7 +182,7 @@ def render_gis_panel(district: str, risk_level: str):
+     st.markdown("### 📍 Selected District Details")
+ 
+     st.markdown(
+-        f"""
++        "
+     <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px;">
+         <b>District:</b> {district}<br>
+         <b>Risk Level:</b> <span style="color: {'red' if risk_level == 'EXTREME' else 'orange' if risk_level == 'HIGH' else 'yellow' if risk_level == 'MODERATE' else 'green'};">{risk_level}</span><br>
+diff --git a/hackathon/archive/dashboard.py b/hackathon/archive/dashboard.py
+index b7bad68..934953d 100644
+--- a/hackathon/archive/dashboard.py
++++ b/hackathon/archive/dashboard.py
+@@ -35,7 +35,9 @@ def call_api(endpoint, method="GET", data=None):
+ def main():
+     """Main dashboard function - called by streamlit_app.py."""
+     st.title("🌊 CivicFlood AI - Simple Dashboard")
+-    st.caption("National Flood Intelligence Platform • Ghana AI Innovation Challenge 2026")
++    st.caption(
++        "National Flood Intelligence Platform • Ghana AI Innovation Challenge 2026"
++    )
+ 
+     # Check API
+     health = call_api("/health")
+@@ -60,10 +62,9 @@ def main():
+     info = DISTRICTS[district]
+ 
+     with st.spinner("Analyzing risk..."):
+-        score_data = call_api("/score", "POST", {
+-            "location": district,
+-            "precipitation": rainfall_mm
+-        })
++        score_data = call_api(
++            "/score", "POST", {"location": district, "precipitation": rainfall_mm}
++        )
+ 
+     score = score_data.get("score", 50)
+     risk_tier = score_data.get("risk_tier", "MODERATE")
+@@ -77,7 +78,11 @@ def main():
+     with col3:
+         st.metric("Rainfall", f"{rainfall_mm} mm")
+     with col4:
+-        color = "🔴" if score >= 80 else "🟠" if score >= 60 else "🟡" if score >= 40 else "🟢"
++        color = (
++            "🔴"
++            if score >= 80
++            else "🟠" if score >= 60 else "🟡" if score >= 40 else "🟢"
++        )
+         st.metric("Risk Score", f"{color} {score:.1f}%")
+ 
+     st.divider()
+@@ -85,7 +90,7 @@ def main():
+     col1, col2 = st.columns(2)
+     with col1:
+         st.markdown(f"### Risk Category: **{risk_tier}**")
+-        st.progress(score/100, text=f"{score:.1f}%")
++        st.progress(score / 100, text=f"{score:.1f}%")
+     with col2:
+         st.markdown("### Recommendations")
+         if score >= 80:
+diff --git a/hackathon/archive/dashboard_enhanced_v3.py b/hackathon/archive/dashboard_enhanced_v3.py
+index 11c0fc7..36c7792 100644
+--- a/hackathon/archive/dashboard_enhanced_v3.py
++++ b/hackathon/archive/dashboard_enhanced_v3.py
+@@ -26,38 +26,39 @@ from hackathon.app.pages_disabled.dashboard_enhanced import main as original_mai
+ def main():
+     # Call original dashboard first
+     original_main()
+-    
++
+     # Add enhanced features
+     st.divider()
+     st.markdown("## 🆕 Enhanced Features")
+-    
++
+     # Get current risk score from session state or use default
+     # In production, this would come from the API
+     current_risk = st.session_state.get("current_risk", 90.6)
+     current_district = st.session_state.get("current_district", "Accra Central")
+-    
++
+     # Timeline
+     render_timeline(current_risk)
+-    
++
+     st.divider()
+-    
++
+     # Enhanced AI Copilot
+     render_copilot(current_district, current_risk)
+-    
++
+     st.divider()
+-    
++
+     # Situation Report
+     render_situation_report(current_district, current_risk)
+-    
++
+     st.divider()
+-    
++
+     # Evacuation Intelligence
+     render_evacuation_info(current_district)
+-    
++
+     st.divider()
+-    
++
+     # National Ranking
+     render_district_ranking()
+ 
++
+ if __name__ == "__main__":
+     main()
+diff --git a/hackathon/archive/dashboard_v4.py b/hackathon/archive/dashboard_v4.py
+index 5584f1a..b6eb76a 100644
+--- a/hackathon/archive/dashboard_v4.py
++++ b/hackathon/archive/dashboard_v4.py
+@@ -39,6 +39,7 @@ from hackathon.app.modules.v4.situation_map import render_situation_map
+ # ============================================================
+ API_URL = os.getenv("NFCC_API_URL", "https://nfcc-platform-production.up.railway.app")
+ 
++
+ def call_api(endpoint, method="GET", data=None):
+     url = f"{API_URL}{endpoint}"
+     try:
+@@ -50,6 +51,7 @@ def call_api(endpoint, method="GET", data=None):
+     except:
+         return {}
+ 
++
+ # ============================================================
+ # DISTRICTS
+ # ============================================================
+@@ -59,9 +61,10 @@ DISTRICTS = {
+     "Accra East": {"region": "Greater Accra", "population": 142587},
+     "Tema": {"region": "Greater Accra", "population": 198742},
+     "Kumasi": {"region": "Ashanti", "population": 443981},
+-    "Tamale": {"region": "Northern", "population": 371578}
++    "Tamale": {"region": "Northern", "population": 371578},
+ }
+ 
++
+ # ============================================================
+ # SIDEBAR (Minimal - Just controls)
+ # ============================================================
+@@ -70,57 +73,57 @@ def render_sidebar():
+         st.markdown("### 🎛️ Controls")
+         district = st.selectbox("📍 Select District", list(DISTRICTS.keys()), index=0)
+         rainfall_mm = st.slider("🌧️ Rainfall (mm)", 0, 200, 75)
+-        
++
+         st.divider()
+         st.markdown("### 📊 Data Status")
+-        
++
+         health = call_api("/health")
+         if health.get("status") == "healthy":
+             st.success("✅ API Connected")
+         else:
+             st.warning("⚠️ API Unavailable")
+-        
++
+         st.caption(f"🌐 {API_URL}")
+         st.divider()
+         st.caption("v3.0.0 • Ghana AI Challenge 2026")
+-        
++
+         return district, rainfall_mm
+ 
++
+ # ============================================================
+ # MAIN FUNCTION
+ # ============================================================
+ def main():
+     """Main dashboard function - called by streamlit_app.py"""
+-    
++
+     # Render sidebar and get inputs
+     district, rainfall_mm = render_sidebar()
+-    
++
+     # Get risk score
+     with st.spinner("🔄 Analyzing..."):
+-        score_data = call_api("/score", "POST", {
+-            "location": district,
+-            "precipitation": rainfall_mm
+-        })
++        score_data = call_api(
++            "/score", "POST", {"location": district, "precipitation": rainfall_mm}
++        )
+     score = score_data.get("score", 50)
+-    
++
+     # 1. HEADER
+     render_mission_control_header()
+-    
++
+     # 2. AI NATIONAL BRIEFING (Hero section)
+     render_national_briefing(district, score)
+-    
++
+     st.divider()
+-    
++
+     # 3. MAP + RECOMMENDATIONS (Two columns)
+     col_left, col_right = st.columns([2, 1])
+-    
++
+     with col_left:
+         render_situation_map(district, score)
+-    
++
+     with col_right:
+         # Show recommendations based on risk
+         st.markdown("### 🚨 Recommended Actions")
+-        
++
+         if score >= 80:
+             st.error("🚨 **IMMEDIATE EVACUATION**")
+             st.markdown("• Seek higher ground")
+@@ -138,40 +141,43 @@ def main():
+         else:
+             st.success("✅ **NORMAL**")
+             st.markdown("• Continue monitoring")
+-    
++
+     st.divider()
+-    
++
+     # 4. EVIDENCE + IMPACT (Two columns)
+     col1, col2 = st.columns(2)
+-    
++
+     with col1:
+         render_evidence_panel(score)
+-    
++
+     with col2:
+         render_impact_panel(district, score)
+-    
++
+     st.divider()
+-    
++
+     # 5. OPERATIONS + COMMUNITY (Two columns)
+     col1, col2 = st.columns(2)
+-    
++
+     with col1:
+         render_operations_panel(district)
+-    
++
+     with col2:
+         render_community_intelligence()
+-    
++
+     st.divider()
+-    
++
+     # 6. AI COPILOT (Full width, prominent)
+     render_ai_copilot_v4(district, score)
+-    
++
+     # ============================================================
+     # FOOTER
+     # ============================================================
+     st.divider()
+-    st.caption("🌊 CivicFlood AI • Powered by NFCC Platform • Ghana AI Innovation Challenge 2026")
++    st.caption(
++        "🌊 CivicFlood AI • Powered by NFCC Platform • Ghana AI Innovation Challenge 2026"
++    )
+     st.caption(f"🔗 API: {API_URL}")
+ 
++
+ if __name__ == "__main__":
+     main()
+diff --git a/src/alerts/providers/email_provider.py b/src/alerts/providers/email_provider.py
+index 700d151..05a8dfd 100644
+--- a/src/alerts/providers/email_provider.py
++++ b/src/alerts/providers/email_provider.py
+@@ -59,7 +59,7 @@ class EmailAlertProvider(BaseAlertProvider):
+             )
+ 
+     def _format_html_message(self, alert: AlertPayload) -> str:
+-        return f"""
++        return "
+         <!DOCTYPE html>
+         <html>
+         <head>
+@@ -84,7 +84,7 @@ class EmailAlertProvider(BaseAlertProvider):
+         """
+ 
+     def _format_text_message(self, alert: AlertPayload) -> str:
+-        return f"""
++        return "
+ 🚨 FLOOD ALERT: {alert.location}
+ Risk: {alert.risk_tier} ({alert.score:.1f}/100)
+ 
+diff --git a/src/alerts/subscriptions.py b/src/alerts/subscriptions.py
+index 8b9453e..c00898f 100644
+--- a/src/alerts/subscriptions.py
++++ b/src/alerts/subscriptions.py
+@@ -42,12 +42,12 @@ class SubscriptionManager:
+         """)
+ 
+         cursor.execute("""
+-            CREATE INDEX IF NOT EXISTS idx_subscriptions_phone 
++            CREATE INDEX IF NOT EXISTS idx_subscriptions_phone
+             ON subscriptions(phone_number)
+         """)
+ 
+         cursor.execute("""
+-            CREATE INDEX IF NOT EXISTS idx_subscriptions_district 
++            CREATE INDEX IF NOT EXISTS idx_subscriptions_district
+             ON subscriptions(district)
+         """)
+ 
+@@ -66,7 +66,7 @@ class SubscriptionManager:
+         if existing:
+             cursor.execute(
+                 """
+-                UPDATE subscriptions 
++                UPDATE subscriptions
+                 SET district = ?,
+                     updated_at = CURRENT_TIMESTAMP,
+                     active = TRUE
+@@ -113,7 +113,7 @@ class SubscriptionManager:
+         cursor = conn.cursor()
+ 
+         query = """
+-            SELECT phone_number FROM subscriptions 
++            SELECT phone_number FROM subscriptions
+             WHERE active = TRUE AND district = ?
+         """
+         params = [district]
+@@ -147,11 +147,11 @@ class SubscriptionManager:
+         sms = cursor.fetchone()[0]
+ 
+         cursor.execute("""
+-            SELECT district, COUNT(*) as count 
+-            FROM subscriptions 
+-            WHERE active = TRUE 
+-            GROUP BY district 
+-            ORDER BY count DESC 
++            SELECT district, COUNT(*) as count
++            FROM subscriptions
++            WHERE active = TRUE
++            GROUP BY district
++            ORDER BY count DESC
+             LIMIT 5
+         """)
+         top_districts = cursor.fetchall()
+diff --git a/src/community/community_memory.py b/src/community/community_memory.py
+index 7d42a8c..c54053b 100644
+--- a/src/community/community_memory.py
++++ b/src/community/community_memory.py
+@@ -75,7 +75,7 @@ class CommunityMemoryEngine:
+             """
+             INSERT INTO reports (
+                 report_id, district, community, report_type, description,
+-                flood_depth_m, photo_url, reporter_name, reporter_phone, 
++                flood_depth_m, photo_url, reporter_name, reporter_phone,
+                 reporter_email, report_time
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         """,
+@@ -144,7 +144,7 @@ class CommunityMemoryEngine:
+ 
+         cursor.execute(
+             """
+-            UPDATE reports 
++            UPDATE reports
+             SET validated = 1, validation_confidence = ?
+             WHERE report_id = ?
+         """,
+diff --git a/tests/framework/analytics.py b/tests/framework/analytics.py
+index 63718b9..e74b16c 100644
+--- a/tests/framework/analytics.py
++++ b/tests/framework/analytics.py
+@@ -127,7 +127,7 @@ class FailureAnalyzer:
+ 
+     def _generate_html_report(self, report: Dict[str, Any]) -> str:
+         """Generate HTML dashboard."""
+-        return f"""
++        return "
+         <!DOCTYPE html>
+         <html>
+         <head>

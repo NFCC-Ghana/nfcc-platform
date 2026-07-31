@@ -1,0 +1,30 @@
+9fa4967 (HEAD -> architecture-cleanup, origin/feature/ghana-ai-challenge, feature/ghana-ai-challenge) feat: Complete dashboard visual fixes and improvements
+6743ef6 fix: Risk Timeline - render_risk_timeline_visual with simple string concatenation
+b6b7487 feat: Add fallback data for API zeros
+53d06a7 feat: Phase 4 - Complete visual storytelling implementation
+cc5167a fix: Add working map to Render dashboard, remove duplicate stats
+cbca392 diagnostic: Minimal map to test st_folium rendering
+eaae762 🐛 Fix: Add get_db() alias for test compatibility
+e0a3244 fix: Dynamic import handling for Render deployment
+ed8e298 feat: Enterprise Command Center - Single authoritative dashboard
+7a3dfe1 fix: Correct indentation and add backward compatibility properties
+a7850bc fix: Add backward compatibility properties to DashboardState
+c88ff69 feat: Complete enterprise-grade state management
+e0fa6a6 chore: Remove diagnostic output, restore clean entry point
+c6cdd26 fix: Map serialization - plain text popups only
+affd798 debug: Add diagnostic output to identify import issue
+f83894a fix: Correct render.yaml configuration
+e647af8 fix: Render deployment dependencies
+93db830 fix: Python path issue for Streamlit imports
+0db7400 chore: Force Render rebuild with map fix
+f7826cc fix: Restore all V4 modules after accidental deletion
+2f487de chore: Complete canonical dashboard migration
+7eb594a fix: Fully populate dashboard state with all data
+2aa84fc fix: Folium map serialization error - plain text popups
+ebeb652 fix: Remove ALL duplicate set_page_config() calls
+37a45c5 chore: Archive legacy V4 modules
+2617612 chore: Clean up legacy dashboard files and update .gitignore
+5775b29 feat: Complete V4 modules with full functionality
+f48f2f8 fix: Correct Python path for Render deployment
+a94f722 refactor: Single canonical dashboard architecture
+c7ece22 fix: Add missing V4 module imports and correct signatures
