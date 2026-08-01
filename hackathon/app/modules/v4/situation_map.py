@@ -161,23 +161,40 @@ def render_situation_map(state):
         )
         st.dataframe(risk_df, use_container_width=True)
 
+
 def render_map_fallback():
     """Fallback function when map fails to load."""
     st.warning("⚠️ Map unavailable - showing data instead")
     st.markdown("### 📍 Affected Areas")
     risk_data = [
         {"name": "Alajo", "lat": 5.565, "lon": -0.218, "risk": "EXTREME", "pop": 18750},
-        {"name": "Kaneshie", "lat": 5.555, "lon": -0.228, "risk": "EXTREME", "pop": 22340},
+        {
+            "name": "Kaneshie",
+            "lat": 5.555,
+            "lon": -0.228,
+            "risk": "EXTREME",
+            "pop": 22340,
+        },
         {"name": "Circle", "lat": 5.575, "lon": -0.225, "risk": "HIGH", "pop": 15620},
         {"name": "Nima", "lat": 5.555, "lon": -0.215, "risk": "HIGH", "pop": 48230},
-        {"name": "Mamobi", "lat": 5.545, "lon": -0.212, "risk": "MODERATE", "pop": 34320},
+        {
+            "name": "Mamobi",
+            "lat": 5.545,
+            "lon": -0.212,
+            "risk": "MODERATE",
+            "pop": 34320,
+        },
     ]
     import pandas as pd
-    risk_df = pd.DataFrame([
-        {"Community": r["name"], "Risk": r["risk"], "Population": f"{r['pop']:,}"}
-        for r in risk_data
-    ])
+
+    risk_df = pd.DataFrame(
+        [
+            {"Community": r["name"], "Risk": r["risk"], "Population": f"{r['pop']:,}"}
+            for r in risk_data
+        ]
+    )
     st.dataframe(risk_df, use_container_width=True)
+
 
 def render_minimal_map():
     """Minimal map for testing."""
@@ -186,10 +203,7 @@ def render_minimal_map():
             location=[5.6037, -0.1870],
             zoom_start=10,
         )
-        folium.Marker(
-            [5.6037, -0.1870],
-            popup="Test Marker"
-        ).add_to(m)
+        folium.Marker([5.6037, -0.1870], popup="Test Marker").add_to(m)
         st_folium(m, width=700, height=500, key="minimal_map_test")
         return True
     except Exception as e:
