@@ -305,3 +305,17 @@ def delete_subscription(email: str) -> bool:
         cursor.execute("DELETE FROM subscriptions WHERE email = ?", (email,))
         conn.commit()
         return cursor.rowcount > 0
+
+
+def get_total_alerts_count(location_filter: Optional[str] = None) -> int:
+    """Get total number of alerts, optionally filtered by location."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if location_filter:
+            cursor.execute(
+                "SELECT COUNT(*) FROM alerts WHERE location = ?", (location_filter,)
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) FROM alerts")
+        row = cursor.fetchone()
+        return row[0] if row else 0
