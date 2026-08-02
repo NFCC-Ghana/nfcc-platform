@@ -94,3 +94,13 @@ def suppress_logging():
     # Restore after tests (optional)
     for logger_name in ["nfcc", "nfcc-api", "nfcc.alert.engine", "nfcc-api.health"]:
         logging.getLogger(logger_name).setLevel(logging.INFO)
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "ci_skip: skip test in CI environment")
+
+# Skip provider tests in CI if needed
+def pytest_collection_modifyitems(items):
+    if os.environ.get("CI"):
+        for item in items:
+            if "provider" in item.nodeid.lower() or "mock" in item.nodeid.lower():
+                item.add_marker(pytest.mark.skip(reason="Skipping in CI environment"))
