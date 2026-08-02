@@ -12,14 +12,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - name: Install dependencies from lock file
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-lock.txt
+          pip install -r requirements.txt
+
       - name: Run tests
         run: |
-          pytest tests/ -v --cov=src
+          pytest tests/ -v --cov=src --cov-report=term-missing --cov-report=html:reports/coverage --cov-fail-under=0
