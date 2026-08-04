@@ -1,26 +1,44 @@
 """Database operations for alerts and subscriptions."""
 
-import sqlite3
 import json
-from pathlib import Path
-from typing import Dict, List, Optional, Any
+import logging
+import secrets
+import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
-import secrets
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent.parent.parent / "data" / "alerts.db"
 
 
 @contextmanager
 def get_db():
-    """Get a thread-safe database connection."""
-    # Use check_same_thread=False to allow multi-threaded access
+    """
+    Get a thread-safe database connection.
+    Creates a NEW connection each time to avoid thread issues.
+    """
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # check_same_thread=False allows connections across threads
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
     finally:
         conn.close()
+
+
+def get_db_connection():
+    """
+    Get a database connection (for backward compatibility).
+    Creates a NEW connection each time.
+    """
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def init_db() -> None:
@@ -121,7 +139,8 @@ def get_alert_stats() -> Dict[str, Any]:
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as total FROM alerts")
-        total = cursor.fetchone()["total"]
+        total_row = cursor.fetchone()
+        total = total_row["total"] if total_row else 0
 
         cursor.execute("""
             SELECT risk_tier, COUNT(*) as count
@@ -145,6 +164,20 @@ def get_alert_stats() -> Dict[str, Any]:
             "by_risk_tier": by_tier,
             "top_locations": top_locations,
         }
+
+
+def get_total_alerts_count(location_filter: Optional[str] = None) -> int:
+    """Get total number of alerts, optionally filtered by location."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if location_filter:
+            cursor.execute(
+                "SELECT COUNT(*) FROM alerts WHERE location = ?", (location_filter,)
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) FROM alerts")
+        row = cursor.fetchone()
+        return row[0] if row else 0
 
 
 # ============================================================
