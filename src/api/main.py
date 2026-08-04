@@ -159,3 +159,7 @@ app.include_router(dam_router)
 app.include_router(subscriptions_router)
 app.include_router(explain_router)
 app.include_router(health_router)
+
+# Ensure database is initialized on startup
+from src.database.alert_db import init_db
+init_db()
