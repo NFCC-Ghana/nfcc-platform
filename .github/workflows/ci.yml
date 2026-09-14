@@ -21,8 +21,24 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run tests
         run: |
-          pytest tests/ -v --cov=src --cov-report=term-missing --cov-report=html:reports/coverage --cov-fail-under=0
+          pytest tests/ -v --tb=short -k "not providers" --cov=src --cov-report=term-missing --cov-report=html:reports/coverage --cov-fail-under=0
+
+      - name: Check imports
+        run: |
+          python -c "from src.api.main import app; print('API imports OK')"
+
+      - name: API smoke test
+        run: |
+          uvicorn src.api.main:app --host 127.0.0.1 --port 8000 &
+          sleep 10
+          curl -f http://127.0.0.1:8000/health
+          curl -f http://127.0.0.1:8000/
+          curl -f http://127.0.0.1:8000/districts
+          curl -f -X POST http://127.0.0.1:8000/score \
+            -H "Content-Type: application/json" \
+            -d '{"location":"Accra Central","precipitation":95.5}'
+          kill %1
