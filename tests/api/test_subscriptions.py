@@ -26,8 +26,9 @@ def test_db_path():
 def test_client(test_db_path):
     """Create a FastAPI TestClient with a file-based database."""
 
-    # Patch the DB_PATH to use the temporary file
-    with patch("src.database.alert_db.DB_PATH", test_db_path):
+    # Patch the DB_PATH to use the temporary file. Must be a Path, not the
+    # raw str tempfile.mkstemp() returns - get_db() calls DB_PATH.parent.
+    with patch("src.database.alert_db.DB_PATH", Path(test_db_path)):
         # Create the database file
         Path(test_db_path).touch()
 

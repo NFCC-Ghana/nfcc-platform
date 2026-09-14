@@ -18,9 +18,10 @@ from src.api.routes.forecast import router as forecast_router
 from src.api.routes.explain_fusion import router as explain_fusion_router
 from src.api.routes.subscriptions import router as subscriptions_router
 from src.alerts.formatter import get_risk_tier
+from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
-from src.database.alert_db import init_subscriptions_table
+from src.database.alert_db import init_subscriptions_table, get_alert_history, get_total_alerts_count
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -127,9 +128,41 @@ async def root():
         "environment": settings.ENVIRONMENT
     }
 
-# Score endpoint
-@app.post("/score", response_model=ScoreResponse)
-async def score(request: ScoreRequest):
+# Bare alias for the alerts_router's GET /alerts/history - same
+# underlying query functions, trimmed response. /alerts/history is the
+# real, fully-featured endpoint (pagination, location filtering, response
+# schema); this exists because a bare GET /alerts is also part of the
+# documented API surface.
+@app.get("/alerts")
+async def alerts_root(limit: int = 50):
+    return {
+        "count": get_total_alerts_count(),
+        "data": get_alert_history(limit=limit),
+    }
+
+
+# Districts endpoint - exposes the district risk profiles already used
+# internally by src/alerts/district_risk.py (calculate_adjusted_score,
+# should_alert_for_district) to adjust scores/thresholds per district, but
+# which had no API surface of its own until now.
+@app.get("/districts")
+async def districts():
+    return {
+        "count": len(DISTRICT_PROFILES),
+        "districts": [
+            {
+                "name": profile.name,
+                "base_risk_factor": profile.base_risk_factor,
+                "vulnerability_score": profile.vulnerability_score,
+                "historical_flood_probability": profile.historical_flood_probability,
+                "effective_threshold": profile.effective_threshold,
+            }
+            for profile in DISTRICT_PROFILES.values()
+        ],
+    }
+
+
+def _score_one(request: ScoreRequest) -> ScoreResponse:
     score_value = calculate_score(request.precipitation, request.temperature)
     risk_tier = get_risk_tier(score_value)
 
@@ -137,8 +170,22 @@ async def score(request: ScoreRequest):
     alert_sent = False
     if alert_engine and score_value > 50:
         try:
-            alert_engine.process(score_value, request.location, request.precipitation)
-            alert_sent = True
+            # Keyword args, not positional - process()'s signature is
+            # (location, score, force, precipitation, ...). A previous
+            # positional call here, process(score_value, request.location,
+            # request.precipitation), bound score_value to `location`,
+            # the location string to `score`, and precipitation to the
+            # `force` bool flag - every alert triggered from this endpoint
+            # was recorded under a numeric "location" with a location-name
+            # "score". alert_sent is also the engine's own real result now,
+            # not just "the call didn't raise" - a provider genuinely
+            # failing to send still reported alert_sent: true before this.
+            result = alert_engine.process(
+                location=request.location,
+                score=score_value,
+                precipitation=request.precipitation,
+            )
+            alert_sent = result.get("alert_sent", False)
         except Exception as e:
             logger.error(f"Alert failed: {e}")
 
@@ -149,6 +196,22 @@ async def score(request: ScoreRequest):
         alert_sent=alert_sent,
         timestamp=datetime.now().isoformat()
     )
+
+
+# Score endpoint
+@app.post("/score", response_model=ScoreResponse)
+async def score(request: ScoreRequest):
+    return _score_one(request)
+
+
+# Batch score endpoint - BatchScoreRequest already existed as a model with
+# no route ever built for it. Scores each request the same way /score
+# does (same alert side effects per location), sequentially - the alert
+# engine's own rate limiter is what actually protects a real burst of
+# locations from over-alerting, not anything batch-specific here.
+@app.post("/score/batch", response_model=List[ScoreResponse])
+async def score_batch(request: BatchScoreRequest):
+    return [_score_one(r) for r in request.requests]
 
 
 # Include all routers

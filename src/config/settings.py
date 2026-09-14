@@ -142,27 +142,48 @@ class Settings:
     EMAIL_RETRY_DELAY: float = float(os.getenv("EMAIL_RETRY_DELAY", "2.0") or "2.0")
     EMAIL_ENABLED: bool = bool(SMTP_USER and SMTP_PASSWORD and EMAIL_RECIPIENTS)
 
-    # Model Configuration - Use only joblib format
-    MODEL_PATH: str = os.getenv("MODEL_PATH", "models/xgboost_flood_risk.joblib")
+    # Model Configuration.
+    #
+    # models/xgboost_flood_risk.pkl (282KB, a real trained XGBRegressor -
+    # see src/models/train_model.py) is the only model file that has ever
+    # actually been trained and committed. models/xgboost_flood_risk.joblib
+    # is NOT a converted copy of it - it's a 53-byte placeholder
+    # (`{"model": "xgboost_flood_risk", "version": "1.0.0"}`) committed by
+    # "fix: Force add dummy model file for CI tests", just JSON text, not
+    # a real serialized model at all.
+    #
+    # This default used to point at that placeholder, and the "if the
+    # configured path is .pkl, prefer a same-named .joblib sibling if one
+    # exists" logic below actively redirected any explicit .pkl override
+    # back onto it too - so unless MODEL_PATH was set to exactly
+    # "models/xgboost_flood_risk.pkl" AND that redirect logic was somehow
+    # bypassed, joblib.load() received JSON bytes instead of a pickle
+    # stream and failed with a confusing KeyError deep inside pickle's
+    # opcode dispatch, logged as "Failed to load model" with no further
+    # detail. Nothing in Dockerfile.prod, railway.json, or
+    # .env.example overrides this default away from the broken path
+    # (.env.example itself has the same wrong path) - only
+    # elite-resilience.yml happens to set MODEL_PATH explicitly, which is
+    # why that one workflow's tests didn't hit this.
+    MODEL_PATH: str = os.getenv("MODEL_PATH", "models/xgboost_flood_risk.pkl")
     _model_cache = None
 
     def _load_model(self):
-        """Load model from joblib file only."""
-        model_path = Path(self.MODEL_PATH)
+        """Load the trained flood-risk model.
 
-        # If path is .pkl, convert to .joblib
-        if model_path.suffix == ".pkl":
-            joblib_path = model_path.with_suffix(".joblib")
-            if joblib_path.exists():
-                model_path = joblib_path
-                print(f"📁 Using joblib version: {joblib_path}")
+        joblib.load() transparently reads both real joblib-format files
+        and plain pickle files (which is what MODEL_PATH actually points
+        at) - so this does not need separate pickle.load()/joblib.load()
+        code paths for the two extensions.
+        """
+        model_path = Path(self.MODEL_PATH)
 
         if not model_path.exists():
             raise FileNotFoundError(f"Model not found at {model_path}")
 
         try:
             model = joblib.load(model_path)
-            print(f"✅ Model loaded from joblib: {model_path}")
+            print(f"✅ Model loaded from: {model_path}")
             return model
         except Exception as e:
             print(f"❌ Failed to load model: {e}")

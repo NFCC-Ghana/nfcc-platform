@@ -79,7 +79,24 @@ async def get_history(
             limit=limit,
             offset=offset,
             location_filter=location_filter,
-            data=[AlertRecord(**record) for record in alerts_data],
+            # Explicit field-by-field, not AlertRecord(**record): the
+            # alerts table (src/database/alert_db.py) and this response
+            # model never had the same shape - the DB's `score` column
+            # maps to `risk_score` here, and `precipitation`/`recipient`
+            # have no equivalent field on AlertRecord at all. Blind
+            # unpacking raised a pydantic ValidationError on every row.
+            data=[
+                AlertRecord(
+                    id=record["id"],
+                    timestamp=record["timestamp"],
+                    location=record["location"],
+                    risk_score=record["score"],
+                    risk_tier=record["risk_tier"],
+                    alert_sent=bool(record["alert_sent"]),
+                    provider=record.get("provider"),
+                )
+                for record in alerts_data
+            ],
         )
     except Exception as e:
         logger.error(f"Error retrieving alert history: {str(e)}")
