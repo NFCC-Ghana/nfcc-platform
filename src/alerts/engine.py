@@ -1,7 +1,6 @@
 """Alert engine for processing and sending alerts."""
 
 import logging
-from datetime import datetime
 from typing import Dict, Any, List, Optional, Union
 from src.alerts.models import AlertPayload
 from src.alerts.rate_limit import RateLimiter
@@ -58,6 +57,16 @@ class AlertEngine:
                 result.extend(factory_result)
             elif isinstance(p, BaseAlertProvider):
                 # It's already a provider instance
+                result.append(p)
+            elif callable(getattr(p, "send", None)) and hasattr(p, "name"):
+                # Duck-typed provider (e.g. a test double) - not a
+                # BaseAlertProvider subclass, but has the .send()/.name
+                # shape process() actually calls. Without this branch,
+                # every duck-typed provider fell through to the warning
+                # below and was silently dropped, so a test constructing
+                # AlertEngine(providers=[mock_a, mock_b]) transparently got
+                # neither of them - just the unrelated single-provider
+                # "no providers configured" fallback instead.
                 result.append(p)
             else:
                 logger.warning(f"Unknown provider type: {p}")
@@ -156,6 +165,7 @@ class AlertEngine:
             location=location,
             score=score,
             risk_tier=risk_tier,
+            precipitation=precipitation,
             alert_sent=any_success,
             provider_results=results,
         )
@@ -173,6 +183,7 @@ class AlertEngine:
         location: str,
         score: float,
         risk_tier: str,
+        precipitation: float,
         alert_sent: bool,
         provider_results: List[Dict[str, Any]],
     ) -> None:
@@ -189,32 +200,34 @@ class AlertEngine:
             location: Geographic location of the alert
             score: Alert risk score
             risk_tier: Categorical risk level (LOW, MODERATE, HIGH, CRITICAL, EXTREME)
+            precipitation: Rainfall reading that produced this score
             alert_sent: Whether at least one provider succeeded
             provider_results: List of result dicts from each provider
         """
         try:
-            # Generate timestamp in ISO format
-            timestamp = datetime.utcnow().isoformat() + "Z"
-
-            # Save a record for each provider's attempt
+            # Save a record for each provider's attempt. save_alert() takes
+            # individual keyword args (location, score, risk_tier,
+            # precipitation, alert_sent, provider, recipient) - it does NOT
+            # take a single dict positional argument the way this used to
+            # call it (`save_alert(alert_record)`, which silently bound the
+            # whole dict to save_alert's `location` parameter and raised a
+            # TypeError on every call, caught by the except below and only
+            # ever logged - no alert has ever actually been persisted via
+            # this path). message_id/error/timestamp have no equivalent
+            # save_alert parameter - the alerts table doesn't track them.
             for result in provider_results:
-                alert_record = {
-                    "timestamp": timestamp,
-                    "location": location,
-                    "risk_score": score,
-                    "risk_tier": risk_tier,
-                    "alert_sent": result.get("success", False),
-                    "provider": result.get("provider", "unknown"),
-                    "message_id": result.get("message_id"),  # Present if successful
-                    "error": None if result.get("success") else result.get("message"),  # Error if failed
-                }
-
-                # Insert into database
-                alert_id = save_alert(alert_record)
+                alert_id = save_alert(
+                    location=location,
+                    score=score,
+                    risk_tier=risk_tier,
+                    precipitation=precipitation,
+                    alert_sent=result.get("success", False),
+                    provider=result.get("provider", "unknown"),
+                )
                 logger.debug(
                     f"Saved alert to DB | ID: {alert_id} | "
-                    f"Provider: {alert_record['provider']} | "
-                    f"Success: {alert_record['alert_sent']}"
+                    f"Provider: {result.get('provider', 'unknown')} | "
+                    f"Success: {result.get('success', False)}"
                 )
 
         except Exception as e:

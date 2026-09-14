@@ -28,58 +28,53 @@ def get_test_db():
 
 
 @pytest.fixture(scope="function")
-def db_with_test_data():
+def test_client():
     """
-    Create a fresh test database with sample data for each test.
-    This ensures each test runs in isolation.
+    Create a test client backed by a fresh, isolated test database.
+
+    get_db is patched to TEST_DB_PATH *before* init_db()/save_alert() run,
+    not after - those two calls go through alert_db.get_db() themselves,
+    so seeding data first and patching afterward (the previous shape of
+    this fixture, split across two fixtures) initialized and seeded the
+    real data/alerts.db while the API being tested queried the still-empty,
+    never-created TEST_DB_PATH, failing every test in this class with
+    "no such table: alerts".
     """
-    # Remove existing test database
     if TEST_DB_PATH.exists():
         TEST_DB_PATH.unlink()
-    
-    # Initialize fresh database
-    alert_db.init_db()
-    
-    # Insert test data
-    from src.database.alert_db import save_alert
-    
-    test_alerts = [
-        {"location": "Accra", "score": 85.0, "risk_tier": "CRITICAL", "precipitation": 75.0},
-        {"location": "Accra", "score": 75.0, "risk_tier": "HIGH", "precipitation": 50.0},
-        {"location": "Accra", "score": 60.0, "risk_tier": "HIGH", "precipitation": 40.0},
-        {"location": "Accra", "score": 45.0, "risk_tier": "MODERATE", "precipitation": 30.0},
-        {"location": "Accra", "score": 30.0, "risk_tier": "MODERATE", "precipitation": 20.0},
-        {"location": "Accra", "score": 15.0, "risk_tier": "LOW", "precipitation": 10.0},
-        {"location": "Tema", "score": 70.0, "risk_tier": "HIGH", "precipitation": 45.0},
-        {"location": "Tema", "score": 50.0, "risk_tier": "MODERATE", "precipitation": 35.0},
-        {"location": "Kumasi", "score": 55.0, "risk_tier": "MODERATE", "precipitation": 30.0},
-        {"location": "Kumasi", "score": 40.0, "risk_tier": "MODERATE", "precipitation": 25.0},
-    ]
-    
-    for alert in test_alerts:
-        save_alert(**alert)
-    
-    yield
 
-
-@pytest.fixture(scope="function")
-def test_client(db_with_test_data):
-    """
-    Create a test client with the test database.
-    Patches the get_db function to use the test database.
-    """
     original_get_db = alert_db.get_db
-    
+
     def mock_get_db():
         return get_test_db()
-    
+
     alert_db.get_db = mock_get_db
-    
-    client = TestClient(app)
-    yield client
-    
-    # Restore original
-    alert_db.get_db = original_get_db
+    try:
+        alert_db.init_db()
+
+        from src.database.alert_db import save_alert
+
+        test_alerts = [
+            {"location": "Accra", "score": 85.0, "risk_tier": "CRITICAL", "precipitation": 75.0},
+            {"location": "Accra", "score": 75.0, "risk_tier": "HIGH", "precipitation": 50.0},
+            {"location": "Accra", "score": 60.0, "risk_tier": "HIGH", "precipitation": 40.0},
+            {"location": "Accra", "score": 45.0, "risk_tier": "MODERATE", "precipitation": 30.0},
+            {"location": "Accra", "score": 30.0, "risk_tier": "MODERATE", "precipitation": 20.0},
+            {"location": "Accra", "score": 15.0, "risk_tier": "LOW", "precipitation": 10.0},
+            {"location": "Tema", "score": 70.0, "risk_tier": "HIGH", "precipitation": 45.0},
+            {"location": "Tema", "score": 50.0, "risk_tier": "MODERATE", "precipitation": 35.0},
+            {"location": "Kumasi", "score": 55.0, "risk_tier": "MODERATE", "precipitation": 30.0},
+            {"location": "Kumasi", "score": 40.0, "risk_tier": "MODERATE", "precipitation": 25.0},
+        ]
+        for alert in test_alerts:
+            save_alert(**alert)
+
+        client = TestClient(app)
+        yield client
+    finally:
+        alert_db.get_db = original_get_db
+        if TEST_DB_PATH.exists():
+            TEST_DB_PATH.unlink()
 
 
 class TestAlertHistory:

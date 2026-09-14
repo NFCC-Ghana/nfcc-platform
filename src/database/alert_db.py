@@ -128,10 +128,17 @@ def get_alerts(
 
 
 def get_alert_history(
-    location: str = None, limit: int = 100, offset: int = 0
+    location_filter: str = None, limit: int = 100, offset: int = 0
 ) -> List[Dict[str, Any]]:
-    """Get alert history (alias for get_alerts)."""
-    return get_alerts(location=location, limit=limit, offset=offset)
+    """Get alert history (alias for get_alerts).
+
+    Parameter is named location_filter, not location, to match its
+    sibling get_total_alerts_count() and the one caller of this function
+    (src/api/routes/alerts.py's GET /alerts/history) - it used to be
+    named `location`, which that route was never actually calling it
+    with, raising a TypeError on every request that reached this far.
+    """
+    return get_alerts(location=location_filter, limit=limit, offset=offset)
 
 
 def get_alert_stats() -> Dict[str, Any]:
