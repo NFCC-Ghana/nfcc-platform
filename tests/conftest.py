@@ -11,6 +11,19 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.database.alert_db import init_db
+from src.alerts.engine import AlertEngine
+from src.alerts.providers.mock_provider import MockAlertProvider
+
+# tests/fixtures/__init__.py already re-exports every fixture in
+# dataframe_fixtures.py, model_fixtures.py, and provider_fixtures.py (e.g.
+# trained_model, sample_dataframe_with_features) via `import *` - but
+# pytest only auto-discovers fixtures declared in a conftest.py (or a
+# registered plugin), never from an arbitrary package's __init__.py just
+# because something else imports it. Nothing actually imported this
+# package into conftest.py, so every fixture in it was invisible to every
+# test that requested one, the same "fixture not found" failure api_client
+# had above.
+from tests.fixtures import *  # noqa: F401,F403
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -59,6 +72,26 @@ def api_client():
     --maxfail=5 stopped every run long before reaching most of them.
     """
     yield from _new_api_test_client()
+
+
+@pytest.fixture
+def alert_engine():
+    """A real AlertEngine backed by a single mock provider (no external
+    calls), matching the construction already used directly in
+    tests/unit/test_engine_edge_cases.py::TestEngineRateLimiting."""
+    engine = AlertEngine(providers=[MockAlertProvider()], alerts_per_hour=100)
+    engine.cooldown_minutes = 0
+    return engine
+
+
+@pytest.fixture
+def alert_engine_no_cooldown():
+    """Same as alert_engine, named for tests that are specifically
+    exercising threshold behavior and want it explicit in the test's own
+    signature that cooldown can't be the reason an alert didn't fire."""
+    engine = AlertEngine(providers=[MockAlertProvider()], alerts_per_hour=100)
+    engine.cooldown_minutes = 0
+    return engine
 
 
 # Skip provider tests in CI if needed

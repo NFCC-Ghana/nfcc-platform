@@ -17,15 +17,12 @@ from tests.fixtures.provider_fixtures import *
 
 __all__ = [
     # From dataframe_fixtures
-    "sample_dataframe",
-    "rainfall_dataframe",
-    "empty_dataframe",
+    "sample_dataframe_with_features",
     # From model_fixtures
-    "mock_model",
-    "mock_predictions",
-    "mock_features",
+    "trained_model",
     # From provider_fixtures
-    "mock_provider_config",
-    "mock_whatsapp_config",
+    "mock_email_config",
     "mock_sms_config",
+    "mock_whatsapp_config",
+    "sample_alert_payload",
 ]
