@@ -1,0 +1,41 @@
+name: CiviSenti Community Report Validation
+
+on:
+  schedule:
+    # Runs daily at 9:00am GMT/UTC
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  civisenti-validation:
+    runs-on: ubuntu-latest
+
+    env:
+      NFCC_ENV: development
+      ALERT_DRY_RUN: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: nfcc
+          environment-file: environment.yml
+          auto-activate-base: false
+
+      - name: Run CiviSenti validation summary
+        shell: bash -l {0}
+        run: |
+          conda activate nfcc
+          python scripts/civisenti_handler.py --summary
+
+      - name: Upload CiviSenti outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: civisenti-community-report-output
+          path: |
+            data/community_reports/
+            logs/
