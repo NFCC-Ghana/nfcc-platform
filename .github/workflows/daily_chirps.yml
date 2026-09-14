@@ -12,6 +12,10 @@ jobs:
 
     env:
       GEE_PROJECT_ID: nfcc-earth-engine-2026
+      # Full JSON key of a GCP service account with Earth Engine access -
+      # see docs/GEE_SETUP.md for how to create one and add it here as a
+      # repo secret (Settings > Secrets and variables > Actions).
+      GEE_SERVICE_ACCOUNT_KEY: ${{ secrets.GEE_SERVICE_ACCOUNT_KEY }}
 
     steps:
       - name: Checkout repository
