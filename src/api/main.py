@@ -5,16 +5,23 @@ from datetime import datetime
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.alerts.engine import AlertEngine
 from src.api.explain import router as explain_router
 from src.api.health import router as health_router
+from src.api.dam_router import router as dam_router
+from src.api.routes.alerts import router as alerts_router
+from src.api.routes.forecast import router as forecast_router
+from src.api.routes.explain_fusion import router as explain_fusion_router
+from src.api.routes.subscriptions import router as subscriptions_router
 from src.alerts.formatter import get_risk_tier
+from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
+from src.database.alert_db import init_subscriptions_table, get_alert_history, get_total_alerts_count
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -25,46 +32,39 @@ alert_engine = None
 
 
 class ScoreRequest(BaseModel):
-    """Score request model."""
-
     location: str = Field(..., description="District location")
     precipitation: float = Field(..., description="Precipitation in mm", ge=0)
     temperature: Optional[float] = Field(None, description="Temperature in Celsius")
 
 
 class BatchScoreRequest(BaseModel):
-    """Batch score request model."""
-
     requests: List[ScoreRequest]
 
 
 class ScoreResponse(BaseModel):
-    """Score response model with timestamp."""
-
     location: str
     score: float
     risk_tier: str
     alert_sent: bool
-    timestamp: str = Field(..., description="ISO format timestamp")
+    timestamp: str
 
 
 def calculate_score(precipitation: float, temperature: float = None) -> float:
-    """Calculate flood risk score from precipitation."""
     if precipitation <= 0:
         return 0.0
     elif precipitation < 10:
-        return precipitation * 3
+        return min(100, precipitation * 3)
     elif precipitation < 30:
-        return 30 + (precipitation - 10) * 1.5
-    elif precipitation < 60:
-        return 60 + (precipitation - 30) * 0.83
+        return min(100, 30 + (precipitation - 10) * 2)
+    elif precipitation < 50:
+        return min(100, 70 + (precipitation - 30) * 1.5)
     else:
-        return min(100, 85 + (precipitation - 60) * 0.375)
+        return min(100, 95 + (precipitation - 50) * 0.2)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
+    global alert_engine
 
     logger.info(f"Starting NFCC Flood Alert Platform v{settings.API_VERSION}...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
@@ -75,6 +75,13 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Model loaded successfully")
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
+
+    # Initialize subscription storage
+    try:
+        init_subscriptions_table()
+        logger.info("✅ Subscriptions table initialized")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize subscriptions table: {e}")
 
     # Initialize alert engine
     alert_engine = AlertEngine()
@@ -88,127 +95,134 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
-    description=settings.APP_DESCRIPTION,
     version=settings.API_VERSION,
+    description="National Flood Intelligence Platform API",
     lifespan=lifespan,
 )
 
-# Register routers
-app.include_router(explain_router)
-app.include_router(health_router)
-
-# Add CORS middleware
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "environment": settings.ENVIRONMENT,
+        "version": settings.API_VERSION,
+        "model": "loaded" if settings.model else "not loaded"
+    }
 
+# Root endpoint
 @app.get("/")
-async def root() -> Dict[str, Any]:
-    """Root endpoint."""
+async def root():
     return {
         "name": settings.APP_NAME,
         "version": settings.API_VERSION,
-        "environment": settings.ENVIRONMENT,
-        "status": "operational",
+        "environment": settings.ENVIRONMENT
+    }
+
+# Bare alias for the alerts_router's GET /alerts/history - same
+# underlying query functions, trimmed response. /alerts/history is the
+# real, fully-featured endpoint (pagination, location filtering, response
+# schema); this exists because a bare GET /alerts is also part of the
+# documented API surface.
+@app.get("/alerts")
+async def alerts_root(limit: int = 50):
+    return {
+        "count": get_total_alerts_count(),
+        "data": get_alert_history(limit=limit),
     }
 
 
-@app.get("/health")
-async def health() -> Dict[str, Any]:
-    """Health check endpoint."""
-    from src.api.health import health_check
-
-    return await health_check()
-
-
+# Districts endpoint - exposes the district risk profiles already used
+# internally by src/alerts/district_risk.py (calculate_adjusted_score,
+# should_alert_for_district) to adjust scores/thresholds per district, but
+# which had no API surface of its own until now.
 @app.get("/districts")
-async def get_districts() -> Dict[str, Any]:
-    """Get list of available districts."""
-    districts = [
-        "Accra Central",
-        "Accra East",
-        "Accra West",
-        "Tema",
-        "Kumasi",
-        "Takoradi",
-        "Tamale",
-        "Cape Coast",
-        "Koforidua",
-        "Ho",
-    ]
-    return {"status": "success", "districts": districts, "count": len(districts)}
+async def districts():
+    return {
+        "count": len(DISTRICT_PROFILES),
+        "districts": [
+            {
+                "name": profile.name,
+                "base_risk_factor": profile.base_risk_factor,
+                "vulnerability_score": profile.vulnerability_score,
+                "historical_flood_probability": profile.historical_flood_probability,
+                "effective_threshold": profile.effective_threshold,
+            }
+            for profile in DISTRICT_PROFILES.values()
+        ],
+    }
 
 
-@app.get("/alerts")
-async def get_alerts() -> Dict[str, Any]:
-    """Get recent alerts."""
-    return {"status": "success", "alerts": [], "message": "Alert history endpoint"}
+def _score_one(request: ScoreRequest) -> ScoreResponse:
+    score_value = calculate_score(request.precipitation, request.temperature)
+    risk_tier = get_risk_tier(score_value)
 
-
-@app.post("/score")
-async def score_endpoint(request: ScoreRequest) -> ScoreResponse:
-    """Calculate flood risk score and trigger alerts."""
-
-    score = calculate_score(request.precipitation, request.temperature)
-    risk_tier = get_risk_tier(score)
-    send_alert = score >= 30
-
+    # Send alert if risk is high enough
     alert_sent = False
-    if alert_engine and send_alert:
-        result = alert_engine.process(
-            location=request.location,
-            score=score,
-            precipitation=request.precipitation,
-            message=f"Flood risk detected with {request.precipitation:.1f}mm rainfall",
-        )
-        alert_sent = result.get("alert_sent", False)
-
-    logger.info(
-        f"Scored | {request.location} | {score:.1f} | {risk_tier} | alert={alert_sent}"
-    )
-
-    current_timestamp = datetime.utcnow().isoformat() + "Z"
+    if alert_engine and score_value > 50:
+        try:
+            # Keyword args, not positional - process()'s signature is
+            # (location, score, force, precipitation, ...). A previous
+            # positional call here, process(score_value, request.location,
+            # request.precipitation), bound score_value to `location`,
+            # the location string to `score`, and precipitation to the
+            # `force` bool flag - every alert triggered from this endpoint
+            # was recorded under a numeric "location" with a location-name
+            # "score". alert_sent is also the engine's own real result now,
+            # not just "the call didn't raise" - a provider genuinely
+            # failing to send still reported alert_sent: true before this.
+            result = alert_engine.process(
+                location=request.location,
+                score=score_value,
+                precipitation=request.precipitation,
+            )
+            alert_sent = result.get("alert_sent", False)
+        except Exception as e:
+            logger.error(f"Alert failed: {e}")
 
     return ScoreResponse(
         location=request.location,
-        score=round(score, 1),
+        score=round(score_value, 1),
         risk_tier=risk_tier,
         alert_sent=alert_sent,
-        timestamp=current_timestamp,
+        timestamp=datetime.now().isoformat()
     )
 
 
-@app.post("/score/batch")
-async def batch_score_endpoint(request: BatchScoreRequest) -> Dict[str, Any]:
-    """Calculate scores for multiple locations."""
-    results = []
-    for req in request.requests:
-        score = calculate_score(req.precipitation, req.temperature)
-        risk_tier = get_risk_tier(score)
+# Score endpoint
+@app.post("/score", response_model=ScoreResponse)
+async def score(request: ScoreRequest):
+    return _score_one(request)
 
-        alert_sent = False
-        if alert_engine and score >= 30:
-            result = alert_engine.process(
-                location=req.location,
-                score=score,
-                precipitation=req.precipitation,
-            )
-            alert_sent = result.get("alert_sent", False)
 
-        results.append(
-            {
-                "location": req.location,
-                "score": round(score, 1),
-                "risk_tier": risk_tier,
-                "precipitation": req.precipitation,
-                "alert_sent": alert_sent,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-            }
-        )
+# Batch score endpoint - BatchScoreRequest already existed as a model with
+# no route ever built for it. Scores each request the same way /score
+# does (same alert side effects per location), sequentially - the alert
+# engine's own rate limiter is what actually protects a real burst of
+# locations from over-alerting, not anything batch-specific here.
+@app.post("/score/batch", response_model=List[ScoreResponse])
+async def score_batch(request: BatchScoreRequest):
+    return [_score_one(r) for r in request.requests]
 
-    return {"status": "success", "results": results, "count": len(results)}
+
+# Include all routers
+app.include_router(alerts_router)
+app.include_router(forecast_router)
+app.include_router(explain_fusion_router)
+app.include_router(dam_router)
+app.include_router(subscriptions_router)
+app.include_router(explain_router)
+app.include_router(health_router)
+
+# Ensure database is initialized on startup
+from src.database.alert_db import init_db
+init_db()

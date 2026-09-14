@@ -17,6 +17,10 @@ dependencies:
   - xarray
   - rioxarray
 
+  # Remote sensing (satellite rainfall via Google Earth Engine - see
+  # scripts/daily_chirps_pull.py; `import ee` needs this)
+  - earthengine-api
+
   # ML
   - scikit-learn
   - xgboost

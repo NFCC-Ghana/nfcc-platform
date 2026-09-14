@@ -1,0 +1,347 @@
+"""Database operations for alerts and subscriptions."""
+
+import json
+import logging
+import secrets
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+DB_PATH = Path(__file__).parent.parent.parent / "data" / "alerts.db"
+
+
+@contextmanager
+def get_db():
+    """
+    Get a thread-safe database connection.
+    Creates a NEW connection each time to avoid thread issues.
+    """
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # check_same_thread=False allows connections across threads
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def get_db_connection():
+    """
+    Get a database connection (for backward compatibility).
+    Creates a NEW connection each time.
+    """
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    """Initialize the alerts database with table and indexes."""
+    init_alerts_table()
+    init_subscriptions_table()
+
+
+def init_alerts_table() -> None:
+    """Initialize the alerts table for storing alert history."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                location TEXT NOT NULL,
+                score REAL NOT NULL,
+                risk_tier TEXT NOT NULL,
+                precipitation REAL NOT NULL,
+                alert_sent BOOLEAN DEFAULT 0,
+                timestamp TEXT NOT NULL,
+                provider TEXT,
+                recipient TEXT
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alerts_location ON alerts(location)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp)"
+        )
+        conn.commit()
+
+
+def save_alert(
+    location: str,
+    score: float,
+    risk_tier: str,
+    precipitation: float,
+    alert_sent: bool = False,
+    provider: str = None,
+    recipient: str = None,
+) -> int:
+    """Save an alert to the database."""
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO alerts (
+                location, score, risk_tier, precipitation,
+                alert_sent, timestamp, provider, recipient
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                location,
+                score,
+                risk_tier,
+                precipitation,
+                alert_sent,
+                now,
+                provider,
+                recipient,
+            ),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_alerts(
+    location: str = None, limit: int = 100, offset: int = 0
+) -> List[Dict[str, Any]]:
+    """Retrieve alerts with optional filtering."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if location:
+            cursor.execute(
+                "SELECT * FROM alerts WHERE location = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                (location, limit, offset),
+            )
+        else:
+            cursor.execute(
+                "SELECT * FROM alerts ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_alert_history(
+    location_filter: str = None, limit: int = 100, offset: int = 0
+) -> List[Dict[str, Any]]:
+    """Get alert history (alias for get_alerts).
+
+    Parameter is named location_filter, not location, to match its
+    sibling get_total_alerts_count() and the one caller of this function
+    (src/api/routes/alerts.py's GET /alerts/history) - it used to be
+    named `location`, which that route was never actually calling it
+    with, raising a TypeError on every request that reached this far.
+    """
+    return get_alerts(location=location_filter, limit=limit, offset=offset)
+
+
+def get_alert_stats() -> Dict[str, Any]:
+    """Get statistics about alerts."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as total FROM alerts")
+        total_row = cursor.fetchone()
+        total = total_row["total"] if total_row else 0
+
+        cursor.execute("""
+            SELECT risk_tier, COUNT(*) as count
+            FROM alerts
+            GROUP BY risk_tier
+            ORDER BY count DESC
+        """)
+        by_tier = {row["risk_tier"]: row["count"] for row in cursor.fetchall()}
+
+        cursor.execute("""
+            SELECT location, COUNT(*) as count
+            FROM alerts
+            GROUP BY location
+            ORDER BY count DESC
+            LIMIT 10
+        """)
+        top_locations = [dict(row) for row in cursor.fetchall()]
+
+        return {
+            "total_alerts": total,
+            "by_risk_tier": by_tier,
+            "top_locations": top_locations,
+        }
+
+
+def get_total_alerts_count(location_filter: Optional[str] = None) -> int:
+    """Get total number of alerts, optionally filtered by location."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if location_filter:
+            cursor.execute(
+                "SELECT COUNT(*) FROM alerts WHERE location = ?", (location_filter,)
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) FROM alerts")
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+
+# ============================================================
+# Subscription Management Functions
+# ============================================================
+
+
+def init_subscriptions_table() -> None:
+    """Initialize the subscriptions table."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT NOT NULL UNIQUE,
+                phone TEXT,
+                preferred_provider TEXT NOT NULL DEFAULT 'email',
+                location_filter TEXT,
+                min_risk_tier TEXT NOT NULL DEFAULT 'MODERATE',
+                active BOOLEAN NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                unsubscribe_token TEXT UNIQUE
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_subscription_email ON subscriptions(email)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_subscription_active ON subscriptions(active)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_subscription_location ON subscriptions(location_filter)"
+        )
+        conn.commit()
+
+
+def subscribe(data_dict: Dict[str, Any]) -> int:
+    """Create a new subscription."""
+    now = datetime.now().isoformat()
+    token = secrets.token_urlsafe(16)
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO subscriptions (
+                email, phone, preferred_provider, location_filter,
+                min_risk_tier, active, created_at, updated_at, unsubscribe_token
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                data_dict.get("email"),
+                data_dict.get("phone"),
+                data_dict.get("preferred_provider", "email"),
+                data_dict.get("location_filter"),
+                data_dict.get("min_risk_tier", "MODERATE"),
+                1,
+                now,
+                now,
+                token,
+            ),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def unsubscribe(email: str) -> bool:
+    """Unsubscribe a user by marking their subscription as inactive."""
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE subscriptions SET active = 0, updated_at = ? WHERE email = ?",
+            (now, email),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def get_subscription(email: str) -> Optional[Dict[str, Any]]:
+    """Retrieve a subscription by email address."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM subscriptions WHERE email = ?", (email,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+
+def get_all_subscriptions(active_only: bool = True) -> List[Dict[str, Any]]:
+    """Retrieve all subscriptions, optionally filtered by active status."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if active_only:
+            cursor.execute(
+                "SELECT * FROM subscriptions WHERE active = 1 ORDER BY created_at DESC"
+            )
+        else:
+            cursor.execute("SELECT * FROM subscriptions ORDER BY created_at DESC")
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_subscriptions_for_location(
+    location: str, active_only: bool = True
+) -> List[Dict[str, Any]]:
+    """Retrieve subscriptions for a specific location."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if active_only:
+            cursor.execute(
+                """
+                SELECT * FROM subscriptions
+                WHERE (location_filter = ? OR location_filter IS NULL)
+                AND active = 1
+                ORDER BY created_at DESC
+            """,
+                (location,),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT * FROM subscriptions
+                WHERE location_filter = ? OR location_filter IS NULL
+                ORDER BY created_at DESC
+            """,
+                (location,),
+            )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def update_subscription(email: str, updates: Dict[str, Any]) -> bool:
+    """Update a subscription with provided fields."""
+    if not updates:
+        return True
+
+    now = datetime.now().isoformat()
+    set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
+    values = list(updates.values())
+    values.append(now)
+    values.append(email)
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE subscriptions SET {set_clause}, updated_at = ? WHERE email = ?",
+            values,
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def delete_subscription(email: str) -> bool:
+    """Permanently delete a subscription record."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM subscriptions WHERE email = ?", (email,))
+        conn.commit()
+        return cursor.rowcount > 0

@@ -71,9 +71,25 @@ def parse_args() -> argparse.Namespace:
 
 
 def initialize_earth_engine() -> None:
+    """Authenticate to Earth Engine.
+
+    In CI (and any environment with no interactive login), GEE_SERVICE_ACCOUNT_KEY
+    holds the full JSON key of a GCP service account with Earth Engine access -
+    see docs/GEE_SETUP.md for how to create one and wire it into GitHub Actions
+    as a secret. Locally, an engineer instead runs `earthengine authenticate`
+    once (see the same doc), which stores a token ee.Initialize() picks up on
+    its own with no key material needed here.
+    """
+    key_json = os.getenv("GEE_SERVICE_ACCOUNT_KEY")
     try:
-        ee.Initialize(project=PROJECT_ID)
-        logging.info("Google Earth Engine initialized with project: %s", PROJECT_ID)
+        if key_json:
+            info = json.loads(key_json)
+            credentials = ee.ServiceAccountCredentials(info["client_email"], key_data=key_json)
+            ee.Initialize(credentials, project=PROJECT_ID)
+            logging.info("Google Earth Engine initialized with service account: %s", info["client_email"])
+        else:
+            ee.Initialize(project=PROJECT_ID)
+            logging.info("Google Earth Engine initialized with project: %s", PROJECT_ID)
     except Exception as exc:
         logging.error("Failed to initialize Google Earth Engine: %s", exc)
         raise

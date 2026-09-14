@@ -1,0 +1,9 @@
+district,population,vulnerability_score
+Accra Central,150000,0.95
+Accra East,120000,0.85
+Accra West,100000,0.82
+Tema,180000,0.78
+Kumasi,250000,0.70
+Takoradi,90000,0.65
+Tamale,80000,0.60
+Cape Coast,70000,0.55

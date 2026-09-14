@@ -8,6 +8,7 @@ from src.alerts.provider_factory import ProviderFactory
 from src.alerts.cooldown import should_send_alert
 from src.alerts.providers.base import BaseAlertProvider
 from src.config.settings import settings
+from src.database.alert_db import save_alert
 
 logger = logging.getLogger("nfcc.alert.engine")
 
@@ -56,6 +57,16 @@ class AlertEngine:
                 result.extend(factory_result)
             elif isinstance(p, BaseAlertProvider):
                 # It's already a provider instance
+                result.append(p)
+            elif callable(getattr(p, "send", None)) and hasattr(p, "name"):
+                # Duck-typed provider (e.g. a test double) - not a
+                # BaseAlertProvider subclass, but has the .send()/.name
+                # shape process() actually calls. Without this branch,
+                # every duck-typed provider fell through to the warning
+                # below and was silently dropped, so a test constructing
+                # AlertEngine(providers=[mock_a, mock_b]) transparently got
+                # neither of them - just the unrelated single-provider
+                # "no providers configured" fallback instead.
                 result.append(p)
             else:
                 logger.warning(f"Unknown provider type: {p}")
@@ -149,6 +160,16 @@ class AlertEngine:
 
         logger.warning(f"🚨 ALERT | {location} | Score: {score} | {risk_tier}")
 
+        # Save alert to database for persistence and analytics
+        self._save_alert_to_db(
+            location=location,
+            score=score,
+            risk_tier=risk_tier,
+            precipitation=precipitation,
+            alert_sent=any_success,
+            provider_results=results,
+        )
+
         return {
             "alert_sent": any_success,
             "risk_tier": risk_tier,
@@ -156,6 +177,62 @@ class AlertEngine:
             "providers": results,
             "cooldown_minutes": self.cooldown_minutes,
         }
+
+    def _save_alert_to_db(
+        self,
+        location: str,
+        score: float,
+        risk_tier: str,
+        precipitation: float,
+        alert_sent: bool,
+        provider_results: List[Dict[str, Any]],
+    ) -> None:
+        """
+        Save alert to SQLite database after processing.
+
+        Logs each provider's attempt separately if multiple providers were tried.
+        For each provider result, creates a database record capturing:
+        - Provider name that attempted to send the alert
+        - Message ID if the send was successful
+        - Error details if the send failed
+
+        Args:
+            location: Geographic location of the alert
+            score: Alert risk score
+            risk_tier: Categorical risk level (LOW, MODERATE, HIGH, CRITICAL, EXTREME)
+            precipitation: Rainfall reading that produced this score
+            alert_sent: Whether at least one provider succeeded
+            provider_results: List of result dicts from each provider
+        """
+        try:
+            # Save a record for each provider's attempt. save_alert() takes
+            # individual keyword args (location, score, risk_tier,
+            # precipitation, alert_sent, provider, recipient) - it does NOT
+            # take a single dict positional argument the way this used to
+            # call it (`save_alert(alert_record)`, which silently bound the
+            # whole dict to save_alert's `location` parameter and raised a
+            # TypeError on every call, caught by the except below and only
+            # ever logged - no alert has ever actually been persisted via
+            # this path). message_id/error/timestamp have no equivalent
+            # save_alert parameter - the alerts table doesn't track them.
+            for result in provider_results:
+                alert_id = save_alert(
+                    location=location,
+                    score=score,
+                    risk_tier=risk_tier,
+                    precipitation=precipitation,
+                    alert_sent=result.get("success", False),
+                    provider=result.get("provider", "unknown"),
+                )
+                logger.debug(
+                    f"Saved alert to DB | ID: {alert_id} | "
+                    f"Provider: {result.get('provider', 'unknown')} | "
+                    f"Success: {result.get('success', False)}"
+                )
+
+        except Exception as e:
+            # Log but don't raise - database errors should not break alert processing
+            logger.error(f"Failed to save alert to database: {str(e)}")
 
     def _get_default_message(self, risk_tier: str) -> str:
         messages = {
