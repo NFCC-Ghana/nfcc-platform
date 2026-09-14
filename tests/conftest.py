@@ -27,17 +27,38 @@ def initialize_database():
         db_path.unlink()
 
 
+def _new_api_test_client():
+    from fastapi.testclient import TestClient
+    from src.api.main import app
+
+    # Ensure database is initialized
+    init_db()
+
+    with TestClient(app) as client:
+        yield client
+
+
 @pytest.fixture
 def test_client():
     """Create a test client for API tests."""
-    from fastapi.testclient import TestClient
-    from src.api.main import app
-    
-    # Ensure database is initialized
-    init_db()
-    
-    with TestClient(app) as client:
-        yield client
+    yield from _new_api_test_client()
+
+
+@pytest.fixture
+def api_client():
+    """Create a test client for API tests.
+
+    Same thing as test_client (a plain fastapi.testclient.TestClient
+    against the real app, with the database initialized) under the
+    fixture name a large fraction of tests/ was actually written
+    against - about 40 tests across test_endpoints.py, test_subscriptions.py,
+    test_elite_complete.py, test_elite_simple.py, test_forecast_api.py,
+    test_pipeline.py, test_openapi_contract.py, and test_engine_edge_cases.py
+    request `api_client` and errored with "fixture 'api_client' not found"
+    before this existed - invisible in CI because pytest.ini's
+    --maxfail=5 stopped every run long before reaching most of them.
+    """
+    yield from _new_api_test_client()
 
 
 # Skip provider tests in CI if needed
