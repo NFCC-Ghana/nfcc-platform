@@ -27,6 +27,7 @@ service-account*.json
 .venv/
 venv/
 nfcc/
+.venv-dev/
 
 # ==========================================
 # Testing / Coverage
@@ -66,6 +67,19 @@ data/interim/
 # ==========================================
 logs/
 logs/*.jsonl
+*.log
+nohup.out
+
+# Ad-hoc local run output - a script or test framework writing its
+# results to the repo root instead of reports/ or data/ (which are
+# already ignored above). alerts.log, daily_report.html, dashboard.html,
+# results.json, 20260524_results.json, and test.txt were all committed
+# by accident this same way and had to be manually removed.
+/results.json
+/*_results.json
+/daily_report.html
+/dashboard.html
+/test.txt
 
 # ==========================================
 # IDE / Editor
