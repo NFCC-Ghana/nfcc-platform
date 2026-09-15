@@ -41,21 +41,37 @@ on `gcloud run services update`. The Cloud Run service's runtime identity
 `roles/secretmanager.secretAccessor` on each secret - already granted.
 
 Non-secret config is set as plain env vars via `--update-env-vars`, currently:
-`NFCC_ENV=production`, `ENVIRONMENT=production`, `TWILIO_WHATSAPP_FROM`,
-`ALERT_WHATSAPP_RECIPIENTS`.
+`NFCC_ENV=production`, `ENVIRONMENT=production`.
 
-SMTP/email and Twilio SMS are **not configured** - the values that existed on
-Railway (`SMTP_USER`, `SMTP_PASS`, `TWILIO_SMS_FROM`, some SMS recipients)
-were placeholder/template text, not real credentials. Email alerting stays
-off (`EMAIL_ENABLED` evaluates false) until real SMTP credentials exist. Note
-also that Railway's variable names (`SMTP_PASS`, `ALERT_EMAIL_FROM`) didn't
-match what `src/config/settings.py` actually reads (`SMTP_PASSWORD`,
-`SMTP_FROM`) - if/when real SMTP credentials are added, set them under the
-names `settings.py` expects, not the old Railway names.
+**All external alert channels (WhatsApp, SMS, email) are currently
+disabled** - `GET /health` reports `"whatsapp": {"status": "disabled"}` and
+this is intentional, not a bug:
 
-WhatsApp alerts use Twilio's shared sandbox number
-(`whatsapp:+14155238886`), not a purchased number - recipients must have
-joined the sandbox via its join code for messages to actually deliver.
+- SMTP/email and Twilio SMS were never functional even on Railway - the
+  values there (`SMTP_USER`, `SMTP_PASS`, `TWILIO_SMS_FROM`, some SMS
+  recipients) were placeholder/template text, not real credentials. Note also
+  that Railway's variable names (`SMTP_PASS`, `ALERT_EMAIL_FROM`) didn't even
+  match what `src/config/settings.py` reads (`SMTP_PASSWORD`, `SMTP_FROM`) -
+  if/when real SMTP credentials are added, set them under the names
+  `settings.py` expects, not the old Railway names.
+- WhatsApp's `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` secrets *are* real and
+  wired up (see table above), but were left disconnected after testing showed
+  the Twilio account behind them has no free trial units and Twilio does not
+  offer free trials in Ghana at all - sending anything (even sandbox
+  WhatsApp messages) requires an upgraded/paid Twilio account. `whatsapp` is
+  disabled by simply not setting `TWILIO_WHATSAPP_FROM` /
+  `ALERT_WHATSAPP_RECIPIENTS` as env vars (settings.py treats empty
+  recipients as disabled), rather than by removing the secrets, so
+  re-enabling later - once there's budget for a paid Twilio account - is just
+  adding those two env vars back:
+  ```bash
+  gcloud run services update nfcc-platform --region=europe-west1 \
+    --update-env-vars="TWILIO_WHATSAPP_FROM=whatsapp:+14155238886,ALERT_WHATSAPP_RECIPIENTS=+233244714242"
+  ```
+  Twilio's WhatsApp sandbox uses a shared number
+  (`whatsapp:+14155238886`), not a purchased one - each recipient must send
+  the sandbox's join code to it from WhatsApp before messages will deliver
+  to them, and sandbox join codes/sessions can expire and need repeating.
 
 ## IAM roles needed by a deploying identity
 
