@@ -1,0 +1,11 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-f"
+      - "Dockerfile.prod"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/nfcc-platform"
+      - "."
+images:
+  - "gcr.io/$PROJECT_ID/nfcc-platform"

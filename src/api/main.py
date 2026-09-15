@@ -109,16 +109,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "environment": settings.ENVIRONMENT,
-        "version": settings.API_VERSION,
-        "model": "loaded" if settings.model else "not loaded"
-    }
-
 # Root endpoint
 @app.get("/")
 async def root():
