@@ -37,7 +37,7 @@ class CivicFloodHydrologicalIntelligence:
     def get_historical_context(self, district: str) -> Dict:
         """Get historical flood context for a community."""
         history = flood_polygons.get_flood_risk_summary(district)
-        similar = flood_polygons.get_similar_events(district, 50)
+        similar = flood_polygons.get_flood_events(district)
 
         return {
             "district": district,

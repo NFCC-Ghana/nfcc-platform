@@ -23,6 +23,11 @@ plotly>=5.17.0
 twilio>=8.0.0
 python-dotenv>=1.0.0
 
+# Remote sensing (src/hydrology/sentinel_processor.py needs `import ee` -
+# environment.yml has this via conda-forge for the conda-based workflows,
+# but ci.yml installs via plain pip, which never got this package)
+earthengine-api>=0.1.400
+
 # Testing
 pytest==7.4.3
 pytest-cov==4.1.0
