@@ -8,6 +8,7 @@ International-standard professional dashboard
 # IMPORTS - ALL AT THE TOP (E402 fixed)
 # ============================================================
 
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -67,7 +68,9 @@ st.markdown(
 # CONFIGURATION
 # ============================================================
 
-API_URL = "https://nfcc-platform-production.up.railway.app"
+API_URL = os.getenv(
+    "NFCC_API_URL", "https://nfcc-platform-355353600602.europe-west1.run.app"
+)
 
 st.set_page_config(
     page_title="CivicFlood AI - National Emergency Operations Center",

@@ -34,6 +34,6 @@ All AI modules leverage the existing NFCC production platform:
 - `src/alerts/engine.py` - Alert dispatch
 
 ## Deployment
-- **Backend:** Railway (https://nfcc-platform-production.up.railway.app)
+- **Backend:** Google Cloud Run (https://nfcc-platform-355353600602.europe-west1.run.app)
 - **Dashboard:** Local / Streamlit Cloud
 - **Repository:** github.com/NFCC-Ghana/nfcc-platform

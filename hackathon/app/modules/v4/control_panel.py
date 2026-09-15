@@ -42,7 +42,7 @@ def render_control_panel():
         st.divider()
 
         st.markdown("### ✅ API Connected")
-        st.code("https://nfcc-platform-production.up.railway.app", language="text")
+        st.code("https://nfcc-platform-355353600602.europe-west1.run.app", language="text")
 
         st.divider()
         st.caption("🏆 Ghana AI Innovation Challenge 2026")

@@ -3,6 +3,7 @@ CivicFlood AI - Main Dashboard Page
 """
 
 import json
+import os
 from datetime import datetime
 
 import pandas as pd
@@ -13,7 +14,9 @@ import streamlit as st
 # Set page config
 
 # API URL
-API_URL = "https://nfcc-platform-production.up.railway.app"
+API_URL = os.getenv(
+    "NFCC_API_URL", "https://nfcc-platform-355353600602.europe-west1.run.app"
+)
 
 
 def call_api(endpoint: str, method: str = "GET", data: dict = None) -> dict:

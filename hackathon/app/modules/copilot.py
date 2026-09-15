@@ -519,7 +519,7 @@ Implement immediate evacuation measures for high-risk areas.
 • CHIRPS Rainfall • NASA SMAP • Sentinel-1 • Community Reports
 • Ghana River Gauges • Dam Database
 
-**🔗 API: https://nfcc-platform-production.up.railway.app**
+**🔗 API: https://nfcc-platform-355353600602.europe-west1.run.app**
 
 Stay safe! 🌊
 """
