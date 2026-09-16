@@ -1334,6 +1334,14 @@ def main():
     district = control_data["district"]
 
     if control_data["review_mode"]:
+        # Cleanly stop any in-progress demo rather than leaving
+        # demo_stage_idx frozen mid-sequence - without this, switching
+        # Review Queue mode off again would silently resume the demo from
+        # wherever it was interrupted instead of returning to a fresh
+        # "click Start Demo" state.
+        if st.session_state.get("demo_stage_idx") is not None:
+            st.session_state["demo_stage_idx"] = None
+            st.info("🎬 Demo stopped because Review Queue mode was opened.")
         render_alert_review_queue()
         return
 
