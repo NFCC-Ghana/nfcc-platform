@@ -10,6 +10,7 @@ International-standard professional dashboard
 
 import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -328,6 +329,17 @@ def render_control_panel():
         )
 
         st.divider()
+        st.markdown("### 🎬 Stakeholder Demo")
+        st.caption(
+            "Auto-plays a flood event for this district through the real "
+            "system - for briefings where there's no time to click through."
+        )
+        demo_mode = st.toggle("Demo mode", value=False)
+        start_demo = False
+        if demo_mode:
+            start_demo = st.button("▶ Start Demo", use_container_width=True)
+
+        st.divider()
         st.markdown("### 📡 Data Sources")
         sources = [
             "🛰️ CHIRPS Rainfall",
@@ -343,7 +355,12 @@ def render_control_panel():
         st.divider()
         st.caption("🏆 Ghana AI Innovation Challenge 2026")
 
-    return {"district": district, "rainfall_mm": rainfall_mm}
+    return {
+        "district": district,
+        "rainfall_mm": rainfall_mm,
+        "demo_mode": demo_mode,
+        "start_demo": start_demo,
+    }
 
 
 def render_executive_summary(state):
@@ -1056,12 +1073,20 @@ def render_ai_copilot(state):
 # ============================================================
 
 
-def main():
-    """Enterprise Command Center with Visual Storytelling."""
-    control_data = render_control_panel()
-    district = control_data["district"]
-    rainfall_mm = control_data["rainfall_mm"]
+def render_situation(
+    district: str, rainfall_mm: float, stage_label: str = None, show_copilot: bool = True
+):
+    """Fetch the real situation for (district, rainfall_mm) and render the
+    full dashboard for it - the one place that does this, used by both
+    normal manual-slider mode and the auto-playing demo mode below, so a
+    demo stage is the real system's real response to a hypothetical
+    rainfall value, not separately-fabricated demo content.
 
+    show_copilot=False skips the AI Copilot panel (its button/chat_input
+    widgets have fixed keys, so calling it more than once in a single
+    script run - which the demo loop does, one call per stage - would
+    raise a duplicate-widget-key error; it also doesn't make sense to
+    show an input box mid-auto-play anyway)."""
     district_data = get_district_data(district)
 
     api_payload = {
@@ -1110,6 +1135,15 @@ def main():
             state.lead_time_hours = 72
             state.lead_time_action = "STAY INFORMED"
 
+    if stage_label:
+        st.markdown(
+            f"<div style='background:#111827;color:#fff;padding:10px 20px;"
+            f"border-radius:8px;text-align:center;font-size:18px;"
+            f"font-weight:700;letter-spacing:1px;margin-bottom:16px;'>"
+            f"🎬 {stage_label}</div>",
+            unsafe_allow_html=True,
+        )
+
     render_header(state)
     render_executive_summary(state)
     render_national_map(state)
@@ -1123,13 +1157,66 @@ def main():
         render_ai_decision_center(state)
 
     render_risk_timeline(state)
-    render_ai_copilot(state)
+    if show_copilot:
+        render_ai_copilot(state)
 
     st.divider()
     st.caption("🌊 CivicFlood AI • Decision Intelligence for National Flood Response")
     st.caption("NFCC Platform • Ghana AI Innovation Challenge 2026")
     st.caption(f"📊 {state.active_sources_count} Data Sources Active • 🔗 {API_URL}")
     st.caption(f"🔄 Last updated: {state.timestamp[:19]}")
+
+
+# Scripted rainfall trajectory for demo mode - each stage is a real value
+# sent to the real /situation endpoint, so the "story" is the actual
+# system's actual response, not separately scripted/fabricated content.
+# Chosen to walk the score from LOW through EXTREME using the real
+# calculate_score() curve, not evenly-spaced rainfall values.
+DEMO_STAGES = [
+    ("STAGE 1 / 5 — CALM CONDITIONS", 5),
+    ("STAGE 2 / 5 — RAIN BUILDING", 25),
+    ("STAGE 3 / 5 — WARNING LEVEL", 45),
+    ("STAGE 4 / 5 — SEVERE FLOODING", 70),
+    ("STAGE 5 / 5 — PEAK EMERGENCY: FULL EVACUATION", 120),
+]
+DEMO_SECONDS_PER_STAGE = 18
+
+
+def run_demo(district: str):
+    """Auto-play DEMO_STAGES for one district, replacing the display each
+    stage rather than stacking - a ~90 second walkthrough for a briefing
+    with no time to click through the dashboard manually."""
+    placeholder = st.empty()
+    for label, rainfall_mm in DEMO_STAGES:
+        with placeholder.container():
+            render_situation(
+                district, rainfall_mm, stage_label=label, show_copilot=False
+            )
+        time.sleep(DEMO_SECONDS_PER_STAGE)
+
+    with placeholder.container():
+        st.success(
+            "🎬 Demo complete. Turn off Demo mode in the sidebar to return "
+            "to manual control, or click Start Demo again to replay."
+        )
+        render_situation(district, DEMO_STAGES[-1][1], show_copilot=True)
+
+
+def main():
+    """Enterprise Command Center with Visual Storytelling."""
+    control_data = render_control_panel()
+    district = control_data["district"]
+
+    if control_data["demo_mode"]:
+        if control_data["start_demo"]:
+            run_demo(district)
+        else:
+            st.info(
+                "🎬 **Demo mode is on.** Click **▶ Start Demo** in the "
+                "sidebar to auto-play a flood event for this district."
+            )
+    else:
+        render_situation(district, control_data["rainfall_mm"])
 
 
 if __name__ == "__main__":
