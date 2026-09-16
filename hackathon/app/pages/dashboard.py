@@ -127,6 +127,41 @@ def get_national_summary() -> dict:
     return call_api("/national/summary", "GET")
 
 
+# Single source of truth for tier -> (summary text, color, recommendation),
+# matching the backend's real 5-tier system. Used by both the full
+# dashboard's AI Situation Summary and the compact broadcast view - was
+# previously defined only inline inside render_executive_summary, which
+# meant the broadcast view (below) would have needed its own duplicate
+# copy to show the same message.
+SITUATION_BY_TIER = {
+    "EXTREME": (
+        "🔴 EXTREME: Immediate evacuation required.",
+        "#cc0000",
+        "🚨 MANDATORY EVACUATION ORDER",
+    ),
+    "CRITICAL": (
+        "🔴 CRITICAL: Prepare for evacuation immediately.",
+        "#ff0000",
+        "🚨 EVACUATION ORDER LIKELY",
+    ),
+    "HIGH": (
+        "🟠 HIGH: Elevated flood risk in this area.",
+        "#ff6600",
+        "⚠️ PREPARE TO EVACUATE",
+    ),
+    "MODERATE": (
+        "🟡 MODERATE: Monitor conditions closely.",
+        "#ffaa00",
+        "📢 STAY INFORMED",
+    ),
+    "LOW": (
+        "🟢 LOW: Normal monitoring.",
+        "#00cc00",
+        "✅ CONTINUE NORMAL OPERATIONS",
+    ),
+}
+
+
 def get_district_data(district: str) -> dict:
     """Get district-specific data."""
     districts = {
@@ -429,35 +464,8 @@ def render_executive_summary(state):
         # both the backend and the "Current Risk Level" card above it,
         # e.g. showing "HIGH" here while the card read "CRITICAL" for the
         # same score, and never reaching EXTREME even at a 100% score.
-        situation_by_tier = {
-            "EXTREME": (
-                "🔴 EXTREME: Immediate evacuation required.",
-                "#cc0000",
-                "🚨 MANDATORY EVACUATION ORDER",
-            ),
-            "CRITICAL": (
-                "🔴 CRITICAL: Prepare for evacuation immediately.",
-                "#ff0000",
-                "🚨 EVACUATION ORDER LIKELY",
-            ),
-            "HIGH": (
-                "🟠 HIGH: Elevated flood risk in this area.",
-                "#ff6600",
-                "⚠️ PREPARE TO EVACUATE",
-            ),
-            "MODERATE": (
-                "🟡 MODERATE: Monitor conditions closely.",
-                "#ffaa00",
-                "📢 STAY INFORMED",
-            ),
-            "LOW": (
-                "🟢 LOW: Normal monitoring.",
-                "#00cc00",
-                "✅ CONTINUE NORMAL OPERATIONS",
-            ),
-        }
-        summary, color, recommendation = situation_by_tier.get(
-            state.risk_category, situation_by_tier["MODERATE"]
+        summary, color, recommendation = SITUATION_BY_TIER.get(
+            state.risk_category, SITUATION_BY_TIER["MODERATE"]
         )
 
         st.markdown(
@@ -1093,20 +1101,12 @@ def render_ai_copilot(state):
 # ============================================================
 
 
-def render_situation(
-    district: str, rainfall_mm: float, stage_label: str = None, show_copilot: bool = True
-):
-    """Fetch the real situation for (district, rainfall_mm) and render the
-    full dashboard for it - the one place that does this, used by both
-    normal manual-slider mode and the auto-playing demo mode below, so a
-    demo stage is the real system's real response to a hypothetical
-    rainfall value, not separately-fabricated demo content.
-
-    show_copilot=False skips the AI Copilot panel (its button/chat_input
-    widgets have fixed keys, so calling it more than once in a single
-    script run - which the demo loop does, one call per stage - would
-    raise a duplicate-widget-key error; it also doesn't make sense to
-    show an input box mid-auto-play anyway)."""
+def fetch_situation_state(district: str, rainfall_mm: float):
+    """Real fetch-and-build-state logic, shared by the full detailed
+    dashboard (render_situation) and the compact broadcast view
+    (render_broadcast_view) - both show the real system's real response
+    to (district, rainfall_mm), just laid out differently. Returns
+    (state, district_data)."""
     district_data = get_district_data(district)
 
     api_payload = {
@@ -1155,6 +1155,25 @@ def render_situation(
             state.lead_time_hours = 72
             state.lead_time_action = "STAY INFORMED"
 
+    return state, district_data
+
+
+def render_situation(
+    district: str, rainfall_mm: float, stage_label: str = None, show_copilot: bool = True
+):
+    """Fetch the real situation for (district, rainfall_mm) and render the
+    full, detailed dashboard for it - every panel, meant for an operator
+    who needs to scroll through and inspect everything. See
+    render_broadcast_view for the compact single-screen alternative used
+    by demo mode.
+
+    show_copilot=False skips the AI Copilot panel (its button/chat_input
+    widgets have fixed keys, so calling it more than once in a single
+    script run - which the demo loop does, one call per stage - would
+    raise a duplicate-widget-key error; it also doesn't make sense to
+    show an input box mid-auto-play anyway)."""
+    state, district_data = fetch_situation_state(district, rainfall_mm)
+
     if stage_label:
         st.markdown(
             f"<div style='background:#111827;color:#fff;padding:10px 20px;"
@@ -1185,6 +1204,110 @@ def render_situation(
     st.caption("NFCC Platform • Ghana AI Innovation Challenge 2026")
     st.caption(f"📊 {state.active_sources_count} Data Sources Active • 🔗 {API_URL}")
     st.caption(f"🔄 Last updated: {state.timestamp[:19]}")
+
+
+def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
+    """Compact, single-screen 'TV broadcast' view for demo mode - one
+    dominant risk indicator, a handful of key numbers, no scrolling.
+
+    render_situation (the full dashboard) repeated every single detailed
+    panel per stage, which was exactly as long and scroll-heavy during
+    the demo as normal manual mode - the opposite of a quick, glanceable
+    presentation for a 5-minute stakeholder briefing. This shows the same
+    real fetch_situation_state() data, just as one condensed screen
+    instead of the full operational console."""
+    state, _ = fetch_situation_state(district, rainfall_mm)
+    summary, color, recommendation = SITUATION_BY_TIER.get(
+        state.risk_category, SITUATION_BY_TIER["MODERATE"]
+    )
+    style = get_risk_tier_style(tier=state.risk_category)
+
+    # Real peak risk in the next 24h, from the forecast-driven risk
+    # timeline (src/api/routes/situation.py) - not a synthetic estimate.
+    peak_score = (
+        max(p["score"] for p in state.risk_timeline)
+        if state.risk_timeline
+        else state.risk_score
+    )
+
+    st.markdown(
+        f"<div style='background:#111827;color:#fff;padding:10px 24px;"
+        f"border-radius:8px;display:flex;justify-content:space-between;"
+        f"align-items:center;margin-bottom:16px;'>"
+        f"<span style='font-size:18px;font-weight:700;letter-spacing:1px;'>"
+        f"🎬 {stage_label}</span>"
+        f"<span style='font-size:14px;color:#9ca3af;'>{district} • "
+        f"{datetime.now().strftime('%H:%M:%S UTC')}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"<div style='background:{style['color']};color:#fff;"
+        f"padding:36px 24px;border-radius:16px;text-align:center;"
+        f"margin-bottom:20px;'>"
+        f"<div style='font-size:72px;line-height:1;'>{style['emoji']}</div>"
+        f"<div style='font-size:64px;font-weight:800;line-height:1.1;'>"
+        f"{state.risk_score:.0f}%</div>"
+        f"<div style='font-size:28px;font-weight:700;letter-spacing:2px;'>"
+        f"{state.risk_category}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    render_quick_stats(
+        [
+            {
+                "label": "Population at Risk",
+                "value": state.population_exposed,
+                "emoji": "👥",
+                "color": style["color"],
+            },
+            {
+                "label": "Lead Time",
+                "value": f"{state.lead_time_hours}h",
+                "emoji": "⏰",
+                "color": style["color"],
+            },
+            {
+                "label": "Peak Risk (24h)",
+                "value": f"{peak_score:.0f}%",
+                "emoji": "📈",
+                "color": style["color"],
+            },
+            {
+                "label": "Confidence",
+                "value": f"{state.risk_confidence * 100:.0f}%",
+                "emoji": "🎯",
+                "color": style["color"],
+            },
+        ],
+        columns=4,
+    )
+
+    st.markdown(
+        f"<div style='background:#f0f2f6;padding:16px 20px;"
+        f"border-radius:8px;border-left:6px solid {color};"
+        f"margin-top:16px;font-size:16px;'>"
+        f"<strong>{summary}</strong><br>"
+        f"<span style='font-size:14px;'>Recommended: {recommendation}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Three real readings driving the score - condensed to one line, not
+    # the full 5-item Evidence & Confidence panel.
+    sat_note = (
+        "🛰️ Water detected"
+        if state.satellite_water_detected
+        else "🛰️ No water detected"
+    )
+    st.caption(
+        f"🌧️ Rainfall: {state.rainfall_mm:.0f}mm  •  "
+        f"🌊 River: {state.river_level_m:.1f}m  •  "
+        f"💧 Soil saturation: {state.soil_saturation_percent:.0f}%  •  "
+        f"{sat_note} ({state.satellite_source})"
+    )
 
 
 # All districts this platform has real hydrology/impact data for - used
@@ -1379,7 +1502,9 @@ def main():
         render_situation(district, DEMO_STAGES[-1][1], show_copilot=True)
     else:
         label, rainfall_mm = DEMO_STAGES[idx]
-        render_situation(district, rainfall_mm, stage_label=label, show_copilot=False)
+        # Compact broadcast view, not the full scrolling dashboard - see
+        # render_broadcast_view's docstring for why.
+        render_broadcast_view(district, rainfall_mm, stage_label=label)
         time.sleep(DEMO_SECONDS_PER_STAGE)
         st.session_state["demo_stage_idx"] = idx + 1
         st.rerun()
