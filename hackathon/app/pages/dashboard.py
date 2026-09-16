@@ -416,45 +416,20 @@ def render_national_map(state):
     map_state.shelters_available = getattr(state, "shelters_available", 3)
     map_state.verified_reports = getattr(state, "verified_reports", 0)
 
-    # Render the actual map
+    # Render the actual map. render_situation_map() already renders its own
+    # Districts Monitored / Active Flood Zones / Shelters Available /
+    # Verified Reports row (with the real verified_reports/shelters_available
+    # values via map_state above) plus its own "click on markers" caption -
+    # there used to be a second, entirely separate render_quick_stats() call
+    # here duplicating the exact same four stats with hardcoded values
+    # (Verified Reports always "4"), which just fell out of sync with the
+    # real row above it once that one started showing real data.
     try:
         render_situation_map(map_state)
     except Exception as e:
         st.error(f"❌ Map error: {str(e)}")
         render_map_fallback()
 
-    # Visual stats
-    render_quick_stats(
-        [
-            {
-                "label": "Districts Monitored",
-                "value": 10,
-                "emoji": "🗺️",
-                "color": "#4299e1",
-            },
-            {
-                "label": "Active Flood Zones",
-                "value": 3,
-                "emoji": "🌊",
-                "color": "#e53e3e",
-            },
-            {
-                "label": "Shelters Available",
-                "value": 3,
-                "emoji": "🏛️",
-                "color": "#38a169",
-            },
-            {
-                "label": "Verified Reports",
-                "value": 4,
-                "emoji": "✅",
-                "color": "#9f7aea",
-            },
-        ],
-        columns=4,
-    )
-
-    st.caption("🗺️ Click on markers for details • Updated in real-time")
     st.divider()
 
 
