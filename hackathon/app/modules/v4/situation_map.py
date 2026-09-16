@@ -133,15 +133,24 @@ def render_situation_map(state):
 
         st_folium(m, width=800, height=500)
 
+        # Districts Monitored / Active Flood Zones / Shelters Available have
+        # no real data source anywhere in the codebase (no live shelter
+        # registry or flood-zone tracker exists) and stay as illustrative
+        # placeholders. Verified Reports now uses the real count from
+        # src/community/community_memory.py via /situation instead of a
+        # hardcoded "4" that never matched state.verified_reports (which
+        # was already correctly wired and reads 0 - no real report has ever
+        # been submitted, since there's no citizen-facing reporting channel
+        # built yet).
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Districts Monitored", "10")
         with col2:
             st.metric("Active Flood Zones", "3")
         with col3:
-            st.metric("Shelters Available", "3")
+            st.metric("Shelters Available", state.shelters_available)
         with col4:
-            st.metric("Verified Reports", "4")
+            st.metric("Verified Reports", state.verified_reports)
 
         st.caption("🗺️ Click on markers for details • Updated in real-time")
 

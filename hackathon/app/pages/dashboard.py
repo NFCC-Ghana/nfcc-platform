@@ -665,28 +665,33 @@ def render_impact_panel(state, district_data):
     st.divider()
 
 
-def render_operations_panel(state):
+def render_operations_panel(state, district_data):
     """QUESTION 5: What are we doing? - VISUAL VERSION"""
     st.markdown("## 🚗 Operations")
     st.caption("*What resources are deployed and available?*")
 
-    # Shelters - Visual status
-    st.markdown("### 🏛️ Shelters")
+    # No real shelter registry exists anywhere in the codebase (nothing
+    # salvaged from PR #26 tracks named venues or capacity), so these
+    # remain illustrative - but generic per-district venue names instead
+    # of always literally naming Accra venues ("Accra High School") even
+    # when e.g. Kumasi is selected, which was actively misleading rather
+    # than just a placeholder.
+    district = state.district
     shelters = [
         {
-            "name": "Accra High School",
+            "name": f"{district} Senior High School",
             "status": "OPEN",
             "capacity": 1200,
             "available": 850,
         },
         {
-            "name": "Community Center",
+            "name": f"{district} Community Center",
             "status": "OPEN",
             "capacity": 500,
             "available": 320,
         },
         {
-            "name": "Trade Fair Centre",
+            "name": f"{district} Trade Fair Centre",
             "status": "PREPARING",
             "capacity": 2000,
             "available": 2000,
@@ -724,12 +729,20 @@ def render_operations_panel(state):
     ]
     render_resource_status(resources)
 
-    # Evacuation Routes - Visual display using component
-    st.markdown("### 🗺️ Evacuation Routes")
+    # Evacuation Routes - Visual display using component. Origins are the
+    # district's real affected communities (district_data, already used
+    # correctly for the Affected Communities card); destinations are the
+    # shelters above. No real routing engine or travel-time data exists
+    # anywhere in the codebase, so drive times stay as illustrative
+    # round-number estimates - previously this whole block was hardcoded
+    # to fixed Accra community/shelter names regardless of which district
+    # was selected.
+    communities = district_data.get("affected_communities", [state.district])
+    shelter_names = [s["name"] for s in shelters]
+    drive_times = ["15 min", "20 min", "25 min"]
     routes = [
-        {"from": "Alajo", "to": "Accra High School", "time": "15 min"},
-        {"from": "Kaneshie", "to": "Community Center", "time": "20 min"},
-        {"from": "Circle", "to": "Trade Fair Centre", "time": "25 min"},
+        {"from": communities[i], "to": shelter_names[i], "time": drive_times[i]}
+        for i in range(min(3, len(communities), len(shelter_names)))
     ]
     render_evacuation_routes(routes)
 
@@ -1029,7 +1042,7 @@ def main():
 
     col1, col2 = st.columns(2)
     with col1:
-        render_operations_panel(state)
+        render_operations_panel(state, district_data)
     with col2:
         render_ai_decision_center(state)
 

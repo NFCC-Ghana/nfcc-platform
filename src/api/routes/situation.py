@@ -33,27 +33,48 @@ class SituationRequest(BaseModel):
     precipitation: float = Field(..., description="Precipitation in mm", ge=0)
 
 
-# Economic impact has no calibrated model behind it (impact_estimator only
-# estimates population/infrastructure exposure, not GHS losses) - this is a
-# simple, transparent per-person estimate, not a real economic model. Kept
-# in the same order of magnitude as the dashboard's previous fallback
-# formula (hackathon/app/modules/v4/state_fallback.py) for continuity, but
-# now driven by the real population_exposed figure instead of a separately
-# re-derived one.
-_GHS_LOSS_PER_PERSON = 2500
-_RESIDENTIAL_SHARE = 0.55
-_INFRASTRUCTURE_SHARE = 0.30
-_AGRICULTURE_SHARE = 0.15
+# Economic impact has no calibrated model behind it anywhere in the
+# codebase - impact_estimator only estimates *exposure counts*
+# (households/schools/hospitals/markets), not GHS losses. This is a simple,
+# transparent, asset-based estimate (illustrative per-unit costs x real
+# exposed counts), not a real economic model - it replaced an earlier,
+# cruder version that just split one population-derived total three ways
+# by fixed ratios, which meant residential/infrastructure/agricultural loss
+# always moved in lockstep and never actually reflected how many schools,
+# hospitals, or markets were really exposed in a given district.
+_GHS_PER_HOUSEHOLD = 8_000  # flood repair/replacement: structure + contents
+_GHS_PER_SCHOOL = 400_000  # building + equipment
+_GHS_PER_HOSPITAL = 1_500_000  # building + critical medical equipment
+_GHS_PER_MARKET = 250_000  # stalls + goods
+_GHS_PER_SUBSTATION = 800_000  # electrical infrastructure
+_GHS_PER_KM2_AGRICULTURE = 300_000  # at full rainfall intensity
 
 
-def _estimate_economic_loss(population_exposed: int, rainfall_mm: float) -> dict:
+def _estimate_economic_loss(
+    households_affected: int,
+    schools_exposed: int,
+    hospitals_exposed: int,
+    markets_exposed: int,
+    power_substations_affected: int,
+    area_km2: float,
+    rainfall_mm: float,
+) -> dict:
     rainfall_factor = min(1.0, rainfall_mm / 100)
-    total = population_exposed * _GHS_LOSS_PER_PERSON * rainfall_factor
+
+    residential = households_affected * _GHS_PER_HOUSEHOLD
+    infrastructure = (
+        schools_exposed * _GHS_PER_SCHOOL
+        + hospitals_exposed * _GHS_PER_HOSPITAL
+        + markets_exposed * _GHS_PER_MARKET
+        + power_substations_affected * _GHS_PER_SUBSTATION
+    )
+    agricultural = area_km2 * _GHS_PER_KM2_AGRICULTURE * rainfall_factor
+
     return {
-        "residential_loss_ghs": round(total * _RESIDENTIAL_SHARE, 2),
-        "infrastructure_loss_ghs": round(total * _INFRASTRUCTURE_SHARE, 2),
-        "agricultural_loss_ghs": round(total * _AGRICULTURE_SHARE, 2),
-        "total_loss_ghs": round(total, 2),
+        "residential_loss_ghs": round(residential, 2),
+        "infrastructure_loss_ghs": round(infrastructure, 2),
+        "agricultural_loss_ghs": round(agricultural, 2),
+        "total_loss_ghs": round(residential + infrastructure + agricultural, 2),
     }
 
 
@@ -101,6 +122,12 @@ async def get_situation(request: SituationRequest):
 
     if impact:
         population_exposed = impact["population_exposed"]
+        households_affected = int(population_exposed / 4)
+        # impact_estimator doesn't model power infrastructure at all - same
+        # rough population-based heuristic the dashboard's old fallback
+        # used, not real substation data.
+        power_substations_affected = max(1, int(impact["population_total"] / 75000))
+
         response.update(
             {
                 "population_total": impact["population_total"],
@@ -108,23 +135,26 @@ async def get_situation(request: SituationRequest):
                 "exposure_percentage": impact["exposure_percentage"],
                 "children_exposed": impact["children_exposed"],
                 "elderly_exposed": impact["elderly_exposed"],
-                "households_affected": int(population_exposed / 4),
+                "households_affected": households_affected,
                 "schools_exposed": impact["schools_exposed"],
                 "hospitals_exposed": impact["hospitals_exposed"],
                 "markets_exposed": impact["markets_exposed"],
-                # impact_estimator doesn't model power infrastructure at
-                # all - same rough population-based heuristic the
-                # dashboard's old fallback used, not real substation data.
-                "power_substations_affected": max(
-                    1, int(impact["population_total"] / 75000)
-                ),
+                "power_substations_affected": power_substations_affected,
                 "lead_time_hours": impact["lead_time_hours"],
                 "lead_time_action": impact["lead_time_action"],
                 "area_km2": impact["area_km2"],
             }
         )
         response.update(
-            _estimate_economic_loss(population_exposed, request.precipitation)
+            _estimate_economic_loss(
+                households_affected=households_affected,
+                schools_exposed=impact["schools_exposed"],
+                hospitals_exposed=impact["hospitals_exposed"],
+                markets_exposed=impact["markets_exposed"],
+                power_substations_affected=power_substations_affected,
+                area_km2=impact["area_km2"],
+                rainfall_mm=request.precipitation,
+            )
         )
 
     if hydrology:
