@@ -1182,41 +1182,54 @@ DEMO_STAGES = [
 DEMO_SECONDS_PER_STAGE = 18
 
 
-def run_demo(district: str):
-    """Auto-play DEMO_STAGES for one district, replacing the display each
-    stage rather than stacking - a ~90 second walkthrough for a briefing
-    with no time to click through the dashboard manually."""
-    placeholder = st.empty()
-    for label, rainfall_mm in DEMO_STAGES:
-        with placeholder.container():
-            render_situation(
-                district, rainfall_mm, stage_label=label, show_copilot=False
-            )
-        time.sleep(DEMO_SECONDS_PER_STAGE)
+def main():
+    """Enterprise Command Center with Visual Storytelling.
 
-    with placeholder.container():
+    Demo mode advances one stage per full Streamlit script rerun (session
+    state + st.rerun()), rather than looping through all stages inside a
+    single script execution. A single-execution loop looked simpler but
+    breaks the instant it renders anything bidirectional like st_folium's
+    map: on a real browser (unlike Streamlit's headless AppTest, which
+    doesn't simulate this and is why the loop version passed automated
+    testing but failed live), the map component reports its state back to
+    the frontend the moment it mounts, which triggers an unrequested
+    rerun - that aborts the loop mid-first-stage and restarts main() from
+    scratch, where the Start Demo button's one-shot "clicked" flag has
+    already reset to False, landing back on the "click Start Demo"
+    message after only a flash of stage 1. Advancing via rerun instead of
+    a loop works *with* that behavior instead of fighting it - it's
+    exactly how normal manual-slider mode already renders every time the
+    slider moves, which is why that path never hit this problem."""
+    control_data = render_control_panel()
+    district = control_data["district"]
+
+    if not control_data["demo_mode"]:
+        st.session_state["demo_stage_idx"] = None
+        render_situation(district, control_data["rainfall_mm"])
+        return
+
+    if control_data["start_demo"]:
+        st.session_state["demo_stage_idx"] = 0
+
+    idx = st.session_state.get("demo_stage_idx")
+
+    if idx is None:
+        st.info(
+            "🎬 **Demo mode is on.** Click **▶ Start Demo** in the "
+            "sidebar to auto-play a flood event for this district."
+        )
+    elif idx >= len(DEMO_STAGES):
         st.success(
             "🎬 Demo complete. Turn off Demo mode in the sidebar to return "
             "to manual control, or click Start Demo again to replay."
         )
         render_situation(district, DEMO_STAGES[-1][1], show_copilot=True)
-
-
-def main():
-    """Enterprise Command Center with Visual Storytelling."""
-    control_data = render_control_panel()
-    district = control_data["district"]
-
-    if control_data["demo_mode"]:
-        if control_data["start_demo"]:
-            run_demo(district)
-        else:
-            st.info(
-                "🎬 **Demo mode is on.** Click **▶ Start Demo** in the "
-                "sidebar to auto-play a flood event for this district."
-            )
     else:
-        render_situation(district, control_data["rainfall_mm"])
+        label, rainfall_mm = DEMO_STAGES[idx]
+        render_situation(district, rainfall_mm, stage_label=label, show_copilot=False)
+        time.sleep(DEMO_SECONDS_PER_STAGE)
+        st.session_state["demo_stage_idx"] = idx + 1
+        st.rerun()
 
 
 if __name__ == "__main__":
