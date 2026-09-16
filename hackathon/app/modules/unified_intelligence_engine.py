@@ -9,6 +9,8 @@ from typing import Any, Dict, List
 import pandas as pd
 import streamlit as st
 
+from hackathon.app.modules.v4.state import tier_from_score
+
 
 class UnifiedIntelligenceEngine:
     """
@@ -58,26 +60,26 @@ class UnifiedIntelligenceEngine:
         }
 
     def _get_risk_category(self) -> str:
-        if self.risk_score >= 80:
-            return "EXTREME"
-        if self.risk_score >= 60:
-            return "HIGH"
-        if self.risk_score >= 40:
-            return "MODERATE"
-        return "LOW"
+        # Matches the backend's real tiers (tier_from_score /
+        # src/alerts/formatter.py:get_risk_tier) instead of a
+        # separately-drifted 4-tier scale that mislabeled its own >=80
+        # threshold as "EXTREME" (the backend's actual EXTREME starts at
+        # 85, with a distinct CRITICAL tier at 70-85 that this omitted).
+        return tier_from_score(self.risk_score)
 
     def _generate_recommendations(self) -> List[str]:
+        tier = tier_from_score(self.risk_score)
         recs = []
-        if self.risk_score >= 80:
+        if tier in ("EXTREME", "CRITICAL"):
             recs.append("🚨 IMMEDIATE EVACUATION - Seek higher ground")
             recs.append("📢 Issue public warnings through all channels")
-        if self.risk_score >= 60:
+        elif tier == "HIGH":
             recs.append("⚠️ PREPARE TO EVACUATE - Move to higher ground")
             recs.append("📋 Review emergency response plans")
-        if self.risk_score >= 40:
+        elif tier == "MODERATE":
             recs.append("ℹ️ MONITOR CONDITIONS - Stay informed")
             recs.append("📊 Check community reports for updates")
-        if self.risk_score < 40:
+        else:
             recs.append("✅ NORMAL - Continue monitoring")
         return recs
 

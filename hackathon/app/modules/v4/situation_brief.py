@@ -5,6 +5,8 @@ Provides a concise summary of the current flood situation.
 
 from datetime import datetime
 
+from hackathon.app.modules.v4.state import tier_from_score
+
 
 def generate_situation_brief(state) -> dict:
     """Generate a situation brief from the current state."""
@@ -19,9 +21,14 @@ def generate_situation_brief(state) -> dict:
         ),
     }
 
-    if state.risk_score >= 80:
+    # Keyed off the real tier (matches state.risk_category /
+    # src/alerts/formatter.py:get_risk_tier) instead of a separately
+    # drifted 4-tier scale (80/60/40, no EXTREME).
+    tier = tier_from_score(state.risk_score)
+
+    if tier in ("EXTREME", "CRITICAL"):
         brief["summary"] = (
-            "CRITICAL: Immediate evacuation required. "
+            f"{tier}: Immediate evacuation required. "
             "Multiple risk factors are at extreme levels."
         )
         brief["key_actions"] = [
@@ -30,7 +37,7 @@ def generate_situation_brief(state) -> dict:
             "Open all shelters",
             "Deploy rescue teams",
         ]
-    elif state.risk_score >= 60:
+    elif tier == "HIGH":
         brief["summary"] = (
             "HIGH: Prepare for evacuation. " "Conditions are deteriorating rapidly."
         )
@@ -40,7 +47,7 @@ def generate_situation_brief(state) -> dict:
             "Position resources",
             "Monitor river levels",
         ]
-    elif state.risk_score >= 40:
+    elif tier == "MODERATE":
         brief["summary"] = (
             "MODERATE: Monitor conditions closely. " "Risk is elevated but manageable."
         )

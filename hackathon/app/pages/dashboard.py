@@ -21,7 +21,11 @@ import streamlit as st
 
 from hackathon.app.modules.v4.situation_map import render_map_fallback
 from hackathon.app.modules.v4.situation_map import render_situation_map
-from hackathon.app.modules.v4.state import create_state_from_api
+from hackathon.app.modules.v4.state import (
+    create_state_from_api,
+    get_risk_tier_style,
+    tier_from_score,
+)
 from hackathon.app.modules.v4.visual_components import (
     render_affected_communities,
     render_economic_impact,
@@ -329,22 +333,43 @@ def render_executive_summary(state):
     with col2:
         st.markdown("🤖 **AI Situation Summary**")
 
-        if state.risk_score >= 80:
-            summary = "🔴 CRITICAL: Immediate evacuation required."
-            color = "#ff0000"
-            recommendation = "🚨 MANDATORY EVACUATION ORDER"
-        elif state.risk_score >= 60:
-            summary = "🟠 HIGH: Prepare for evacuation immediately."
-            color = "#ff6600"
-            recommendation = "⚠️ PREPARE TO EVACUATE"
-        elif state.risk_score >= 40:
-            summary = "🟡 MODERATE: Monitor conditions closely."
-            color = "#ffaa00"
-            recommendation = "📢 STAY INFORMED"
-        else:
-            summary = "🟢 LOW: Normal monitoring."
-            color = "#00cc00"
-            recommendation = "✅ CONTINUE NORMAL OPERATIONS"
+        # Keyed off state.risk_category (sourced from the backend's own
+        # risk_tier in create_state_from_api) instead of re-deriving from
+        # risk_score with a separate set of thresholds - this used to have
+        # its own 4-tier scale (40/60/80, no EXTREME) that disagreed with
+        # both the backend and the "Current Risk Level" card above it,
+        # e.g. showing "HIGH" here while the card read "CRITICAL" for the
+        # same score, and never reaching EXTREME even at a 100% score.
+        situation_by_tier = {
+            "EXTREME": (
+                "🔴 EXTREME: Immediate evacuation required.",
+                "#cc0000",
+                "🚨 MANDATORY EVACUATION ORDER",
+            ),
+            "CRITICAL": (
+                "🔴 CRITICAL: Prepare for evacuation immediately.",
+                "#ff0000",
+                "🚨 EVACUATION ORDER LIKELY",
+            ),
+            "HIGH": (
+                "🟠 HIGH: Elevated flood risk in this area.",
+                "#ff6600",
+                "⚠️ PREPARE TO EVACUATE",
+            ),
+            "MODERATE": (
+                "🟡 MODERATE: Monitor conditions closely.",
+                "#ffaa00",
+                "📢 STAY INFORMED",
+            ),
+            "LOW": (
+                "🟢 LOW: Normal monitoring.",
+                "#00cc00",
+                "✅ CONTINUE NORMAL OPERATIONS",
+            ),
+        }
+        summary, color, recommendation = situation_by_tier.get(
+            state.risk_category, situation_by_tier["MODERATE"]
+        )
 
         st.markdown(
             f"<div style='background-color:#f0f2f6;padding:15px;"
@@ -717,7 +742,18 @@ def render_ai_decision_center(state):
     st.markdown("## 🎯 AI Decision Center")
     st.caption("*What actions should we take and why?*")
 
-    if state.risk_score >= 80:
+    # Thresholds and urgency/color now match the backend's real tiers
+    # (get_risk_tier_style) instead of a separately-drifted 4-tier scale
+    # (80/60/40, no EXTREME) - EXTREME shares CRITICAL's action content
+    # below (there's no operationally distinct "beyond mandatory
+    # evacuation" action), but its badge now correctly reads EXTREME with
+    # the darker red used everywhere else, instead of mislabeling a 100%
+    # score as merely "CRITICAL".
+    tier = tier_from_score(state.risk_score)
+    urgency = tier
+    urgency_color = get_risk_tier_style(tier=tier)["color"]
+
+    if tier in ("EXTREME", "CRITICAL"):
         action = "🚨 Issue Mandatory Evacuation Order"
         confidence = 95
         reasons = [
@@ -729,9 +765,7 @@ def render_ai_decision_center(state):
         impact = "Protect 8,200 people"
         cost = 120000
         time_window = "Within 45 minutes"
-        urgency = "CRITICAL"
-        urgency_color = "#ff0000"
-    elif state.risk_score >= 60:
+    elif tier == "HIGH":
         action = "⚠️ Prepare for Evacuation"
         confidence = 87
         reasons = [
@@ -743,9 +777,7 @@ def render_ai_decision_center(state):
         impact = "Protect 4,500 people"
         cost = 65000
         time_window = "Within 2 hours"
-        urgency = "HIGH"
-        urgency_color = "#ff6600"
-    elif state.risk_score >= 40:
+    elif tier == "MODERATE":
         action = "📢 Issue Public Awareness Message"
         confidence = 78
         reasons = [
@@ -756,8 +788,6 @@ def render_ai_decision_center(state):
         impact = "Alert 12,000 people"
         cost = 15000
         time_window = "Within 4 hours"
-        urgency = "MEDIUM"
-        urgency_color = "#ffaa00"
     else:
         action = "✅ Continue Normal Monitoring"
         confidence = 92
@@ -769,8 +799,6 @@ def render_ai_decision_center(state):
         impact = "Monitor 10 districts"
         cost = 5000
         time_window = "Ongoing"
-        urgency = "LOW"
-        urgency_color = "#00cc00"
 
     col1, col2 = st.columns([2, 1])
 
@@ -785,7 +813,7 @@ def render_ai_decision_center(state):
             border-left: 6px solid {urgency_color};
         ">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 20px;">{urgency_color.replace('#', '')}</span>
+                <span style="font-size: 20px;">{get_risk_tier_style(tier=tier)["emoji"]}</span>
                 <span style="font-weight: 600; color: {urgency_color}; font-size: 14px;">
                     {urgency}
                 </span>
@@ -973,13 +1001,14 @@ def main():
     state.api_connected = "error" not in api_data
 
     if state.lead_time_hours == 0:
-        if state.risk_score >= 80:
+        tier = tier_from_score(state.risk_score)
+        if tier in ("EXTREME", "CRITICAL"):
             state.lead_time_hours = 2
             state.lead_time_action = "IMMEDIATE EVACUATION"
-        elif state.risk_score >= 60:
+        elif tier == "HIGH":
             state.lead_time_hours = 6
             state.lead_time_action = "PREPARE TO EVACUATE"
-        elif state.risk_score >= 40:
+        elif tier == "MODERATE":
             state.lead_time_hours = 24
             state.lead_time_action = "MONITOR CONDITIONS"
         else:

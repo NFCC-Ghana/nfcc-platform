@@ -7,9 +7,12 @@ from datetime import datetime
 
 import streamlit as st
 
+from hackathon.app.modules.v4.state import tier_from_score
+
 
 def get_operational_briefing(district: str, risk_score: float) -> str:
     """Generate concise operational briefing."""
+    tier = tier_from_score(risk_score)
 
     return f"""
 ┌─────────────────────────────────────────────────────────────────┐
@@ -18,7 +21,7 @@ def get_operational_briefing(district: str, risk_score: float) -> str:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  CURRENT SITUATION:                                             │
-│  • Risk Level: {risk_score:.0f}% ({'EXTREME' if risk_score >= 80 else 'HIGH'}) │
+│  • Risk Level: {risk_score:.0f}% ({tier}) │
 │  • Confidence: 92% (5 active data sources)                      │
 │  • Population at Risk: 102,157                                  │
 │                                                                  │
@@ -74,7 +77,7 @@ def render_decision_copilot(district: str, risk_score: float) -> None:
             st.success("✅ Alert generated:")
             st.code(f"""
 🚨 FLOOD ALERT: {district}
-Risk: {risk_score:.0f}% ({'EXTREME' if risk_score >= 80 else 'HIGH'})
+Risk: {risk_score:.0f}% ({tier_from_score(risk_score)})
 Action: IMMEDIATE EVACUATION
 Communities: Alajo, Kaneshie, Circle
 Shelters: Accra High School (1.2km)
@@ -111,7 +114,8 @@ Based on all available intelligence ({district} at {risk_score:.0f}% risk):
 
 **Recommendation:**
 """
-            if risk_score >= 80:
+            tier = tier_from_score(risk_score)
+            if tier in ("EXTREME", "CRITICAL"):
                 response += """
 🚨 **IMMEDIATE ACTION REQUIRED**
 
@@ -125,7 +129,7 @@ NADMO should:
 **Timeline:** Within the next 2 hours
 **Confidence:** HIGH (92%)
 """
-            elif risk_score >= 60:
+            elif tier == "HIGH":
                 response += """
 ⚠️ **PREPARE FOR ACTION**
 

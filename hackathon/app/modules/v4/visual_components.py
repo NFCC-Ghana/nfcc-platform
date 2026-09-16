@@ -9,6 +9,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from html import escape
 import math
 
+from hackathon.app.modules.v4.state import get_risk_tier_style
+
 # ============================================================
 # THEME - Centralized Design Tokens
 # ============================================================
@@ -92,36 +94,22 @@ def clamp(value: float, min_val: float = 0, max_val: float = 100) -> float:
 
 
 def risk_color(score: float) -> str:
-    """Get color based on risk score."""
-    if score >= 80:
-        return THEME.DANGER
-    if score >= 60:
-        return "#EA580C"
-    if score >= 40:
-        return THEME.WARNING
-    return THEME.SUCCESS
+    """Get color based on risk score - delegates to the single source of
+    truth (hackathon.app.modules.v4.state.get_risk_tier_style) instead of
+    a locally-drifted 4-tier scale (this function used to be defined
+    twice in this same file, both copies disagreeing with the backend's
+    real 5-tier thresholds and missing EXTREME entirely)."""
+    return get_risk_tier_style(score=score)["color"]
 
 
 def risk_label(score: float) -> str:
-    """Get label based on risk score."""
-    if score >= 80:
-        return "CRITICAL"
-    if score >= 60:
-        return "HIGH"
-    if score >= 40:
-        return "MODERATE"
-    return "LOW"
+    """Get label based on risk score - see risk_color."""
+    return get_risk_tier_style(score=score)["tier"]
 
 
 def risk_emoji(score: float) -> str:
-    """Get emoji based on risk score."""
-    if score >= 80:
-        return "🔴"
-    if score >= 60:
-        return "🟠"
-    if score >= 40:
-        return "🟡"
-    return "🟢"
+    """Get emoji based on risk score - see risk_color."""
+    return get_risk_tier_style(score=score)["emoji"]
 
 
 def safe_text(text: str) -> str:
@@ -160,49 +148,6 @@ def format_currency(value: float, currency: str = "GH₵") -> str:
     if value >= 1_000:
         return f"{currency} {value/1e3:.1f}K"
     return f"{currency} {value:,.0f}"
-
-
-def risk_color(score: float) -> str:
-    """Get color based on risk score."""
-    if score >= 80:
-        return THEME.DANGER
-    if score >= 60:
-        return "#EA580C"
-    if score >= 40:
-        return THEME.WARNING
-    return THEME.SUCCESS
-
-
-def risk_label(score: float) -> str:
-    """Get label based on risk score."""
-    if score >= 80:
-        return "CRITICAL"
-    if score >= 60:
-        return "HIGH"
-    if score >= 40:
-        return "MODERATE"
-    return "LOW"
-
-
-def risk_emoji(score: float) -> str:
-    """Get emoji based on risk score."""
-    if score >= 80:
-        return "🔴"
-    if score >= 60:
-        return "🟠"
-    if score >= 40:
-        return "🟡"
-    return "🟢"
-
-
-def clamp(value: float, min_val: float = 0, max_val: float = 100) -> float:
-    """Clamp a value between min and max."""
-    return max(min_val, min(max_val, value))
-
-
-def safe_text(text: str) -> str:
-    """Escape HTML to prevent injection."""
-    return escape(str(text))
 
 
 # ============================================================

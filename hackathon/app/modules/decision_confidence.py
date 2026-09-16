@@ -7,6 +7,8 @@ from typing import Dict, List
 import pandas as pd
 import streamlit as st
 
+from hackathon.app.modules.v4.state import tier_from_score
+
 
 def get_decision_confidence(district: str, risk_score: float) -> Dict:
     """Get decision confidence with explanation."""
@@ -95,15 +97,19 @@ def render_decision_confidence(district: str, risk_score: float) -> None:
     # Recommendation with confidence
     st.markdown("#### 📋 Recommendation")
 
-    if risk_score >= 80:
+    # Tier boundaries match the backend (tier_from_score) instead of a
+    # separately-drifted 80/60/40 scale; Streamlit only has 4 semantic box
+    # styles, so EXTREME reasonably shares CRITICAL's st.error() styling.
+    tier = tier_from_score(risk_score)
+    if tier in ("EXTREME", "CRITICAL"):
         st.error(
             f"🚨 IMMEDIATE EVACUATION - Seek higher ground (Confidence: {confidence['overall_confidence']:.0f}%)"
         )
-    elif risk_score >= 60:
+    elif tier == "HIGH":
         st.warning(
             f"⚠️ PREPARE TO EVACUATE - Move to higher ground (Confidence: {confidence['overall_confidence']:.0f}%)"
         )
-    elif risk_score >= 40:
+    elif tier == "MODERATE":
         st.info(
             f"ℹ️ MONITOR CONDITIONS - Stay informed (Confidence: {confidence['overall_confidence']:.0f}%)"
         )

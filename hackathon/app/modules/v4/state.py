@@ -128,6 +128,48 @@ class DashboardState:
     impact_environment: Dict[str, Any] = field(default_factory=dict)
 
 
+# Single source of truth for risk-tier -> label/color/emoji, matching
+# src/alerts/formatter.py:get_risk_tier exactly (5 tiers, 30/50/70/85
+# thresholds). Every module that used to re-derive this locally (its own
+# if/elif chain on risk_score, almost always a stale 4-tier version with no
+# EXTREME and different breakpoints) should call get_risk_tier_style()
+# instead, so a single edit here fixes every display consistently.
+TIER_STYLE = {
+    "EXTREME": {"color": "#cc0000", "emoji": "🔴"},
+    "CRITICAL": {"color": "#ff0000", "emoji": "🔴"},
+    "HIGH": {"color": "#ff6600", "emoji": "🟠"},
+    "MODERATE": {"color": "#ffaa00", "emoji": "🟡"},
+    "LOW": {"color": "#00cc00", "emoji": "🟢"},
+}
+
+
+def tier_from_score(score: float) -> str:
+    """Map a 0-100 risk score to a tier name, matching the backend exactly."""
+    if score >= 85:
+        return "EXTREME"
+    elif score >= 70:
+        return "CRITICAL"
+    elif score >= 50:
+        return "HIGH"
+    elif score >= 30:
+        return "MODERATE"
+    else:
+        return "LOW"
+
+
+def get_risk_tier_style(score: float = None, tier: str = None) -> dict:
+    """Resolve a risk tier's label/color/emoji.
+
+    Pass `tier` when you already have the backend's real risk_tier string
+    (preferred - e.g. state.risk_category); pass `score` to derive one
+    locally when no real tier is available yet. Returns
+    {"tier", "color", "emoji"}.
+    """
+    if tier not in TIER_STYLE:
+        tier = tier_from_score(score if score is not None else 0)
+    return {"tier": tier, **TIER_STYLE[tier]}
+
+
 def create_state_from_api(api_data: dict) -> DashboardState:
     """Create a DashboardState from API response data."""
 
@@ -146,33 +188,11 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.risk_score = float(risk_score)
 
     # Prefer the backend's own risk_tier (src/alerts/formatter.py:get_risk_tier)
-    # over re-deriving a category from score thresholds locally - the local
-    # thresholds (40/60/80, 4 tiers) didn't match the backend's actual
-    # thresholds (30/50/70/85, 5 tiers) and could never even reach EXTREME,
-    # the most severe tier, so category/color/emoji silently disagreed with
-    # what the backend determined.
-    tier_style = {
-        "EXTREME": ("#cc0000", "🔴"),
-        "CRITICAL": ("#ff0000", "🔴"),
-        "HIGH": ("#ff6600", "🟠"),
-        "MODERATE": ("#ffaa00", "🟡"),
-        "LOW": ("#00cc00", "🟢"),
-    }
-    risk_tier = api_data.get("risk_tier")
-    if risk_tier not in tier_style:
-        # Fallback for callers with no real risk_tier (e.g. no API response)
-        if state.risk_score >= 85:
-            risk_tier = "EXTREME"
-        elif state.risk_score >= 70:
-            risk_tier = "CRITICAL"
-        elif state.risk_score >= 50:
-            risk_tier = "HIGH"
-        elif state.risk_score >= 30:
-            risk_tier = "MODERATE"
-        else:
-            risk_tier = "LOW"
-    state.risk_category = risk_tier
-    state.risk_color, state.risk_emoji = tier_style[risk_tier]
+    # over re-deriving a category from score thresholds locally.
+    style = get_risk_tier_style(score=state.risk_score, tier=api_data.get("risk_tier"))
+    state.risk_category = style["tier"]
+    state.risk_color = style["color"]
+    state.risk_emoji = style["emoji"]
 
     # Extract other data
     state.population_exposed = api_data.get("population_exposed", 0)

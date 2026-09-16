@@ -8,6 +8,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from hackathon.app.modules.v4.state import get_risk_tier_style
+
 
 def render_emergency_operations_dashboard(district: str, risk_score: float) -> None:
     """Render Emergency Operations Center dashboard."""
@@ -40,16 +42,12 @@ def render_emergency_operations_dashboard(district: str, risk_score: float) -> N
     # Top row: Situation Overview
     col1, col2, col3, col4 = st.columns(4)
 
-    risk_color = (
-        "🔴"
-        if risk_score >= 80
-        else "🟠" if risk_score >= 60 else "🟡" if risk_score >= 40 else "🟢"
-    )
-    risk_category = (
-        "EXTREME"
-        if risk_score >= 80
-        else "HIGH" if risk_score >= 60 else "MODERATE" if risk_score >= 40 else "LOW"
-    )
+    # Matches the backend's real tiers (get_risk_tier_style) instead of a
+    # separately-drifted 4-tier scale (80/60/40) that mislabeled its >=80
+    # threshold as "EXTREME" when the backend's actual EXTREME starts at 85.
+    _style = get_risk_tier_style(score=risk_score)
+    risk_color = _style["emoji"]
+    risk_category = _style["tier"]
 
     with col1:
         st.markdown(

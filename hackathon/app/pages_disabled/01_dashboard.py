@@ -11,6 +11,8 @@ import plotly.express as px
 import requests
 import streamlit as st
 
+from hackathon.app.modules.v4.state import get_risk_tier_style, tier_from_score
+
 # Set page config
 
 # API URL
@@ -122,11 +124,7 @@ def main():
     with col3:
         st.metric("Rainfall", f"{rainfall_mm} mm")
     with col4:
-        color = (
-            "🔴"
-            if score >= 80
-            else "🟠" if score >= 60 else "🟡" if score >= 40 else "🟢"
-        )
+        color = get_risk_tier_style(score=score, tier=risk_tier)["emoji"]
         st.metric("Risk Score", f"{color} {score:.1f}%")
 
     st.divider()
@@ -138,11 +136,12 @@ def main():
         st.progress(score / 100, text=f"{score:.1f}%")
     with col2:
         st.markdown("### Recommendations")
-        if score >= 80:
+        tier = risk_tier if risk_tier else tier_from_score(score)
+        if tier in ("EXTREME", "CRITICAL"):
             st.error("🚨 IMMEDIATE EVACUATION - Seek higher ground")
-        elif score >= 60:
+        elif tier == "HIGH":
             st.warning("⚠️ PREPARE TO EVACUATE - Move to higher ground")
-        elif score >= 40:
+        elif tier == "MODERATE":
             st.info("ℹ️ MONITOR CONDITIONS - Stay informed")
         else:
             st.success("✅ NORMAL - No immediate risk")
