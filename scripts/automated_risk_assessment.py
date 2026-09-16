@@ -59,7 +59,7 @@ def get_forecast_precipitation(lat: float, lon: float) -> float:
             "hourly": "rain",
             "forecast_days": 1,
         },
-        timeout=15,
+        timeout=25,
     )
     resp.raise_for_status()
     rain = resp.json().get("hourly", {}).get("rain", [])
