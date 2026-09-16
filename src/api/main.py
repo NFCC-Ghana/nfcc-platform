@@ -17,7 +17,8 @@ from src.api.routes.alerts import router as alerts_router
 from src.api.routes.forecast import router as forecast_router
 from src.api.routes.explain_fusion import router as explain_fusion_router
 from src.api.routes.subscriptions import router as subscriptions_router
-from src.alerts.formatter import get_risk_tier
+from src.api.routes.situation import router as situation_router
+from src.alerts.formatter import calculate_score, get_risk_tier
 from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
@@ -47,19 +48,6 @@ class ScoreResponse(BaseModel):
     risk_tier: str
     alert_sent: bool
     timestamp: str
-
-
-def calculate_score(precipitation: float, temperature: float = None) -> float:
-    if precipitation <= 0:
-        return 0.0
-    elif precipitation < 10:
-        return min(100, precipitation * 3)
-    elif precipitation < 30:
-        return min(100, 30 + (precipitation - 10) * 2)
-    elif precipitation < 50:
-        return min(100, 70 + (precipitation - 30) * 1.5)
-    else:
-        return min(100, 95 + (precipitation - 50) * 0.2)
 
 
 @asynccontextmanager
@@ -212,6 +200,7 @@ app.include_router(dam_router)
 app.include_router(subscriptions_router)
 app.include_router(explain_router)
 app.include_router(health_router)
+app.include_router(situation_router)
 
 # Ensure database is initialized on startup
 from src.database.alert_db import init_db

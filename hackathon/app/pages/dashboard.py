@@ -986,7 +986,13 @@ def main():
     }
 
     with st.spinner("🔄 Analyzing flood risk..."):
-        api_data = call_api("/score", "POST", api_payload)
+        # /situation (src/api/routes/situation.py) computes the same
+        # score/risk_tier /score does, plus real hydrology evidence,
+        # population/infrastructure impact estimates, and community report
+        # counts in one call - /score alone left every non-header field
+        # (population, schools, evidence readings, lead time, reports) on
+        # static demo defaults, since it never returned any of them.
+        api_data = call_api("/situation", "POST", api_payload)
 
     state = create_state_from_api(api_data)
 

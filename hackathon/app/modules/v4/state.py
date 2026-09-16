@@ -75,6 +75,7 @@ class DashboardState:
     # ============================================================
     residential_loss_ghs: float = 0.0
     infrastructure_loss_ghs: float = 0.0
+    agricultural_loss_ghs: float = 0.0
     total_loss_ghs: float = 0.0
     recovery_time_weeks: int = 0
 
@@ -201,7 +202,10 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.total_reports = api_data.get("total_reports", 0)
     state.verified_reports = api_data.get("verified_reports", 0)
 
-    # Evidence confidence
+    # Evidence confidence - these represent fixed trust in each data
+    # source's general reliability (e.g. "how much do we trust CHIRPS
+    # satellite rainfall data"), not a per-request measurement, so there's
+    # no live value to pull from the API; defaults stand deliberately.
     state.evidence_rainfall_confidence = api_data.get("rainfall_confidence", 85.0)
     state.evidence_river_confidence = api_data.get("river_confidence", 78.0)
     state.evidence_soil_confidence = api_data.get("soil_confidence", 72.0)
@@ -209,15 +213,43 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.evidence_citizen_confidence = api_data.get("citizen_confidence", 65.0)
     state.evidence_overall_confidence = api_data.get("overall_confidence", 80.0)
 
-    # Lead time
+    # Lead time - from src/exposure/impact_estimator.py via /situation,
+    # keyed off the real risk_tier above.
     state.lead_time_hours = api_data.get("lead_time_hours", 24)
     state.lead_time_action = api_data.get("lead_time_action", "MONITOR CONDITIONS")
 
     # Weather
     state.rainfall_mm = api_data.get("rainfall_mm", 75.0)
+    state.river_level_m = api_data.get("river_level_m", state.river_level_m)
+    state.soil_saturation_percent = api_data.get(
+        "soil_saturation_percent", state.soil_saturation_percent
+    )
     state.forecast_24h_mm = api_data.get("forecast_24h_mm", 45.0)
     state.forecast_48h_mm = api_data.get("forecast_48h_mm", 60.0)
     state.forecast_72h_mm = api_data.get("forecast_72h_mm", 30.0)
+
+    # Population/infrastructure impact - from src/exposure/impact_estimator.py
+    # via /situation. Falls back to the dashboard's own demo generator
+    # (state_fallback.get_fallback_data) only when /situation wasn't called
+    # or returned nothing for these fields (population_exposed stays 0).
+    if "population_total" in api_data:
+        state.population = api_data["population_total"]
+    state.children_exposed = api_data.get("children_exposed", 0)
+    state.elderly_exposed = api_data.get("elderly_exposed", 0)
+    state.households_affected = api_data.get("households_affected", 0)
+    state.schools_exposed = api_data.get("schools_exposed", 0)
+    state.hospitals_exposed = api_data.get("hospitals_exposed", 0)
+    state.markets_exposed = api_data.get("markets_exposed", 0)
+    state.power_substations_affected = api_data.get("power_substations_affected", 0)
+    if "area_km2" in api_data:
+        state.area_km2 = api_data["area_km2"]
+
+    # Economic impact - see src/api/routes/situation.py for the (simple,
+    # uncalibrated) loss-estimate formula.
+    state.residential_loss_ghs = api_data.get("residential_loss_ghs", 0.0)
+    state.infrastructure_loss_ghs = api_data.get("infrastructure_loss_ghs", 0.0)
+    state.agricultural_loss_ghs = api_data.get("agricultural_loss_ghs", 0.0)
+    state.total_loss_ghs = api_data.get("total_loss_ghs", 0.0)
 
     return state
 

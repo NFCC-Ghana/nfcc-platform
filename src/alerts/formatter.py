@@ -3,6 +3,20 @@
 from typing import Dict, Any, Optional
 
 
+def calculate_score(precipitation: float, temperature: float = None) -> float:
+    """Convert precipitation (mm) to a 0-100 flood risk score."""
+    if precipitation <= 0:
+        return 0.0
+    elif precipitation < 10:
+        return min(100, precipitation * 3)
+    elif precipitation < 30:
+        return min(100, 30 + (precipitation - 10) * 2)
+    elif precipitation < 50:
+        return min(100, 70 + (precipitation - 30) * 1.5)
+    else:
+        return min(100, 95 + (precipitation - 50) * 0.2)
+
+
 def get_risk_tier(score: float) -> str:
     """Get risk tier from score."""
     if score < 30:
