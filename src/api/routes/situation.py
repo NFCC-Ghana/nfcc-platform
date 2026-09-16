@@ -242,6 +242,12 @@ async def get_situation(request: SituationRequest):
             "saturation_percent", 0
         )
         response["recommendations"] = hydrology.get("recommendations", [])
+        # Real Sentinel-1 SAR satellite flood detection (Google Earth
+        # Engine, via src/hydrology/sentinel_processor.py) when reachable;
+        # satellite["source"] says "Sentinel-1 SAR" for a real detection
+        # or "Sentinel-1 (simulated)"/"(unavailable)" otherwise - always
+        # check this field before treating the numbers as real.
+        response["satellite"] = hydrology.get("satellite", {})
 
     # Risk timeline: real Open-Meteo forecast rainfall (see
     # src/hydrology/weather_forecast.py), layered on top of the current

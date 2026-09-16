@@ -570,12 +570,23 @@ def render_evidence_panel(state):
             "confidence": state.evidence_soil_confidence,
         },
         {
-            "name": "Satellite Detection",
-            "score": 75 if state.risk_score > 50 else 40,
+            # Real Sentinel-1 SAR satellite flood detection (Google Earth
+            # Engine via src/hydrology/sentinel_processor.py) when
+            # reachable - this used to be a fabricated score with no
+            # satellite data behind it at all
+            # (75/40 purely from risk_score, which is itself derived from
+            # rainfall, not satellite imagery). Label discloses when it's
+            # simulated rather than a real detection.
+            "name": (
+                "Satellite Detection"
+                if state.satellite_source == "Sentinel-1 SAR"
+                else "Satellite Detection (simulated)"
+            ),
+            "score": min(100, state.satellite_flood_extent_km2 * 10),
             "stars": (
                 "★★★★★"
-                if state.risk_score > 70
-                else "★★★★☆" if state.risk_score > 40 else "★★★☆☆"
+                if state.satellite_water_detected and state.satellite_flood_extent_km2 > 5
+                else "★★★★☆" if state.satellite_water_detected else "★★★☆☆"
             ),
             "confidence": state.evidence_satellite_confidence,
         },

@@ -8,6 +8,7 @@ from .flood_polygons import flood_polygons
 from .rainfall_history import rainfall_history
 from .reservoir_intelligence import reservoir_intelligence
 from .river_intelligence import river_intelligence
+from .sentinel_processor import sentinel_processor
 from .soil_moisture import soil_moisture
 
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +59,12 @@ class UnifiedHydrologicalIntelligence:
             # 7. Get runoff forecast
             runoff_forecast = soil_moisture.get_runoff_forecast(district, rainfall_mm)
 
+            # 7.5 Real Sentinel-1 SAR satellite flood detection (falls back
+            # to a clearly-marked simulation - source: "Sentinel-1
+            # (simulated)" vs "Sentinel-1 SAR" - if Earth Engine isn't
+            # reachable; never raises).
+            satellite = sentinel_processor.detect_flood(district)
+
             # 8. Calculate composite risk score
             risk_factors = self._calculate_risk_factors(
                 rainfall_data, river_status, dam_risk, soil_status, flood_history
@@ -101,6 +108,13 @@ class UnifiedHydrologicalIntelligence:
                     "risk_level": flood_history.get("risk_level", "LOW"),
                     "similar_events": inundation_risk.get("similar_event", "None"),
                     "estimated_affected": inundation_risk.get("estimated_affected", 0),
+                },
+                "satellite": {
+                    "water_detected": satellite.get("water_detected", False),
+                    "flood_extent_km2": satellite.get("flood_extent_km2", 0),
+                    "acquisition_date": satellite.get("acquisition_date"),
+                    "source": satellite.get("source", "Sentinel-1 (simulated)"),
+                    "confidence": satellite.get("confidence", 0),
                 },
                 "composite_risk": {
                     "score": risk_factors["total_score"],
@@ -148,6 +162,12 @@ class UnifiedHydrologicalIntelligence:
                 "runoff_forecast": {"runoff_risk": "LOW"},
             },
             "history": {"total_events": 0, "risk_level": "LOW"},
+            "satellite": {
+                "water_detected": False,
+                "flood_extent_km2": 0,
+                "source": "Sentinel-1 (unavailable)",
+                "confidence": 0,
+            },
             "composite_risk": {"score": 50, "category": "MODERATE", "confidence": 0.7},
             "recommendations": [
                 {

@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Tuple
 import ee
 import numpy as np
 
+from .ee_auth import initialize_earth_engine
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -20,15 +22,15 @@ class SentinelProcessor:
     """
 
     def __init__(self):
-        self.ee_initialized = False
-
-        # Earth Engine initialization
-        try:
-            ee.Initialize()
-            self.ee_initialized = True
+        # Was a bare ee.Initialize() with no service account/project - that
+        # silently fails in any non-interactive environment (Cloud Run,
+        # CI), which is why this always fell back to
+        # _simulate_flood_detection()'s random numbers in production
+        # despite the real Earth Engine credentials already being set up
+        # and working for the CHIRPS rainfall pull.
+        self.ee_initialized = initialize_earth_engine()
+        if self.ee_initialized:
             logger.info("Earth Engine initialized for Sentinel-1 processing")
-        except Exception as e:
-            logger.warning(f"Earth Engine not available: {e}")
 
         self.cache_path = Path("data/flood_polygons/sentinel")
         self.cache_path.mkdir(parents=True, exist_ok=True)

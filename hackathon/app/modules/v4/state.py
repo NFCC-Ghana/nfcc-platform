@@ -57,6 +57,13 @@ class DashboardState:
     forecast_24h_mm: float = 45.0
     forecast_48h_mm: float = 60.0
     forecast_72h_mm: float = 30.0
+    # Real Sentinel-1 SAR satellite flood detection (Google Earth Engine,
+    # via src/hydrology/sentinel_processor.py) when reachable -
+    # satellite_source says "Sentinel-1 SAR" for a real detection or
+    # "Sentinel-1 (simulated)"/"(unavailable)" otherwise.
+    satellite_water_detected: bool = False
+    satellite_flood_extent_km2: float = 0.0
+    satellite_source: str = "Sentinel-1 (unavailable)"
     # Real forecast-driven risk timeline from /situation (see
     # src/api/routes/situation.py), when available - list of
     # {"hour", "score", "risk_tier"}. Empty when /situation wasn't called
@@ -247,6 +254,11 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.forecast_72h_mm = api_data.get("forecast_72h_mm", 30.0)
     state.risk_timeline = api_data.get("risk_timeline", [])
     state.shelter_names = api_data.get("shelter_names", [])
+
+    satellite = api_data.get("satellite", {})
+    state.satellite_water_detected = satellite.get("water_detected", False)
+    state.satellite_flood_extent_km2 = satellite.get("flood_extent_km2", 0.0)
+    state.satellite_source = satellite.get("source", "Sentinel-1 (unavailable)")
 
     # Population/infrastructure impact - from src/exposure/impact_estimator.py
     # via /situation. Falls back to the dashboard's own demo generator
