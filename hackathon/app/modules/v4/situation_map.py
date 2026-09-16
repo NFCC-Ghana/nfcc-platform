@@ -148,9 +148,9 @@ def render_situation_map(state):
         with col2:
             st.metric("Active Flood Zones", "3")
         with col3:
-            st.metric("Shelters Available", state.shelters_available)
+            st.metric("Shelters Available", getattr(state, "shelters_available", 3))
         with col4:
-            st.metric("Verified Reports", state.verified_reports)
+            st.metric("Verified Reports", getattr(state, "verified_reports", 0))
 
         st.caption("🗺️ Click on markers for details • Updated in real-time")
 

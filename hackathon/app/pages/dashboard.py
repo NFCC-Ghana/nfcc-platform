@@ -398,6 +398,8 @@ def render_national_map(state):
             self.district = "Accra Central"
             self.risk_score = 50
             self.risk_category = "MODERATE"
+            self.shelters_available = 3
+            self.verified_reports = 0
 
     map_state = MapState()
     map_state.lat = getattr(state, "lat", 5.560)
@@ -405,6 +407,14 @@ def render_national_map(state):
     map_state.district = getattr(state, "district", "Accra Central")
     map_state.risk_score = getattr(state, "risk_score", 50)
     map_state.risk_category = getattr(state, "risk_category", "MODERATE")
+    # These two were missing entirely until now - situation_map.py's own
+    # stat cards read state.shelters_available/verified_reports directly
+    # (no getattr fallback there), so passing this stripped-down MapState
+    # instead of the real state raised an AttributeError that its own
+    # try/except silently swallowed into "Map temporarily unavailable",
+    # falling back to a hardcoded, non-district-aware community table.
+    map_state.shelters_available = getattr(state, "shelters_available", 3)
+    map_state.verified_reports = getattr(state, "verified_reports", 0)
 
     # Render the actual map
     try:
