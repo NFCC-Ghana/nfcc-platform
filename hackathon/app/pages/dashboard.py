@@ -340,6 +340,14 @@ def render_control_panel():
             start_demo = st.button("▶ Start Demo", use_container_width=True)
 
         st.divider()
+        st.markdown("### 🔔 Alert Review Queue")
+        st.caption(
+            "Automated risk assessments awaiting human approval before "
+            "any real alert goes out. Nothing is ever sent automatically."
+        )
+        review_mode = st.toggle("Review queue mode", value=False)
+
+        st.divider()
         st.markdown("### 📡 Data Sources")
         sources = [
             "🛰️ CHIRPS Rainfall",
@@ -360,6 +368,7 @@ def render_control_panel():
         "rainfall_mm": rainfall_mm,
         "demo_mode": demo_mode,
         "start_demo": start_demo,
+        "review_mode": review_mode,
     }
 
 
@@ -1167,6 +1176,127 @@ def render_situation(
     st.caption(f"🔄 Last updated: {state.timestamp[:19]}")
 
 
+# All districts this platform has real hydrology/impact data for - used
+# by the "Run Automated Check Now" button to mirror what
+# scripts/automated_risk_assessment.py does on its 3-hourly schedule
+# (.github/workflows/automated_risk_assessment.yml), without waiting for
+# that schedule.
+ALL_TRACKED_DISTRICTS = [
+    "Accra Central",
+    "Accra West",
+    "Accra East",
+    "Tema",
+    "Kumasi",
+    "Tamale",
+    "Cape Coast",
+    "Ho",
+    "Sunyani",
+]
+
+
+def render_alert_review_queue():
+    """The human-in-the-loop screen: automated assessments wait here until
+    a person explicitly approves or dismisses them - see
+    src/api/routes/alert_review.py. Before this screen existed, nothing
+    stood between an automated score crossing threshold and a real alert
+    actually being sent."""
+    st.markdown("# 🔔 Alert Review Queue")
+    st.caption(
+        "Automated risk assessments awaiting human review. Nothing is "
+        "sent to real recipients until you click Approve below."
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        if st.button("🔄 Run Automated Check Now", use_container_width=True):
+            with st.spinner("Assessing all districts..."):
+                queued = 0
+                for district in ALL_TRACKED_DISTRICTS:
+                    try:
+                        precip = weather_forecast_24h(district)
+                    except Exception:
+                        continue
+                    result = call_api(
+                        "/alerts/assess",
+                        "POST",
+                        {"location": district, "precipitation": precip},
+                    )
+                    if result.get("queued"):
+                        queued += 1
+                st.session_state["_last_check_queued"] = queued
+            st.rerun()
+
+    if "_last_check_queued" in st.session_state:
+        st.info(
+            f"Last manual check queued {st.session_state['_last_check_queued']} "
+            f"district(s) for review."
+        )
+
+    pending = call_api("/alerts/pending", "GET")
+    alerts = pending.get("alerts", [])
+
+    if "error" in pending:
+        st.error(f"Could not reach the review queue: {pending['error']}")
+        return
+
+    if not alerts:
+        st.success("✅ No pending alerts. All caught up.")
+        return
+
+    st.markdown(f"### {len(alerts)} awaiting review")
+    for alert in alerts:
+        style = get_risk_tier_style(tier=alert["risk_tier"])
+        with st.container(border=True):
+            c1, c2, c3 = st.columns([2, 2, 1])
+            with c1:
+                st.markdown(
+                    f"{style['emoji']} **{alert['location']}** — "
+                    f"{alert['risk_tier']} ({alert['score']:.0f}%)"
+                )
+                st.caption(f"Precipitation: {alert['precipitation']}mm")
+            with c2:
+                st.markdown(f"*{alert['message']}*")
+                st.caption(f"Queued: {alert['created_at'][:19]}")
+            with c3:
+                if st.button(
+                    "✅ Approve & Send",
+                    key=f"approve_{alert['id']}",
+                    use_container_width=True,
+                ):
+                    call_api(
+                        f"/alerts/pending/{alert['id']}/approve",
+                        "POST",
+                        {"reviewed_by": "dashboard-operator"},
+                    )
+                    st.rerun()
+                if st.button(
+                    "❌ Dismiss",
+                    key=f"dismiss_{alert['id']}",
+                    use_container_width=True,
+                ):
+                    call_api(
+                        f"/alerts/pending/{alert['id']}/dismiss",
+                        "POST",
+                        {"reviewed_by": "dashboard-operator"},
+                    )
+                    st.rerun()
+
+
+def weather_forecast_24h(district: str) -> float:
+    """Real next-24h forecasted rainfall for a district, via the same
+    /situation call the rest of the dashboard already uses (its
+    forecast_24h_mm field, sourced from Open-Meteo) - reused here so the
+    manual "check now" button assesses real current forecast conditions,
+    the same way the scheduled script does, not the rainfall slider's
+    manually-set test value."""
+    result = call_api(
+        "/situation",
+        "POST",
+        {"location": district, "precipitation": 0},
+    )
+    return result.get("forecast_24h_mm", 0.0)
+
+
 # Scripted rainfall trajectory for demo mode - each stage is a real value
 # sent to the real /situation endpoint, so the "story" is the actual
 # system's actual response, not separately scripted/fabricated content.
@@ -1202,6 +1332,10 @@ def main():
     slider moves, which is why that path never hit this problem."""
     control_data = render_control_panel()
     district = control_data["district"]
+
+    if control_data["review_mode"]:
+        render_alert_review_queue()
+        return
 
     if not control_data["demo_mode"]:
         st.session_state["demo_stage_idx"] = None

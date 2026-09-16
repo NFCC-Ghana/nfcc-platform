@@ -1,0 +1,28 @@
+name: Automated Flood Risk Assessment
+
+on:
+  schedule:
+    # Every 3 hours - frequent enough to catch a developing flood event
+    # without spamming the review queue; adjust if the team wants tighter
+    # monitoring during rainy season.
+    - cron: "0 */3 * * *"
+  workflow_dispatch:
+
+jobs:
+  automated-risk-assessment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run automated risk assessment
+        run: python scripts/automated_risk_assessment.py

@@ -45,6 +45,7 @@ def init_db() -> None:
     """Initialize the alerts database with table and indexes."""
     init_alerts_table()
     init_subscriptions_table()
+    init_pending_alerts_table()
 
 
 def init_alerts_table() -> None:
@@ -171,6 +172,106 @@ def get_alert_stats() -> Dict[str, Any]:
             "by_risk_tier": by_tier,
             "top_locations": top_locations,
         }
+
+
+# ============================================================
+# PENDING ALERTS - human review queue
+# ============================================================
+# Automated risk assessment (scripts/automated_risk_assessment.py, run on
+# a schedule via .github/workflows/automated_risk_assessment.yml) inserts
+# rows here instead of calling AlertEngine directly - nothing gets sent to
+# real people until a human reviews it in the dashboard's Alert Review
+# Queue and explicitly approves it (src/api/routes/alert_review.py).
+# Before this, AlertEngine.process() sent the moment a score crossed
+# threshold with no human step anywhere in the code.
+
+
+def init_pending_alerts_table() -> None:
+    """Initialize the pending_alerts table (human review queue)."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pending_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                location TEXT NOT NULL,
+                score REAL NOT NULL,
+                risk_tier TEXT NOT NULL,
+                precipitation REAL NOT NULL,
+                message TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                reviewed_at TEXT,
+                reviewed_by TEXT
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pending_alerts_status "
+            "ON pending_alerts(status)"
+        )
+        conn.commit()
+
+
+def save_pending_alert(
+    location: str,
+    score: float,
+    risk_tier: str,
+    precipitation: float,
+    message: str,
+) -> int:
+    """Queue an automated assessment for human review. Returns the new row's id."""
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO pending_alerts (
+                location, score, risk_tier, precipitation, message,
+                status, created_at
+            ) VALUES (?, ?, ?, ?, ?, 'pending', ?)
+            """,
+            (location, score, risk_tier, precipitation, message, now),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_pending_alerts(status: str = "pending") -> List[Dict[str, Any]]:
+    """List pending-review alerts, newest first. status=None returns all."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if status:
+            cursor.execute(
+                "SELECT * FROM pending_alerts WHERE status = ? "
+                "ORDER BY created_at DESC",
+                (status,),
+            )
+        else:
+            cursor.execute("SELECT * FROM pending_alerts ORDER BY created_at DESC")
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_pending_alert(alert_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch one pending-review alert by id, or None if it doesn't exist."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM pending_alerts WHERE id = ?", (alert_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def update_pending_alert_status(
+    alert_id: int, status: str, reviewed_by: str = None
+) -> None:
+    """Mark a pending alert as approved/dismissed with a review timestamp."""
+    now = datetime.now().isoformat()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE pending_alerts SET status = ?, reviewed_at = ?, "
+            "reviewed_by = ? WHERE id = ?",
+            (status, now, reviewed_by, alert_id),
+        )
+        conn.commit()
 
 
 def get_total_alerts_count(location_filter: Optional[str] = None) -> int:
