@@ -8,6 +8,8 @@ import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 
+from hackathon.app.modules.v4.state import TRACKED_DISTRICT_COUNT
+
 
 def render_situation_map(state):
     """Render the complete interactive situation map."""
@@ -133,20 +135,25 @@ def render_situation_map(state):
 
         st_folium(m, width=800, height=500)
 
-        # Districts Monitored / Active Flood Zones / Shelters Available have
-        # no real data source anywhere in the codebase (no live shelter
-        # registry or flood-zone tracker exists) and stay as illustrative
-        # placeholders. Verified Reports now uses the real count from
-        # src/community/community_memory.py via /situation instead of a
-        # hardcoded "4" that never matched state.verified_reports (which
-        # was already correctly wired and reads 0 - no real report has ever
-        # been submitted, since there's no citizen-facing reporting channel
-        # built yet).
+        # Districts Monitored / Active Flood Zones now come from GET
+        # /national/summary (real river-discharge-based computation via
+        # Open-Meteo's Flood API, dashboard.py's get_national_summary),
+        # passed through on map_state - previously hardcoded "10"/"3" with
+        # no data behind either number. Shelters Available has no real
+        # source anywhere in the codebase (no live shelter registry
+        # exists) and stays illustrative. Verified Reports uses the real
+        # count from src/community/community_memory.py via /situation
+        # instead of a hardcoded "4" that never matched
+        # state.verified_reports (already correctly wired, reads 0 - no
+        # real report has ever been submitted, no reporting channel built).
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Districts Monitored", "10")
+            st.metric(
+                "Districts Monitored",
+                getattr(state, "district_count", TRACKED_DISTRICT_COUNT),
+            )
         with col2:
-            st.metric("Active Flood Zones", "3")
+            st.metric("Active Flood Zones", getattr(state, "active_flood_zones", 3))
         with col3:
             st.metric("Shelters Available", getattr(state, "shelters_available", 3))
         with col4:

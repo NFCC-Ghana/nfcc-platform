@@ -24,7 +24,9 @@ class WeatherForecastEngine:
         self.forecast_cache = {}
         self.open_meteo_url = "https://api.open-meteo.com/v1/forecast"
 
-        # Ghana district coordinates
+        # Ghana district coordinates (verified) - matches
+        # hackathon/app/pages/dashboard.py's get_district_data, the only
+        # other place these are listed.
         self.district_coords = {
             "Accra Central": {"lat": 5.560, "lon": -0.210},
             "Accra West": {"lat": 5.550, "lon": -0.230},
@@ -32,6 +34,9 @@ class WeatherForecastEngine:
             "Tema": {"lat": 5.650, "lon": -0.020},
             "Kumasi": {"lat": 6.670, "lon": -1.620},
             "Tamale": {"lat": 9.400, "lon": -0.840},
+            "Cape Coast": {"lat": 5.100, "lon": -1.250},
+            "Ho": {"lat": 6.601, "lon": 0.471},
+            "Sunyani": {"lat": 7.333, "lon": -2.333},
         }
 
         logger.info("Weather Forecast Engine initialized")
@@ -89,6 +94,16 @@ class WeatherForecastEngine:
             else:
                 forecast[f"{h}h"] = 0.0
 
+        # Cumulative rainfall at each 6-hour mark within the next 24h - used
+        # to build a real forecast-driven risk timeline (src/api/routes/
+        # situation.py), rather than a fixed +15/+10/+5 synthetic offset
+        # from the current score with no actual forecast behind it.
+        forecast["cumulative_6h"] = {}
+        for h in [6, 12, 18, 24]:
+            forecast["cumulative_6h"][str(h)] = (
+                round(sum(rain[:h]), 1) if len(rain) >= h else 0.0
+            )
+
         # Daily breakdown
         forecast["daily"] = []
         for day in range(3):
@@ -137,6 +152,15 @@ class WeatherForecastEngine:
                     / 3,
                 }
             )
+
+        # Same shape as _parse_open_meteo's real cumulative_6h, linearly
+        # interpolated from the 24h total so callers don't need to handle
+        # two different response shapes depending on whether the real API
+        # call succeeded.
+        rain_24h = forecast.get("24h", 0.0)
+        forecast["cumulative_6h"] = {
+            str(h): round(rain_24h * h / 24, 1) for h in [6, 12, 18, 24]
+        }
 
         forecast["source"] = "fallback"
         forecast["timestamp"] = datetime.now().isoformat()

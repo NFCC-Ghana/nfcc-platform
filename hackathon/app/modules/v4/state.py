@@ -7,6 +7,13 @@ import datetime
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
+# Real count of districts this app actually has hydrology/impact data for
+# (dashboard.py's get_district_data lists all 9: Accra Central/West/East,
+# Tema, Kumasi, Tamale, Cape Coast, Ho, Sunyani). Ghana has 261 real MMDAs;
+# the "Districts Monitored" stat used to just hardcode "10", matching
+# neither number.
+TRACKED_DISTRICT_COUNT = 9
+
 
 @dataclass
 class DashboardState:
@@ -50,6 +57,17 @@ class DashboardState:
     forecast_24h_mm: float = 45.0
     forecast_48h_mm: float = 60.0
     forecast_72h_mm: float = 30.0
+    # Real forecast-driven risk timeline from /situation (see
+    # src/api/routes/situation.py), when available - list of
+    # {"hour", "score", "risk_tier"}. Empty when /situation wasn't called
+    # or the forecast call failed; render_risk_timeline falls back to a
+    # synthetic offset from risk_score in that case.
+    risk_timeline: List[Dict[str, Any]] = field(default_factory=list)
+    # Real, named public buildings for the selected district (see
+    # src/exposure/shelter_candidates.py via /situation) - empty when
+    # /situation wasn't called, in which case the Operations panel falls
+    # back to a generic "{district} X" pattern.
+    shelter_names: List[str] = field(default_factory=list)
 
     # ============================================================
     # POPULATION IMPACT
@@ -227,6 +245,8 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.forecast_24h_mm = api_data.get("forecast_24h_mm", 45.0)
     state.forecast_48h_mm = api_data.get("forecast_48h_mm", 60.0)
     state.forecast_72h_mm = api_data.get("forecast_72h_mm", 30.0)
+    state.risk_timeline = api_data.get("risk_timeline", [])
+    state.shelter_names = api_data.get("shelter_names", [])
 
     # Population/infrastructure impact - from src/exposure/impact_estimator.py
     # via /situation. Falls back to the dashboard's own demo generator

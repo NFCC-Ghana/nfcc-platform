@@ -22,6 +22,7 @@ import streamlit as st
 from hackathon.app.modules.v4.situation_map import render_map_fallback
 from hackathon.app.modules.v4.situation_map import render_situation_map
 from hackathon.app.modules.v4.state import (
+    TRACKED_DISTRICT_COUNT,
     create_state_from_api,
     get_risk_tier_style,
     tier_from_score,
@@ -111,6 +112,18 @@ def call_api(
         return {"error": "Cannot connect to API"}
     except Exception as e:
         return {"error": str(e)}
+
+
+@st.cache_data(ttl=900)
+def get_national_summary() -> dict:
+    """Districts Monitored / Active Flood Zones, from GET /national/summary
+    (src/api/routes/situation.py) - real river-discharge-based computation
+    across every tracked district, independent of which one is selected.
+    Cached for 15 minutes since it queries an external API (Open-Meteo
+    Flood API) once per tracked district and river discharge doesn't
+    change meaningfully within that window - re-fetching on every rainfall
+    slider tick would be wasteful and slow (~6s for 9 districts)."""
+    return call_api("/national/summary", "GET")
 
 
 def get_district_data(district: str) -> dict:
@@ -206,6 +219,48 @@ def get_district_data(district: str) -> dict:
                 "Lamashegu",
             ],
         },
+        # Real coordinates and neighborhood names (verified) added alongside
+        # src/exposure/impact_estimator.py's existing population/infrastructure
+        # data for these three districts, which had no UI to select them.
+        "Cape Coast": {
+            "region": "Central",
+            "population": 169894,
+            "area_km2": 62.4,
+            "lat": 5.100,
+            "lon": -1.250,
+            "elevation": 25,
+            "affected_communities": [
+                "Pedu",
+                "Abura",
+                "Kakumdo",
+                "Amamoma",
+                "Kotokuraba",
+            ],
+        },
+        "Ho": {
+            "region": "Volta",
+            "population": 153705,
+            "area_km2": 58.3,
+            "lat": 6.601,
+            "lon": 0.471,
+            "elevation": 100,
+            "affected_communities": ["Bankoe", "Heve", "Ahoe", "Dome", "Hliha"],
+        },
+        "Sunyani": {
+            "region": "Bono",
+            "population": 138256,
+            "area_km2": 55.7,
+            "lat": 7.333,
+            "lon": -2.333,
+            "elevation": 300,
+            "affected_communities": [
+                "Abesim",
+                "Atronie",
+                "New Dormaa",
+                "Penkwase",
+                "Kotokrom",
+            ],
+        },
     }
     return districts.get(district, {})
 
@@ -251,6 +306,9 @@ def render_control_panel():
             "Tema",
             "Kumasi",
             "Tamale",
+            "Cape Coast",
+            "Ho",
+            "Sunyani",
         ]
 
         district = st.selectbox("📍 Select District", districts, index=0)
@@ -390,6 +448,8 @@ def render_national_map(state):
     st.markdown("## 🗺️ National Flood Map")
     st.caption("*Where is flooding occurring or expected?*")
 
+    national = get_national_summary()
+
     # Create a state object for the map
     class MapState:
         def __init__(self):
@@ -400,6 +460,8 @@ def render_national_map(state):
             self.risk_category = "MODERATE"
             self.shelters_available = 3
             self.verified_reports = 0
+            self.district_count = TRACKED_DISTRICT_COUNT
+            self.active_flood_zones = 3
 
     map_state = MapState()
     map_state.lat = getattr(state, "lat", 5.560)
@@ -415,6 +477,13 @@ def render_national_map(state):
     # falling back to a hardcoded, non-district-aware community table.
     map_state.shelters_available = getattr(state, "shelters_available", 3)
     map_state.verified_reports = getattr(state, "verified_reports", 0)
+    # Real, from GET /national/summary (river-discharge-based) - falls
+    # back to the illustrative defaults above if that call failed.
+    if "error" not in national:
+        map_state.district_count = national.get(
+            "district_count", TRACKED_DISTRICT_COUNT
+        )
+        map_state.active_flood_zones = national.get("active_flood_zones", 3)
 
     # Render the actual map. render_situation_map() already renders its own
     # Districts Monitored / Active Flood Zones / Shelters Available /
@@ -655,32 +724,28 @@ def render_operations_panel(state, district_data):
     st.markdown("## 🚗 Operations")
     st.caption("*What resources are deployed and available?*")
 
-    # No real shelter registry exists anywhere in the codebase (nothing
-    # salvaged from PR #26 tracks named venues or capacity), so these
-    # remain illustrative - but generic per-district venue names instead
-    # of always literally naming Accra venues ("Accra High School") even
-    # when e.g. Kumasi is selected, which was actively misleading rather
-    # than just a placeholder.
+    # No officially-designated shelter registry exists publicly for Ghana
+    # (NADMO designates schools/community buildings ad-hoc during an
+    # actual emergency, not from a fixed pre-registered list - confirmed
+    # via research). state.shelter_names (from /situation, real named
+    # public buildings queried from OpenStreetMap per district - see
+    # src/exposure/shelter_candidates.py) replaces the previous generic
+    # "{district} Senior High School" pattern, which was at least
+    # district-scoped but not a real place name. Capacity/status numbers
+    # remain illustrative either way - no real capacity data exists.
     district = state.district
+    names = state.shelter_names or [
+        f"{district} Senior High School",
+        f"{district} Community Center",
+        f"{district} Trade Fair Centre",
+    ]
+    shelter_specs = [
+        {"status": "OPEN", "capacity": 1200, "available": 850},
+        {"status": "OPEN", "capacity": 500, "available": 320},
+        {"status": "PREPARING", "capacity": 2000, "available": 2000},
+    ]
     shelters = [
-        {
-            "name": f"{district} Senior High School",
-            "status": "OPEN",
-            "capacity": 1200,
-            "available": 850,
-        },
-        {
-            "name": f"{district} Community Center",
-            "status": "OPEN",
-            "capacity": 500,
-            "available": 320,
-        },
-        {
-            "name": f"{district} Trade Fair Centre",
-            "status": "PREPARING",
-            "capacity": 2000,
-            "available": 2000,
-        },
+        {"name": names[i], **shelter_specs[i]} for i in range(min(3, len(names)))
     ]
     render_shelter_status(shelters)
 
@@ -751,6 +816,16 @@ def render_ai_decision_center(state):
     urgency = tier
     urgency_color = get_risk_tier_style(tier=tier)["color"]
 
+    # "Protect/Alert N people" and "Estimated Cost" used to be fixed
+    # numbers, identical for every district and rainfall level - state
+    # .population_exposed is real (from /situation), and response
+    # operations cost is a distinct concept from the flood-damage economic
+    # loss already computed elsewhere on this page (evacuation/outreach
+    # logistics cost, not property damage), so it's a separate simple
+    # per-person estimate, illustrative like the economic-loss one - no
+    # real operations-cost model exists anywhere in the codebase either.
+    population_exposed = getattr(state, "population_exposed", 0)
+
     if tier in ("EXTREME", "CRITICAL"):
         action = "🚨 Issue Mandatory Evacuation Order"
         confidence = 95
@@ -760,8 +835,8 @@ def render_ai_decision_center(state):
             "Roads becoming inaccessible",
             "Multiple citizen reports verified",
         ]
-        impact = "Protect 8,200 people"
-        cost = 120000
+        impact = f"Protect {population_exposed:,} people"
+        cost = population_exposed * 15  # full evacuation + temp shelter ops
         time_window = "Within 45 minutes"
     elif tier == "HIGH":
         action = "⚠️ Prepare for Evacuation"
@@ -772,8 +847,8 @@ def render_ai_decision_center(state):
             "Soil saturation increasing",
             "Reports of rising water",
         ]
-        impact = "Protect 4,500 people"
-        cost = 65000
+        impact = f"Protect {population_exposed:,} people"
+        cost = population_exposed * 8  # readiness + resource positioning
         time_window = "Within 2 hours"
     elif tier == "MODERATE":
         action = "📢 Issue Public Awareness Message"
@@ -783,8 +858,8 @@ def render_ai_decision_center(state):
             "Conditions being monitored",
             "Communities advised to stay informed",
         ]
-        impact = "Alert 12,000 people"
-        cost = 15000
+        impact = f"Alert {population_exposed:,} people"
+        cost = population_exposed * 1.25  # SMS/broadcast outreach
         time_window = "Within 4 hours"
     else:
         action = "✅ Continue Normal Monitoring"
@@ -794,8 +869,8 @@ def render_ai_decision_center(state):
             "No immediate threat detected",
             "Regular updates provided",
         ]
-        impact = "Monitor 10 districts"
-        cost = 5000
+        impact = f"Monitor {TRACKED_DISTRICT_COUNT} districts"
+        cost = 5000  # flat routine-monitoring cost, not population-scaled
         time_window = "Ongoing"
 
     col1, col2 = st.columns([2, 1])
@@ -848,15 +923,26 @@ def render_risk_timeline(state):
     st.markdown("## ⏰ Risk Timeline")
     st.caption("*What is expected to happen in the next 24 hours?*")
 
-    hours = ["Now", "6h", "12h", "18h", "24h"]
     current_risk = state.risk_score
-    risks = [
-        current_risk,
-        min(100, current_risk + 15),
-        min(100, current_risk + 10),
-        min(100, current_risk + 5),
-        min(100, current_risk),
-    ]
+
+    # state.risk_timeline (from /situation, src/api/routes/situation.py) is
+    # a real forecast-driven timeline using actual Open-Meteo rainfall
+    # forecasts, scored through the same calculate_score() as everywhere
+    # else. Falls back to the old synthetic +15/+10/+5 offset (which had
+    # no forecast data behind it at all) only if /situation wasn't called
+    # or the forecast fetch failed.
+    if state.risk_timeline:
+        hours = [point["hour"] for point in state.risk_timeline]
+        risks = [point["score"] for point in state.risk_timeline]
+    else:
+        hours = ["Now", "6h", "12h", "18h", "24h"]
+        risks = [
+            current_risk,
+            min(100, current_risk + 15),
+            min(100, current_risk + 10),
+            min(100, current_risk + 5),
+            min(100, current_risk),
+        ]
 
     render_risk_timeline_visual(hours, risks, current_risk)
 

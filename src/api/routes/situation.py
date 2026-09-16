@@ -15,17 +15,89 @@ to avoid reintroducing the kind of drift just fixed across the dashboard.
 import logging
 from typing import Optional
 
+import requests
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.community.community_memory import community_memory
 from src.exposure.impact_estimator import impact_estimator
+from src.exposure.shelter_candidates import get_shelter_names
 from src.hydrology.unified_intelligence import unified_intelligence
+from src.hydrology.weather_forecast import weather_forecast
 
 logger = logging.getLogger("nfcc-api.situation")
 
 router = APIRouter(tags=["situation"])
+
+_FLOOD_API_URL = "https://flood-api.open-meteo.com/v1/flood"
+# A district counts as an "active flood zone" when today's simulated river
+# discharge (Open-Meteo's GloFAS-based Flood API - real river gauge data
+# doesn't exist anywhere in the codebase; src/hydrology/river_gauge_api.py's
+# configured endpoint, hydrology.gov.gh, doesn't resolve) is running well
+# above its long-term seasonal mean for that day. 1.5x is an illustrative
+# threshold, not a calibrated hydrological one - no flood-stage threshold
+# per Ghana river exists publicly.
+_ELEVATED_DISCHARGE_RATIO = 1.5
+
+
+def _is_district_flood_zone_active(lat: float, lon: float) -> Optional[bool]:
+    """True if a district's real-time river discharge is elevated relative
+    to its seasonal mean; None if the Flood API call failed."""
+    try:
+        resp = requests.get(
+            _FLOOD_API_URL,
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "daily": "river_discharge,river_discharge_mean",
+                "forecast_days": 1,
+            },
+            timeout=8,
+        )
+        resp.raise_for_status()
+        daily = resp.json().get("daily", {})
+        discharge = daily.get("river_discharge", [])
+        mean = daily.get("river_discharge_mean", [])
+        # Open-Meteo returns null for either value at some coastal points
+        # where no river is resolved within their 5km grid (documented
+        # limitation, not an error) - Cape Coast hits this in practice.
+        if not discharge or not mean:
+            return None
+        latest_discharge, latest_mean = discharge[-1], mean[-1]
+        if latest_discharge is None or not latest_mean:
+            return None
+        return latest_discharge > _ELEVATED_DISCHARGE_RATIO * latest_mean
+    except Exception as e:
+        logger.warning(f"Flood API call failed for ({lat},{lon}): {e}")
+        return None
+
+
+@router.get("/national/summary")
+async def get_national_summary():
+    """District count and a real, computed "active flood zones" count
+    (river discharge vs. seasonal mean, via Open-Meteo's Flood API) across
+    every district this app tracks - was previously a hardcoded "10
+    districts / 3 zones" with no data behind either number. Independent of
+    which single district is selected in the dashboard, so this is its own
+    endpoint rather than folded into /situation."""
+
+    results = {}
+    for district, coords in weather_forecast.district_coords.items():
+        results[district] = _is_district_flood_zone_active(
+            coords["lat"], coords["lon"]
+        )
+
+    active = [d for d, is_active in results.items() if is_active]
+    checked = [d for d, is_active in results.items() if is_active is not None]
+
+    return {
+        "district_count": len(weather_forecast.district_coords),
+        "active_flood_zones": len(active),
+        "active_flood_zone_districts": active,
+        "districts_checked": len(checked),
+        "source": "open-meteo-flood-api",
+    }
 
 
 class SituationRequest(BaseModel):
@@ -118,6 +190,12 @@ async def get_situation(request: SituationRequest):
         "risk_tier": risk_tier,
         "total_reports": report_stats.get("total_reports", 0),
         "verified_reports": report_stats.get("validated_reports", 0),
+        # Real, named public buildings per district (see
+        # src/exposure/shelter_candidates.py) - not an officially
+        # designated shelter registry (none exists publicly for Ghana),
+        # but genuine places, not generic "{district} Senior High School"
+        # placeholder text repeated for every district.
+        "shelter_names": get_shelter_names(request.location),
     }
 
     if impact:
@@ -164,5 +242,34 @@ async def get_situation(request: SituationRequest):
             "saturation_percent", 0
         )
         response["recommendations"] = hydrology.get("recommendations", [])
+
+    # Risk timeline: real Open-Meteo forecast rainfall (see
+    # src/hydrology/weather_forecast.py), layered on top of the current
+    # precipitation input and scored through the same calculate_score()
+    # used everywhere else - "now" always matches the score above exactly;
+    # future points show what the real forecast implies is coming, instead
+    # of a fixed +15/+10/+5 synthetic offset with no forecast behind it at
+    # all (the dashboard's old behavior).
+    try:
+        forecast = weather_forecast.get_forecast_for_district(request.location)
+        cumulative = forecast.get("cumulative_6h", {})
+        timeline = [{"hour": "Now", "score": score, "risk_tier": risk_tier}]
+        for h in [6, 12, 18, 24]:
+            future_precip = request.precipitation + cumulative.get(str(h), 0.0)
+            future_score = calculate_score(future_precip)
+            timeline.append(
+                {
+                    "hour": f"{h}h",
+                    "score": future_score,
+                    "risk_tier": get_risk_tier(future_score),
+                }
+            )
+        response["risk_timeline"] = timeline
+        response["forecast_24h_mm"] = forecast.get("24h", 0.0)
+        response["forecast_48h_mm"] = forecast.get("48h", 0.0)
+        response["forecast_72h_mm"] = forecast.get("72h", 0.0)
+        response["forecast_source"] = forecast.get("source", "unknown")
+    except Exception as e:
+        logger.error(f"Weather forecast failed for {request.location}: {e}")
 
     return response
