@@ -1,0 +1,11 @@
+# Scoped to this directory so Streamlit Community Cloud installs just these
+# lightweight packages via pip instead of falling back to the repo root's
+# environment.yml, which triggers a full conda solve (slow - it's sized for
+# the ML/GEE backend, not this dashboard) since this app's main file lives
+# under hackathon/app/pages/.
+streamlit==1.46.0
+requests>=2.31.0
+pandas==2.1.4
+plotly>=5.17.0
+folium==0.19.0
+streamlit-folium==0.24.0
