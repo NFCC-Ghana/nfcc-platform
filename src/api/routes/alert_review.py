@@ -32,6 +32,8 @@ from pydantic import BaseModel, Field
 
 from src.alerts.engine import AlertEngine
 from src.alerts.formatter import calculate_score, get_risk_tier
+from src.exposure.impact_estimator import impact_estimator
+from src.hydrology.sentinel_processor import sentinel_processor
 from src.database.alert_db import (
     get_pending_alert,
     get_pending_alerts,
@@ -54,6 +56,44 @@ _DEFAULT_MESSAGES = {
     "CRITICAL": "CRITICAL flood risk. Immediate action required.",
     "EXTREME": "EXTREME flood risk. Emergency response needed.",
 }
+
+# Common Alerting Protocol (OASIS CAP standard - the international
+# backbone behind FEMA IPAWS, the EU, Japan, Canada's NAAD) classifies
+# every alert along three INDEPENDENT axes instead of one collapsed
+# score. A reviewer seeing "Severe / Immediate / Observed" has genuinely
+# richer decision context than just "78%".
+_SEVERITY_BY_TIER = {
+    "EXTREME": "Extreme",
+    "CRITICAL": "Severe",
+    "HIGH": "Moderate",
+    "MODERATE": "Minor",
+}
+
+
+def _urgency_from_lead_time(lead_time_hours: int) -> str:
+    """CAP urgency = time available to prepare, not a fixed lookup - real
+    lead_time_hours already comes from src/exposure/impact_estimator.py,
+    keyed off the same risk tier used everywhere else."""
+    if lead_time_hours <= 2:
+        return "Immediate"
+    if lead_time_hours <= 6:
+        return "Expected"
+    return "Future"
+
+
+def _certainty_from_satellite(satellite: dict) -> str:
+    """CAP certainty = confidence in the observation/prediction. Real
+    Sentinel-1 SAR water detection (src/hydrology/sentinel_processor.py)
+    is actual physical evidence, not a forecast - "Observed" per CAP's
+    own definition ("determined to have occurred or to be ongoing").
+    Falls back to "Likely" (rainfall-forecast-based, not yet confirmed by
+    satellite) when Earth Engine isn't reachable or no water is detected
+    yet, rather than overclaiming certainty the system doesn't have."""
+    if satellite.get("source") == "Sentinel-1 SAR" and satellite.get(
+        "water_detected"
+    ):
+        return "Observed"
+    return "Likely"
 
 
 class AssessRequest(BaseModel):
@@ -84,16 +124,40 @@ async def assess_district(request: AssessRequest):
         }
 
     message = _DEFAULT_MESSAGES.get(risk_tier, "Flood alert issued.")
+
+    # Real severity/urgency/certainty - not fabricated to look
+    # standards-compliant. Each falls back honestly if its real source is
+    # unavailable rather than raising and losing the assessment entirely.
+    severity = _SEVERITY_BY_TIER.get(risk_tier, "Unknown")
+
+    try:
+        impact = impact_estimator.estimate_impact(request.location, score, risk_tier)
+        urgency = _urgency_from_lead_time(impact.get("lead_time_hours", 24))
+    except Exception as e:
+        logger.warning(f"Impact estimate failed for urgency calc: {e}")
+        urgency = "Future"
+
+    try:
+        satellite = sentinel_processor.detect_flood(request.location)
+        certainty = _certainty_from_satellite(satellite)
+    except Exception as e:
+        logger.warning(f"Satellite check failed for certainty calc: {e}")
+        certainty = "Likely"
+
     alert_id = save_pending_alert(
         location=request.location,
         score=score,
         risk_tier=risk_tier,
         precipitation=request.precipitation,
         message=message,
+        severity=severity,
+        urgency=urgency,
+        certainty=certainty,
     )
     logger.info(
         f"Queued pending alert #{alert_id} for {request.location} "
-        f"(score={score}, tier={risk_tier})"
+        f"(score={score}, tier={risk_tier}, "
+        f"CAP: {severity}/{urgency}/{certainty})"
     )
     return {
         "queued": True,
@@ -102,6 +166,9 @@ async def assess_district(request: AssessRequest):
         "score": score,
         "risk_tier": risk_tier,
         "message": message,
+        "severity": severity,
+        "urgency": urgency,
+        "certainty": certainty,
     }
 
 
@@ -142,6 +209,67 @@ async def approve_pending_alert(alert_id: int, decision: ReviewDecision):
         f"send result: {result.get('alert_sent')}"
     )
     return {"id": alert_id, "status": "approved", "send_result": result}
+
+
+class CancelDecision(BaseModel):
+    reviewed_by: str = Field(default="dashboard")
+    reason: str = Field(
+        ..., description="Why this alert is being retracted/corrected"
+    )
+
+
+@router.post("/pending/{alert_id}/cancel")
+async def cancel_pending_alert(alert_id: int, decision: CancelDecision):
+    """Retract an already-sent alert (CAP msgType=Cancel - the OASIS
+    Common Alerting Protocol standard behind FEMA IPAWS/EU/Japan/Canada
+    treats retraction as a first-class alert type, not an afterthought).
+
+    Directly motivated by South Korea's May 2023 false missile alert: the
+    public endured ~20 minutes of confusion partly because there was no
+    fast, clear correction message - only silence followed by an
+    after-the-fact clarification. This sends a real, immediate correction
+    through the same channels/recipients as the original alert, rather
+    than just quietly flipping a status flag nobody but this dashboard
+    ever sees."""
+    pending = get_pending_alert(alert_id)
+    if pending is None:
+        raise HTTPException(status_code=404, detail=f"No pending alert #{alert_id}")
+    if pending["status"] != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Alert #{alert_id} is {pending['status']}, not approved - "
+                "only a sent alert can be retracted"
+            ),
+        )
+
+    from src.api.main import alert_engine as global_alert_engine
+
+    engine = global_alert_engine or AlertEngine()
+    cancel_message = (
+        f"CORRECTION - Previous flood alert for {pending['location']} "
+        f"has been RETRACTED: {decision.reason}"
+    )
+    result = engine.process(
+        location=pending["location"],
+        score=pending["score"],
+        force=True,
+        precipitation=pending["precipitation"],
+        message=cancel_message,
+    )
+
+    update_pending_alert_status(alert_id, "cancelled", decision.reviewed_by)
+    logger.warning(
+        f"Pending alert #{alert_id} CANCELLED by {decision.reviewed_by} "
+        f"(reason: {decision.reason}) - retraction send result: "
+        f"{result.get('alert_sent')}"
+    )
+    return {
+        "id": alert_id,
+        "status": "cancelled",
+        "reason": decision.reason,
+        "retraction_send_result": result,
+    }
 
 
 @router.post("/pending/{alert_id}/dismiss")

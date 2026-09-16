@@ -208,6 +208,19 @@ def init_pending_alerts_table() -> None:
             "CREATE INDEX IF NOT EXISTS idx_pending_alerts_status "
             "ON pending_alerts(status)"
         )
+        # Migration for tables created before severity/urgency/certainty
+        # existed (the Common Alerting Protocol's own three independent
+        # decision axes - OASIS CAP standard - replacing a single
+        # collapsed risk_tier as the only context a reviewer sees).
+        # SQLite has no "ADD COLUMN IF NOT EXISTS"; catching the duplicate-
+        # column error is the standard way to make this idempotent.
+        for column in ("severity", "urgency", "certainty"):
+            try:
+                cursor.execute(
+                    f"ALTER TABLE pending_alerts ADD COLUMN {column} TEXT"
+                )
+            except Exception:
+                pass  # column already exists
         conn.commit()
 
 
@@ -217,8 +230,19 @@ def save_pending_alert(
     risk_tier: str,
     precipitation: float,
     message: str,
+    severity: str = None,
+    urgency: str = None,
+    certainty: str = None,
 ) -> int:
-    """Queue an automated assessment for human review. Returns the new row's id."""
+    """Queue an automated assessment for human review. Returns the new row's id.
+
+    severity/urgency/certainty are the Common Alerting Protocol's three
+    independent decision axes (OASIS CAP standard, the international
+    backbone behind FEMA IPAWS, EU/Japan/Canada alerting systems) -
+    optional here so existing callers/tests that don't compute them yet
+    keep working, but src/api/routes/alert_review.py's real assessment
+    path always sets all three.
+    """
     now = datetime.now().isoformat()
     with get_db() as conn:
         cursor = conn.cursor()
@@ -226,10 +250,20 @@ def save_pending_alert(
             """
             INSERT INTO pending_alerts (
                 location, score, risk_tier, precipitation, message,
-                status, created_at
-            ) VALUES (?, ?, ?, ?, ?, 'pending', ?)
+                status, created_at, severity, urgency, certainty
+            ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
             """,
-            (location, score, risk_tier, precipitation, message, now),
+            (
+                location,
+                score,
+                risk_tier,
+                precipitation,
+                message,
+                now,
+                severity,
+                urgency,
+                certainty,
+            ),
         )
         conn.commit()
         return cursor.lastrowid

@@ -1375,45 +1375,98 @@ def render_alert_review_queue():
 
     if not alerts:
         st.success("✅ No pending alerts. All caught up.")
-        return
+    else:
+        st.markdown(f"### {len(alerts)} awaiting review")
+        for alert in alerts:
+            style = get_risk_tier_style(tier=alert["risk_tier"])
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2, 2, 1])
+                with c1:
+                    st.markdown(
+                        f"{style['emoji']} **{alert['location']}** — "
+                        f"{alert['risk_tier']} ({alert['score']:.0f}%)"
+                    )
+                    st.caption(f"Precipitation: {alert['precipitation']}mm")
+                    # Common Alerting Protocol's three independent
+                    # decision axes (OASIS CAP standard) - Severity from
+                    # the risk tier, Urgency from real lead-time
+                    # (src/exposure/impact_estimator.py), Certainty from
+                    # real Sentinel-1 satellite confirmation when
+                    # available (src/hydrology/sentinel_processor.py) -
+                    # richer context than the single score/tier above.
+                    if alert.get("severity"):
+                        st.caption(
+                            f"📋 CAP: **{alert['severity']}** severity • "
+                            f"**{alert['urgency']}** urgency • "
+                            f"**{alert['certainty']}** certainty"
+                        )
+                with c2:
+                    st.markdown(f"*{alert['message']}*")
+                    st.caption(f"Queued: {alert['created_at'][:19]}")
+                with c3:
+                    if st.button(
+                        "✅ Approve & Send",
+                        key=f"approve_{alert['id']}",
+                        use_container_width=True,
+                    ):
+                        call_api(
+                            f"/alerts/pending/{alert['id']}/approve",
+                            "POST",
+                            {"reviewed_by": "dashboard-operator"},
+                        )
+                        st.rerun()
+                    if st.button(
+                        "❌ Dismiss",
+                        key=f"dismiss_{alert['id']}",
+                        use_container_width=True,
+                    ):
+                        call_api(
+                            f"/alerts/pending/{alert['id']}/dismiss",
+                            "POST",
+                            {"reviewed_by": "dashboard-operator"},
+                        )
+                        st.rerun()
 
-    st.markdown(f"### {len(alerts)} awaiting review")
-    for alert in alerts:
-        style = get_risk_tier_style(tier=alert["risk_tier"])
-        with st.container(border=True):
-            c1, c2, c3 = st.columns([2, 2, 1])
-            with c1:
-                st.markdown(
-                    f"{style['emoji']} **{alert['location']}** — "
-                    f"{alert['risk_tier']} ({alert['score']:.0f}%)"
-                )
-                st.caption(f"Precipitation: {alert['precipitation']}mm")
-            with c2:
-                st.markdown(f"*{alert['message']}*")
-                st.caption(f"Queued: {alert['created_at'][:19]}")
-            with c3:
-                if st.button(
-                    "✅ Approve & Send",
-                    key=f"approve_{alert['id']}",
-                    use_container_width=True,
-                ):
-                    call_api(
-                        f"/alerts/pending/{alert['id']}/approve",
-                        "POST",
-                        {"reviewed_by": "dashboard-operator"},
+    # Retraction (CAP msgType=Cancel) for already-sent alerts - directly
+    # motivated by South Korea's May 2023 false missile alert, where the
+    # public endured ~20 minutes of confusion partly because there was no
+    # fast, clear correction path. A sent alert is never truly final here.
+    st.divider()
+    st.markdown("### 📤 Recently Sent (can be retracted)")
+    sent = call_api("/alerts/pending?status=approved", "GET")
+    sent_alerts = sent.get("alerts", [])[:10]
+
+    if not sent_alerts:
+        st.caption("No sent alerts to retract.")
+    else:
+        for alert in sent_alerts:
+            style = get_risk_tier_style(tier=alert["risk_tier"])
+            with st.container(border=True):
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    st.markdown(
+                        f"{style['emoji']} **{alert['location']}** — "
+                        f"{alert['risk_tier']} • sent {alert['reviewed_at'][:19]}"
                     )
-                    st.rerun()
-                if st.button(
-                    "❌ Dismiss",
-                    key=f"dismiss_{alert['id']}",
-                    use_container_width=True,
-                ):
-                    call_api(
-                        f"/alerts/pending/{alert['id']}/dismiss",
-                        "POST",
-                        {"reviewed_by": "dashboard-operator"},
+                    reason = st.text_input(
+                        "Retraction reason (required)",
+                        key=f"cancel_reason_{alert['id']}",
+                        placeholder="e.g. Rainfall did not materialize as forecast",
                     )
-                    st.rerun()
+                with c2:
+                    st.write("")
+                    if st.button(
+                        "🔴 Retract Alert",
+                        key=f"cancel_{alert['id']}",
+                        use_container_width=True,
+                        disabled=not reason,
+                    ):
+                        call_api(
+                            f"/alerts/pending/{alert['id']}/cancel",
+                            "POST",
+                            {"reviewed_by": "dashboard-operator", "reason": reason},
+                        )
+                        st.rerun()
 
 
 def weather_forecast_24h(district: str) -> float:
