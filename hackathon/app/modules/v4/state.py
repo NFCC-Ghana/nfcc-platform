@@ -137,27 +137,42 @@ def create_state_from_api(api_data: dict) -> DashboardState:
         state.api_connected = False
         return state
 
-    # Extract risk data
-    risk_score = api_data.get("risk_score", 50.0)
+    # Extract risk data. The real /score endpoint (src/api/main.py) returns
+    # a field named "score", not "risk_score" - this used to always fall
+    # through to the 50.0 default regardless of what the backend computed,
+    # so the headline risk number never actually moved with the rainfall
+    # input despite "API Connected" showing true.
+    risk_score = api_data.get("score", api_data.get("risk_score", 50.0))
     state.risk_score = float(risk_score)
 
-    # Determine risk category
-    if state.risk_score >= 80:
-        state.risk_category = "CRITICAL"
-        state.risk_color = "#ff0000"
-        state.risk_emoji = "🔴"
-    elif state.risk_score >= 60:
-        state.risk_category = "HIGH"
-        state.risk_color = "#ff6600"
-        state.risk_emoji = "🟠"
-    elif state.risk_score >= 40:
-        state.risk_category = "MODERATE"
-        state.risk_color = "#ffaa00"
-        state.risk_emoji = "🟡"
-    else:
-        state.risk_category = "LOW"
-        state.risk_color = "#00cc00"
-        state.risk_emoji = "🟢"
+    # Prefer the backend's own risk_tier (src/alerts/formatter.py:get_risk_tier)
+    # over re-deriving a category from score thresholds locally - the local
+    # thresholds (40/60/80, 4 tiers) didn't match the backend's actual
+    # thresholds (30/50/70/85, 5 tiers) and could never even reach EXTREME,
+    # the most severe tier, so category/color/emoji silently disagreed with
+    # what the backend determined.
+    tier_style = {
+        "EXTREME": ("#cc0000", "🔴"),
+        "CRITICAL": ("#ff0000", "🔴"),
+        "HIGH": ("#ff6600", "🟠"),
+        "MODERATE": ("#ffaa00", "🟡"),
+        "LOW": ("#00cc00", "🟢"),
+    }
+    risk_tier = api_data.get("risk_tier")
+    if risk_tier not in tier_style:
+        # Fallback for callers with no real risk_tier (e.g. no API response)
+        if state.risk_score >= 85:
+            risk_tier = "EXTREME"
+        elif state.risk_score >= 70:
+            risk_tier = "CRITICAL"
+        elif state.risk_score >= 50:
+            risk_tier = "HIGH"
+        elif state.risk_score >= 30:
+            risk_tier = "MODERATE"
+        else:
+            risk_tier = "LOW"
+    state.risk_category = risk_tier
+    state.risk_color, state.risk_emoji = tier_style[risk_tier]
 
     # Extract other data
     state.population_exposed = api_data.get("population_exposed", 0)
