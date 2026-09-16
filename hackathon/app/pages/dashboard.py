@@ -275,6 +275,11 @@ def render_header(state):
     col1, col2, col3 = st.columns([2, 1, 1])
 
     with col1:
+        st.markdown(
+            f"<p style='margin:0;font-size:13px;color:#666;font-weight:600;"
+            f"letter-spacing:0.5px;'>🕐 {datetime.now().strftime('%A, %d %B %Y &nbsp;&nbsp; %H:%M:%S UTC')}</p>",
+            unsafe_allow_html=True,
+        )
         st.markdown("""
         # 🌊 CivicFlood AI
         ### National Emergency Operations Center
