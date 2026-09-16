@@ -41,7 +41,16 @@ class SentinelProcessor:
         logger.info("Sentinel-1 Processor initialized")
 
     def _load_districts(self) -> Dict:
-        """Load district geometries."""
+        """Load district geometries - matches
+        hackathon/app/pages/dashboard.py's get_district_data and
+        src/hydrology/weather_forecast.py's district_coords, the other two
+        places these are listed. This list previously only had the
+        original 6 districts, silently missing Cape Coast/Ho/Sunyani
+        added later - any request for one of those returned a plain
+        {"error": ...} dict with none of detect_flood()'s normal fields,
+        which unified_intelligence.py's satellite block then silently
+        absorbed via its own .get(..., default) fallbacks rather than
+        surfacing as an actual error."""
         return {
             "Accra Central": {"lat": 5.560, "lon": -0.210, "radius": 0.05},
             "Accra West": {"lat": 5.550, "lon": -0.230, "radius": 0.05},
@@ -49,6 +58,9 @@ class SentinelProcessor:
             "Tema": {"lat": 5.650, "lon": -0.020, "radius": 0.05},
             "Kumasi": {"lat": 6.670, "lon": -1.620, "radius": 0.08},
             "Tamale": {"lat": 9.400, "lon": -0.840, "radius": 0.08},
+            "Cape Coast": {"lat": 5.100, "lon": -1.250, "radius": 0.05},
+            "Ho": {"lat": 6.601, "lon": 0.471, "radius": 0.05},
+            "Sunyani": {"lat": 7.333, "lon": -2.333, "radius": 0.05},
         }
 
     def detect_flood(self, district: str, date: Optional[str] = None) -> Dict:
