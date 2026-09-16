@@ -76,21 +76,20 @@ class SentinelProcessor:
             # Get Sentinel-1 imagery
             sentinel1 = ee.ImageCollection("COPERNICUS/S1_GRD")
 
-            # Filter by date
-            if date:
-                target_date = datetime.strptime(date, "%Y-%m-%d")
-                after_date = date
-                baseline_end = (target_date - timedelta(days=30)).strftime("%Y-%m-%d")
-                baseline_start = (target_date - timedelta(days=60)).strftime("%Y-%m-%d")
-            else:
-                # Latest available
-                after_date = datetime.now().strftime("%Y-%m-%d")
-                baseline_end = (datetime.now() - timedelta(days=30)).strftime(
-                    "%Y-%m-%d"
-                )
-                baseline_start = (datetime.now() - timedelta(days=60)).strftime(
-                    "%Y-%m-%d"
-                )
+            # Filter by date. "after" uses a 12-day window ending on the
+            # target date, not that single exact day - Sentinel-1's revisit
+            # time over Ghana is roughly 6-12 days, so filtering for one
+            # specific day almost never actually finds an image, and this
+            # collection being empty was never being detected (see below),
+            # silently deferring an "Empty date ranges" error to the
+            # getInfo() call much further down instead of failing fast here.
+            reference_date = (
+                datetime.strptime(date, "%Y-%m-%d") if date else datetime.now()
+            )
+            after_end = reference_date.strftime("%Y-%m-%d")
+            after_start = (reference_date - timedelta(days=12)).strftime("%Y-%m-%d")
+            baseline_end = (reference_date - timedelta(days=30)).strftime("%Y-%m-%d")
+            baseline_start = (reference_date - timedelta(days=60)).strftime("%Y-%m-%d")
 
             # Get before and after images
             before = (
@@ -102,16 +101,27 @@ class SentinelProcessor:
             )
 
             after_collection = (
-                sentinel1.filterDate(after_date, after_date)
+                sentinel1.filterDate(after_start, after_end)
                 .filterBounds(bbox)
                 .filter(ee.Filter.eq("instrumentMode", "IW"))
                 .select(["VH", "VV"])
             )
 
-            after = after_collection.first()
-
-            if not after:
+            # ee.Image objects are always truthy in Python regardless of
+            # whether the collection they came from was empty - `if not
+            # after:` never actually caught this, letting an empty
+            # collection's null image flow all the way down to the
+            # getInfo() call below before failing. size().getInfo() is a
+            # real, immediate check, same pattern already used correctly
+            # in scripts/daily_chirps_pull.py.
+            if after_collection.size().getInfo() == 0:
+                logger.info(
+                    f"No Sentinel-1 imagery for {district} in "
+                    f"{after_start} to {after_end}"
+                )
                 return self._simulate_flood_detection(district)
+
+            after = after_collection.median()
 
             # Change detection
             vh_diff = before.select("VH").subtract(after.select("VH"))
@@ -131,7 +141,7 @@ class SentinelProcessor:
                 "district": district,
                 "water_detected": area_km2 > 0.1,
                 "flood_extent_km2": round(area_km2, 2),
-                "acquisition_date": after_date,
+                "acquisition_date": f"{after_start} to {after_end}",
                 "baseline_date": f"{baseline_start} to {baseline_end}",
                 "source": "Sentinel-1 SAR",
                 "confidence": 0.85,
