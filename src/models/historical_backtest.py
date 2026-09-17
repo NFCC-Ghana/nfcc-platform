@@ -52,7 +52,12 @@ logger = logging.getLogger("nfcc.models.historical_backtest")
 
 _CHIRPS_COLLECTION = "UCSB-CHG/CHIRPS/DAILY"
 _ALERT_THRESHOLD = 30  # matches src/api/routes/alert_review.py's _REVIEW_THRESHOLD
-_LOOKBACK_DAYS = 21  # real rainfall window fetched before each event date
+# 60, not a shorter window: an initial real run at 21 days found several
+# events' first threshold crossing sitting right at the window boundary
+# (19-21 days before the event) - a truncation artifact, not necessarily
+# the true earliest crossing. 60 days gives real room to find it without
+# the search cutting itself off.
+_LOOKBACK_DAYS = 60
 
 
 def fetch_historical_chirps_series(
