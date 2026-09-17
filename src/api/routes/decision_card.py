@@ -100,6 +100,14 @@ class ExpectedImpact(BaseModel):
 class DecisionCard(BaseModel):
     decision_id: str
     generated_at: str
+    # Real risk_tier/score from the same /situation call this card is
+    # built from (src/alerts/formatter.py:get_risk_tier) - included so a
+    # consumer (the dashboard) can render the same tier badge/color/emoji
+    # used everywhere else on the platform without recomputing it, rather
+    # than having two independent "what tier is this" implementations
+    # that could drift apart.
+    risk_tier: str
+    score: float
     location: LocationBlock
     action: ActionBlock
     priority: str
@@ -117,18 +125,21 @@ class DecisionCardRequest(BaseModel):
     precipitation: float = Field(..., description="Precipitation in mm", ge=0)
 
 
-# Cost-per-person multipliers by tier - same illustrative figures already
-# used in hackathon/app/pages/dashboard.py's render_ai_decision_center,
-# duplicated here rather than shared because the two are different
-# languages/processes; kept in sync manually until the dashboard is
-# migrated to call this endpoint directly instead of computing its own.
+# Cost-per-person multipliers by tier - same illustrative figures
+# originally in hackathon/app/pages/dashboard.py's render_ai_decision_center
+# before it was migrated to call this endpoint instead of computing its
+# own. LOW has no multiplier because LOW's cost isn't population-scaled -
+# see the flat _LOW_TIER_FLAT_COST_GHS below, matching the dashboard's
+# original "routine monitoring has a baseline cost even if exposure is
+# near zero" behavior, which population_exposed * 0 would have silently
+# dropped to zero.
 _COST_PER_PERSON_BY_TIER = {
     "EXTREME": 15,
     "CRITICAL": 15,
     "HIGH": 8,
     "MODERATE": 1.25,
-    "LOW": 0,
 }
+_LOW_TIER_FLAT_COST_GHS = 5000
 
 
 @router.post("/card", response_model=DecisionCard)
@@ -267,13 +278,18 @@ async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
     priority = _PRIORITY_BY_TIER.get(tier, "ROUTINE")
     lead_time_hours = situation.get("lead_time_hours")
     population_exposed = situation.get("population_exposed")
-    cost = None
-    if population_exposed is not None:
+    if tier in ("LOW", "VERY_LOW"):
+        cost = _LOW_TIER_FLAT_COST_GHS
+    elif population_exposed is not None:
         cost = population_exposed * _COST_PER_PERSON_BY_TIER.get(tier, 0)
+    else:
+        cost = None
 
     return DecisionCard(
         decision_id=str(uuid.uuid4()),
         generated_at=datetime.now(timezone.utc).isoformat(),
+        risk_tier=tier,
+        score=situation.get("score", 0.0),
         location=LocationBlock(
             district=request.location,
             communities=get_affected_communities(request.location),

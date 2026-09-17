@@ -865,185 +865,50 @@ def render_operations_panel(state, district_data):
     st.divider()
 
 
-def _gather_decision_evidence(state, tier: str) -> list:
-    """Builds the Decision Center's 'Why?' list ONLY from real fields
-    present on state - each line traces to one specific value, never
-    asserted independent of it.
-
-    Previously this was a fixed set of 3-4 strings per tier (e.g. "Roads
-    becoming inaccessible", "Multiple citizen reports verified") shown
-    for EVERY EXTREME/CRITICAL alert regardless of what data actually
-    existed - state.verified_reports could be 0 and the text would still
-    claim reports were verified, and no signal for road status exists
-    anywhere in this codebase at all, so that claim wasn't just
-    optimistic, it was invented from nothing. This is the exact failure
-    mode the AI Guardrails requirement calls out: never invent weather
-    observations, risk levels, or emergency resources the platform
-    doesn't actually have."""
-    reasons = []
-
-    # rainfall_mm is the actual value that drove this assessment's score
-    # (src/api/routes/situation.py sets it to the real request.precipitation
-    # input); forecast_24h_mm is a SEPARATE real field - future forecasted
-    # rain over the next 24h, from Open-Meteo. Conflating them with `or`
-    # previously meant a scenario with real 90mm current rainfall but a
-    # near-zero forecast for the next 24h (dry period following the event)
-    # would report "Rainfall forecast: 1mm" as the reason for an EXTREME
-    # alert - technically a real field, but the wrong one for the claim.
-    rainfall = getattr(state, "rainfall_mm", None)
-    if rainfall:
-        reasons.append(f"Rainfall driving this assessment: {rainfall:.0f}mm")
-    forecast_24h = getattr(state, "forecast_24h_mm", None)
-    if forecast_24h:
-        reasons.append(f"Forecast next 24h: {forecast_24h:.0f}mm additional")
-
-    river_level = getattr(state, "river_level_m", None)
-    if river_level:
-        reasons.append(f"River level: {river_level:.1f}m")
-
-    soil = getattr(state, "soil_saturation_percent", None)
-    if soil:
-        reasons.append(f"Soil saturation: {soil:.0f}%")
-
-    if getattr(state, "satellite_water_detected", False) and getattr(
-        state, "satellite_source", ""
-    ) == "Sentinel-1 SAR":
-        extent = getattr(state, "satellite_flood_extent_km2", 0)
-        reasons.append(f"Satellite (Sentinel-1 SAR) confirms {extent:.1f} km² water extent")
-
-    verified = getattr(state, "verified_reports", 0)
-    if verified > 0:
-        reasons.append(f"{verified} citizen report(s) verified on the ground")
-    elif tier in ("EXTREME", "CRITICAL", "HIGH"):
-        # Guardrail: say so rather than silently omitting - the platform
-        # genuinely doesn't have ground-truth corroboration here yet.
-        reasons.append("No verified citizen reports yet for this area")
-
-    if not reasons:
-        reasons.append(
-            "Assessment based on real-time rainfall data only - "
-            "no additional corroborating signals available"
-        )
-
-    return reasons
-
-
-def _gather_data_gaps(state) -> list:
-    """Explicit list of known-missing signals for this district - the
-    "say so if you don't have it" half of grounding, as a distinct list
-    from _gather_decision_evidence's positive claims rather than folded
-    in as another bullet. Currently sourced from
-    src/hydrology/dam_intelligence.py (via /situation's dam_intelligence
-    field): for the 3 tracked districts genuinely downstream of a dam,
-    reports the real, specific reason no live feed exists (e.g. Bagre
-    Dam's unresolved cross-border notification gap) instead of leaving a
-    reviewer to assume "no dam mentioned" means "no dam risk"."""
-    gaps = []
-    for dam in getattr(state, "dam_intelligence", None) or []:
-        if not dam.get("available", True):
-            gaps.append(f"{dam.get('dam', 'Dam')}: {dam.get('reason', 'data unavailable')}")
-    return gaps
-
-
-def _compute_decision_confidence(state) -> tuple:
-    """Confidence reflects how many INDEPENDENT real signals corroborate
-    the rainfall-driven risk score - not a fixed per-tier number. The
-    score/tier itself is a deterministic function of real rainfall
-    (src/alerts/formatter.py:calculate_score), so this measures
-    corroboration, not the forecast's own uncertainty.
-
-    Deliberately conservative (60-95, never higher): overconfidence in
-    exactly this kind of single-source-driven estimate is a documented
-    real-world failure - independent reassessment of Google Flood Hub
-    (deployed across 15+ African countries) found >90% false positive/
-    negative rates for extreme events once checked against ground truth,
-    specifically flagged as a risk of "misinformation for those who
-    depend on its outputs for evacuation decisions" in data-sparse
-    regions - exactly Ghana's situation. A number here should never look
-    more certain than the evidence actually supports."""
-    confidence = 60
-    basis = ["Rainfall-driven risk score"]
-
-    if getattr(state, "satellite_water_detected", False) and getattr(
-        state, "satellite_source", ""
-    ) == "Sentinel-1 SAR":
-        confidence += 20
-        basis.append("Satellite confirmation")
-
-    verified = getattr(state, "verified_reports", 0)
-    if verified >= 3:
-        confidence += 15
-        basis.append(f"{verified} verified citizen reports")
-    elif verified > 0:
-        confidence += 7
-        basis.append(f"{verified} verified citizen report")
-
-    return min(confidence, 95), basis
+# Purely presentational (which icon to show for a given action type) -
+# not a data claim, so it stays in the frontend even though the action
+# itself now comes from the backend.
+_ACTION_ICON_BY_TYPE = {
+    "EVACUATE_ALL": "🚨",
+    "EVACUATE_VULNERABLE": "🚨",
+    "PREPARE": "⚠️",
+    "MONITOR": "📢",
+}
 
 
 def render_ai_decision_center(state):
-    """QUESTION 6: What should we do? - VISUAL VERSION"""
+    """QUESTION 6: What should we do? - VISUAL VERSION.
+
+    Calls the backend's POST /decision/card (src/api/routes/decision_card.py)
+    - the single source of truth for action/priority/confidence/evidence/
+    data_gaps - instead of recomputing any of it here. This function used
+    to independently reimplement the same evidence-gathering and
+    confidence-scoring logic the backend now owns, which is exactly the
+    two-implementations-of-one-fact drift risk this platform has hit and
+    fixed repeatedly elsewhere (risk tier thresholds, lead time tables,
+    district lists). This is now purely a renderer: formatting choices
+    (which icon, how to phrase a hint-count as a display string) stay
+    here; every actual claim, number, and confidence value comes from
+    the response."""
     st.markdown("## 🎯 AI Decision Center")
     st.caption("*What actions should we take and why?*")
 
-    # Thresholds and urgency/color now match the backend's real tiers
-    # (get_risk_tier_style) instead of a separately-drifted 4-tier scale
-    # (80/60/40, no EXTREME) - EXTREME shares CRITICAL's action content
-    # below (there's no operationally distinct "beyond mandatory
-    # evacuation" action), but its badge now correctly reads EXTREME with
-    # the darker red used everywhere else, instead of mislabeling a 100%
-    # score as merely "CRITICAL".
-    tier = tier_from_score(state.risk_score)
-    urgency = tier
-    urgency_color = get_risk_tier_style(tier=tier)["color"]
+    card = call_api(
+        "/decision/card",
+        "POST",
+        {"location": state.district, "precipitation": state.rainfall_mm},
+    )
+    if "error" in card or "action" not in card:
+        st.error(
+            f"Could not reach the AI Decision Engine: {card.get('error', 'unknown error')}"
+        )
+        st.divider()
+        return
 
-    # "Protect/Alert N people" and "Estimated Cost" used to be fixed
-    # numbers, identical for every district and rainfall level - state
-    # .population_exposed is real (from /situation), and response
-    # operations cost is a distinct concept from the flood-damage economic
-    # loss already computed elsewhere on this page (evacuation/outreach
-    # logistics cost, not property damage), so it's a separate simple
-    # per-person estimate, illustrative like the economic-loss one - no
-    # real operations-cost model exists anywhere in the codebase either.
-    population_exposed = getattr(state, "population_exposed", 0)
-
-    # Evidence and confidence are now grounded in real state fields (see
-    # _gather_decision_evidence/_compute_decision_confidence above) -
-    # only the action label, illustrative cost-per-person multiplier, and
-    # time_window's LOW-tier "Ongoing" framing remain tier-keyed policy
-    # choices, not data claims.
-    reasons = _gather_decision_evidence(state, tier)
-    data_gaps = _gather_data_gaps(state)
-    confidence, confidence_basis = _compute_decision_confidence(state)
-    lead_time_hours = getattr(state, "lead_time_hours", None)
-
-    if tier in ("EXTREME", "CRITICAL"):
-        action = "🚨 Issue Mandatory Evacuation Order"
-        impact = f"Protect {population_exposed:,} people"
-        cost = population_exposed * 15  # full evacuation + temp shelter ops
-    elif tier == "HIGH":
-        action = "⚠️ Prepare for Evacuation"
-        impact = f"Protect {population_exposed:,} people"
-        cost = population_exposed * 8  # readiness + resource positioning
-    elif tier == "MODERATE":
-        action = "📢 Issue Public Awareness Message"
-        impact = f"Alert {population_exposed:,} people"
-        cost = population_exposed * 1.25  # SMS/broadcast outreach
-    else:
-        action = "✅ Continue Normal Monitoring"
-        impact = f"Monitor {TRACKED_DISTRICT_COUNT} districts"
-        cost = 5000  # flat routine-monitoring cost, not population-scaled
-
-    # Real lead_time_hours (src/exposure/impact_estimator.py, keyed off
-    # the same risk tier) instead of a fixed string per tier - LOW/
-    # VERY_LOW tiers describe continuous monitoring, not a deadline, so
-    # those still read "Ongoing" rather than a literal "Within 72 hours".
-    if tier in ("LOW", "VERY_LOW") or not lead_time_hours:
-        time_window = "Ongoing"
-    elif lead_time_hours <= 1:
-        time_window = "Immediately"
-    else:
-        time_window = f"Within {lead_time_hours} hours"
+    tier = card["risk_tier"]
+    style = get_risk_tier_style(tier=tier)
+    urgency_color = style["color"]
+    action_icon = _ACTION_ICON_BY_TYPE.get(card["action"]["type"], "🎯")
 
     col1, col2 = st.columns([2, 1])
 
@@ -1058,12 +923,12 @@ def render_ai_decision_center(state):
             border-left: 6px solid {urgency_color};
         ">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 20px;">{get_risk_tier_style(tier=tier)["emoji"]}</span>
+                <span style="font-size: 20px;">{style["emoji"]}</span>
                 <span style="font-weight: 600; color: {urgency_color}; font-size: 14px;">
-                    {urgency}
+                    {tier}
                 </span>
             </div>
-            <h2 style="font-size: 22px; margin: 0 0 12px 0;">{action}</h2>
+            <h2 style="font-size: 22px; margin: 0 0 12px 0;">{action_icon} {card["action"]["label"]}</h2>
         </div>
         """,
             unsafe_allow_html=True,
@@ -1071,31 +936,58 @@ def render_ai_decision_center(state):
 
         # Confidence bar - basis shown alongside so the number is
         # explainable (what raised/held it) rather than a bare percentage.
+        confidence = card["confidence"]["value"]
         st.progress(confidence / 100, text=f"Confidence: {confidence}%")
-        st.caption(f"Based on: {' • '.join(confidence_basis)}")
+        st.caption(f"Based on: {' • '.join(card['confidence']['basis'])}")
 
         st.markdown("**Why?**")
-        for reason in reasons:
-            st.markdown(f"• {reason}")
+        # `reason` is a single real, period-joined sentence from the
+        # backend - split purely for bullet-point display, never
+        # reinterpreted or added to.
+        for part in [p.strip() for p in card["reason"].split(". ") if p.strip()]:
+            st.markdown(f"• {part.rstrip('.')}.")
 
         # What the platform explicitly does NOT know for this district -
         # e.g. Bagre Dam's unresolved cross-border notification gap for
         # Tamale - shown so a gap reads as a disclosed unknown, not
         # silence that could be mistaken for "no dam risk here".
-        if data_gaps:
+        if card["data_gaps"]:
             st.markdown("**⚠️ Data Gaps**")
-            for gap in data_gaps:
+            for gap in card["data_gaps"]:
                 st.caption(f"• {gap}")
 
     with col2:
         st.markdown("**Expected Impact**")
+        impact = card["expected_impact"]
+        population = impact.get("population_exposed") or 0
+        cost = impact.get("estimated_cost_ghs") or 0
+        # Which verb/scope to show is a phrasing choice, not a data claim
+        # (the underlying population/cost numbers are all real, from the
+        # response) - LOW tier describes routine district monitoring
+        # rather than a specific population count, matching this app's
+        # tier semantics elsewhere (src/exposure/impact_estimator.py's
+        # own LOW/VERY_LOW "MONITOR CONDITIONS"/"NORMAL ACTIVITIES").
+        if tier in ("LOW", "VERY_LOW"):
+            detail = f"Monitor {TRACKED_DISTRICT_COUNT} districts"
+        elif tier == "MODERATE":
+            detail = f"Alert {population:,} people"
+        else:
+            detail = f"Protect {population:,} people"
         render_impact_card(
             value=cost,
             label="Estimated Cost",
             emoji="💰",
             color="#ed8936",
-            detail=impact,
+            detail=detail,
         )
+
+        lead_time_hours = card.get("time_window_hours")
+        if tier in ("LOW", "VERY_LOW") or not lead_time_hours:
+            time_window = "Ongoing"
+        elif lead_time_hours <= 1:
+            time_window = "Immediately"
+        else:
+            time_window = f"Within {lead_time_hours} hours"
         st.caption(f"⏱️ Time Window: {time_window}")
 
     st.divider()

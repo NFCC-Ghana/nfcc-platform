@@ -20,6 +20,8 @@ def test_decision_card_schema(api_client):
     for key in (
         "decision_id",
         "generated_at",
+        "risk_tier",
+        "score",
         "location",
         "action",
         "priority",
