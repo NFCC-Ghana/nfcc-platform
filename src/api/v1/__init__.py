@@ -17,6 +17,7 @@ lands.
 from fastapi import APIRouter
 
 from src.api.v1.alerts import router as alerts_router
+from src.api.v1.backtest import router as backtest_router
 from src.api.v1.decision import router as decision_router
 from src.api.v1.districts import router as districts_router
 from src.api.v1.evidence import router as evidence_router
@@ -36,3 +37,4 @@ router.include_router(decision_router)
 router.include_router(risk_history_router)
 router.include_router(alerts_router)
 router.include_router(v1_health_router)
+router.include_router(backtest_router)
