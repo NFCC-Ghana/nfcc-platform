@@ -865,6 +865,105 @@ def render_operations_panel(state, district_data):
     st.divider()
 
 
+def _gather_decision_evidence(state, tier: str) -> list:
+    """Builds the Decision Center's 'Why?' list ONLY from real fields
+    present on state - each line traces to one specific value, never
+    asserted independent of it.
+
+    Previously this was a fixed set of 3-4 strings per tier (e.g. "Roads
+    becoming inaccessible", "Multiple citizen reports verified") shown
+    for EVERY EXTREME/CRITICAL alert regardless of what data actually
+    existed - state.verified_reports could be 0 and the text would still
+    claim reports were verified, and no signal for road status exists
+    anywhere in this codebase at all, so that claim wasn't just
+    optimistic, it was invented from nothing. This is the exact failure
+    mode the AI Guardrails requirement calls out: never invent weather
+    observations, risk levels, or emergency resources the platform
+    doesn't actually have."""
+    reasons = []
+
+    # rainfall_mm is the actual value that drove this assessment's score
+    # (src/api/routes/situation.py sets it to the real request.precipitation
+    # input); forecast_24h_mm is a SEPARATE real field - future forecasted
+    # rain over the next 24h, from Open-Meteo. Conflating them with `or`
+    # previously meant a scenario with real 90mm current rainfall but a
+    # near-zero forecast for the next 24h (dry period following the event)
+    # would report "Rainfall forecast: 1mm" as the reason for an EXTREME
+    # alert - technically a real field, but the wrong one for the claim.
+    rainfall = getattr(state, "rainfall_mm", None)
+    if rainfall:
+        reasons.append(f"Rainfall driving this assessment: {rainfall:.0f}mm")
+    forecast_24h = getattr(state, "forecast_24h_mm", None)
+    if forecast_24h:
+        reasons.append(f"Forecast next 24h: {forecast_24h:.0f}mm additional")
+
+    river_level = getattr(state, "river_level_m", None)
+    if river_level:
+        reasons.append(f"River level: {river_level:.1f}m")
+
+    soil = getattr(state, "soil_saturation_percent", None)
+    if soil:
+        reasons.append(f"Soil saturation: {soil:.0f}%")
+
+    if getattr(state, "satellite_water_detected", False) and getattr(
+        state, "satellite_source", ""
+    ) == "Sentinel-1 SAR":
+        extent = getattr(state, "satellite_flood_extent_km2", 0)
+        reasons.append(f"Satellite (Sentinel-1 SAR) confirms {extent:.1f} km² water extent")
+
+    verified = getattr(state, "verified_reports", 0)
+    if verified > 0:
+        reasons.append(f"{verified} citizen report(s) verified on the ground")
+    elif tier in ("EXTREME", "CRITICAL", "HIGH"):
+        # Guardrail: say so rather than silently omitting - the platform
+        # genuinely doesn't have ground-truth corroboration here yet.
+        reasons.append("No verified citizen reports yet for this area")
+
+    if not reasons:
+        reasons.append(
+            "Assessment based on real-time rainfall data only - "
+            "no additional corroborating signals available"
+        )
+
+    return reasons
+
+
+def _compute_decision_confidence(state) -> tuple:
+    """Confidence reflects how many INDEPENDENT real signals corroborate
+    the rainfall-driven risk score - not a fixed per-tier number. The
+    score/tier itself is a deterministic function of real rainfall
+    (src/alerts/formatter.py:calculate_score), so this measures
+    corroboration, not the forecast's own uncertainty.
+
+    Deliberately conservative (60-95, never higher): overconfidence in
+    exactly this kind of single-source-driven estimate is a documented
+    real-world failure - independent reassessment of Google Flood Hub
+    (deployed across 15+ African countries) found >90% false positive/
+    negative rates for extreme events once checked against ground truth,
+    specifically flagged as a risk of "misinformation for those who
+    depend on its outputs for evacuation decisions" in data-sparse
+    regions - exactly Ghana's situation. A number here should never look
+    more certain than the evidence actually supports."""
+    confidence = 60
+    basis = ["Rainfall-driven risk score"]
+
+    if getattr(state, "satellite_water_detected", False) and getattr(
+        state, "satellite_source", ""
+    ) == "Sentinel-1 SAR":
+        confidence += 20
+        basis.append("Satellite confirmation")
+
+    verified = getattr(state, "verified_reports", 0)
+    if verified >= 3:
+        confidence += 15
+        basis.append(f"{verified} verified citizen reports")
+    elif verified > 0:
+        confidence += 7
+        basis.append(f"{verified} verified citizen report")
+
+    return min(confidence, 95), basis
+
+
 def render_ai_decision_center(state):
     """QUESTION 6: What should we do? - VISUAL VERSION"""
     st.markdown("## 🎯 AI Decision Center")
@@ -891,52 +990,42 @@ def render_ai_decision_center(state):
     # real operations-cost model exists anywhere in the codebase either.
     population_exposed = getattr(state, "population_exposed", 0)
 
+    # Evidence and confidence are now grounded in real state fields (see
+    # _gather_decision_evidence/_compute_decision_confidence above) -
+    # only the action label, illustrative cost-per-person multiplier, and
+    # time_window's LOW-tier "Ongoing" framing remain tier-keyed policy
+    # choices, not data claims.
+    reasons = _gather_decision_evidence(state, tier)
+    confidence, confidence_basis = _compute_decision_confidence(state)
+    lead_time_hours = getattr(state, "lead_time_hours", None)
+
     if tier in ("EXTREME", "CRITICAL"):
         action = "🚨 Issue Mandatory Evacuation Order"
-        confidence = 95
-        reasons = [
-            "Rainfall exceeds historical thresholds",
-            "River levels rising rapidly",
-            "Roads becoming inaccessible",
-            "Multiple citizen reports verified",
-        ]
         impact = f"Protect {population_exposed:,} people"
         cost = population_exposed * 15  # full evacuation + temp shelter ops
-        time_window = "Within 45 minutes"
     elif tier == "HIGH":
         action = "⚠️ Prepare for Evacuation"
-        confidence = 87
-        reasons = [
-            "Rainfall approaching warning levels",
-            "River levels elevated",
-            "Soil saturation increasing",
-            "Reports of rising water",
-        ]
         impact = f"Protect {population_exposed:,} people"
         cost = population_exposed * 8  # readiness + resource positioning
-        time_window = "Within 2 hours"
     elif tier == "MODERATE":
         action = "📢 Issue Public Awareness Message"
-        confidence = 78
-        reasons = [
-            "Rainfall expected to continue",
-            "Conditions being monitored",
-            "Communities advised to stay informed",
-        ]
         impact = f"Alert {population_exposed:,} people"
         cost = population_exposed * 1.25  # SMS/broadcast outreach
-        time_window = "Within 4 hours"
     else:
         action = "✅ Continue Normal Monitoring"
-        confidence = 92
-        reasons = [
-            "All indicators within normal range",
-            "No immediate threat detected",
-            "Regular updates provided",
-        ]
         impact = f"Monitor {TRACKED_DISTRICT_COUNT} districts"
         cost = 5000  # flat routine-monitoring cost, not population-scaled
+
+    # Real lead_time_hours (src/exposure/impact_estimator.py, keyed off
+    # the same risk tier) instead of a fixed string per tier - LOW/
+    # VERY_LOW tiers describe continuous monitoring, not a deadline, so
+    # those still read "Ongoing" rather than a literal "Within 72 hours".
+    if tier in ("LOW", "VERY_LOW") or not lead_time_hours:
         time_window = "Ongoing"
+    elif lead_time_hours <= 1:
+        time_window = "Immediately"
+    else:
+        time_window = f"Within {lead_time_hours} hours"
 
     col1, col2 = st.columns([2, 1])
 
@@ -962,8 +1051,10 @@ def render_ai_decision_center(state):
             unsafe_allow_html=True,
         )
 
-        # Confidence bar
+        # Confidence bar - basis shown alongside so the number is
+        # explainable (what raised/held it) rather than a bare percentage.
         st.progress(confidence / 100, text=f"Confidence: {confidence}%")
+        st.caption(f"Based on: {' • '.join(confidence_basis)}")
 
         st.markdown("**Why?**")
         for reason in reasons:

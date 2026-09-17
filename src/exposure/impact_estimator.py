@@ -139,9 +139,19 @@ class ImpactEstimator:
         }
 
     def _load_lead_time_estimates(self) -> Dict:
-        """Load lead time estimates based on risk tier."""
+        """Load lead time estimates based on risk tier.
+
+        CRITICAL was missing here even though it's one of this app's 5 real
+        tiers (src/alerts/formatter.py:get_risk_tier) - looking it up via
+        .get(risk_tier, ...["LOW"]) silently gave a CRITICAL alert LOW's 72
+        hour lead time and "STAY INFORMED" action instead of anything
+        resembling urgency. Value chosen between HIGH's 6h and EXTREME's 2h,
+        matching this tier's CAP response_guidance elsewhere (alert_review.py:
+        "EVACUATE NOW - vulnerable residents first, others within hours").
+        """
         return {
             "EXTREME": {"hours": 2, "action": "IMMEDIATE EVACUATION", "color": "red"},
+            "CRITICAL": {"hours": 3, "action": "EVACUATE NOW", "color": "red"},
             "HIGH": {"hours": 6, "action": "PREPARE TO EVACUATE", "color": "orange"},
             "MODERATE": {
                 "hours": 24,
