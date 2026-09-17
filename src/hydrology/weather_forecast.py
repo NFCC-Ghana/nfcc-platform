@@ -133,10 +133,18 @@ class WeatherForecastEngine:
 
         for h in [24, 48, 72]:
             if h <= hours:
+                # random.exponential() doesn't exist on Python's stdlib
+                # `random` module (that's a numpy.random method) - this
+                # silently crashed with AttributeError any time this
+                # fallback path was actually exercised (real Open-Meteo
+                # call failing), never caught before because nothing had
+                # forced the fallback branch in a test until now.
+                # random.expovariate(lambd) is the stdlib equivalent. with
+                # lambd = 1/mean, matching numpy's exponential(scale=mean).
                 if is_rainy:
-                    base = 15 + random.exponential(10)
+                    base = 15 + random.expovariate(1 / 10)
                 else:
-                    base = 3 + random.exponential(5)
+                    base = 3 + random.expovariate(1 / 5)
                 forecast[f"{h}h"] = round(max(0, base), 1)
             else:
                 forecast[f"{h}h"] = 0.0
