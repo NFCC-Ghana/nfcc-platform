@@ -11,6 +11,12 @@ queues it in the pending_alerts review table
 Alert Review Queue. Nothing gets sent to real people from this script;
 AlertEngine.process() is only ever called when a human clicks Approve.
 
+Also records a risk_history snapshot for every district on every run
+(POST /v1/districts/{district}/risk/history, src/api/v1/risk_history.py)
+- the orchestration that keeps GET /v1/districts/{district}/risk/history
+populated with a real, periodic time series, since this script (running
+outside the API container) has no direct database access.
+
 Usage:
     python scripts/automated_risk_assessment.py
     python scripts/automated_risk_assessment.py --api-url https://...
@@ -90,6 +96,24 @@ def run(api_url: str) -> int:
             logger.error(f"Assessment POST failed for {district}: {e}")
             failures += 1
             continue
+
+        # Record a risk_history snapshot on every scheduled run (priority
+        # deliverable #9's orchestration - this script runs outside the
+        # API container with no direct database access, so recording has
+        # to go through the API the same way /alerts/assess does).
+        # Reuses the same precipitation value already fetched above
+        # rather than querying it a second time. Best-effort: a failure
+        # here doesn't count against this district's overall success -
+        # the real-time assessment above already succeeded independently
+        # of whether its historical record gets saved.
+        try:
+            requests.post(
+                f"{api_url}/v1/districts/{district}/risk/history",
+                json={"precipitation_mm": precipitation, "source": "scheduled"},
+                timeout=20,
+            ).raise_for_status()
+        except Exception as e:
+            logger.warning(f"risk_history POST failed for {district}: {e}")
 
         if result.get("queued"):
             queued_count += 1
