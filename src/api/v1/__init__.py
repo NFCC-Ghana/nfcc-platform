@@ -16,6 +16,7 @@ lands.
 
 from fastapi import APIRouter
 
+from src.api.v1.alerts import router as alerts_router
 from src.api.v1.districts import router as districts_router
 from src.api.v1.forecast import router as forecast_router
 from src.api.v1.risk import router as risk_router
@@ -24,3 +25,4 @@ router = APIRouter(prefix="/v1")
 router.include_router(districts_router)
 router.include_router(risk_router)
 router.include_router(forecast_router)
+router.include_router(alerts_router)
