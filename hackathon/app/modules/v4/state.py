@@ -75,6 +75,13 @@ class DashboardState:
     # /situation wasn't called, in which case the Operations panel falls
     # back to a generic "{district} X" pattern.
     shelter_names: List[str] = field(default_factory=list)
+    # Real dam/reservoir disclosure for districts genuinely downstream of
+    # a tracked dam (src/hydrology/dam_intelligence.py via /situation) -
+    # each entry has available=True with real data, or available=False
+    # with the actual reason no live feed exists (e.g. Bagre Dam's
+    # unresolved cross-border notification gap). [] for the 6 of 9
+    # tracked districts with no known dam exposure.
+    dam_intelligence: List[Dict[str, Any]] = field(default_factory=list)
 
     # ============================================================
     # POPULATION IMPACT
@@ -254,6 +261,7 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.forecast_72h_mm = api_data.get("forecast_72h_mm", 30.0)
     state.risk_timeline = api_data.get("risk_timeline", [])
     state.shelter_names = api_data.get("shelter_names", [])
+    state.dam_intelligence = api_data.get("dam_intelligence", [])
 
     satellite = api_data.get("satellite", {})
     state.satellite_water_detected = satellite.get("water_detected", False)

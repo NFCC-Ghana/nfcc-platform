@@ -928,6 +928,23 @@ def _gather_decision_evidence(state, tier: str) -> list:
     return reasons
 
 
+def _gather_data_gaps(state) -> list:
+    """Explicit list of known-missing signals for this district - the
+    "say so if you don't have it" half of grounding, as a distinct list
+    from _gather_decision_evidence's positive claims rather than folded
+    in as another bullet. Currently sourced from
+    src/hydrology/dam_intelligence.py (via /situation's dam_intelligence
+    field): for the 3 tracked districts genuinely downstream of a dam,
+    reports the real, specific reason no live feed exists (e.g. Bagre
+    Dam's unresolved cross-border notification gap) instead of leaving a
+    reviewer to assume "no dam mentioned" means "no dam risk"."""
+    gaps = []
+    for dam in getattr(state, "dam_intelligence", None) or []:
+        if not dam.get("available", True):
+            gaps.append(f"{dam.get('dam', 'Dam')}: {dam.get('reason', 'data unavailable')}")
+    return gaps
+
+
 def _compute_decision_confidence(state) -> tuple:
     """Confidence reflects how many INDEPENDENT real signals corroborate
     the rainfall-driven risk score - not a fixed per-tier number. The
@@ -996,6 +1013,7 @@ def render_ai_decision_center(state):
     # time_window's LOW-tier "Ongoing" framing remain tier-keyed policy
     # choices, not data claims.
     reasons = _gather_decision_evidence(state, tier)
+    data_gaps = _gather_data_gaps(state)
     confidence, confidence_basis = _compute_decision_confidence(state)
     lead_time_hours = getattr(state, "lead_time_hours", None)
 
@@ -1059,6 +1077,15 @@ def render_ai_decision_center(state):
         st.markdown("**Why?**")
         for reason in reasons:
             st.markdown(f"• {reason}")
+
+        # What the platform explicitly does NOT know for this district -
+        # e.g. Bagre Dam's unresolved cross-border notification gap for
+        # Tamale - shown so a gap reads as a disclosed unknown, not
+        # silence that could be mistaken for "no dam risk here".
+        if data_gaps:
+            st.markdown("**⚠️ Data Gaps**")
+            for gap in data_gaps:
+                st.caption(f"• {gap}")
 
     with col2:
         st.markdown("**Expected Impact**")

@@ -23,6 +23,7 @@ from src.alerts.formatter import calculate_score, get_risk_tier
 from src.community.community_memory import community_memory
 from src.exposure.impact_estimator import impact_estimator
 from src.exposure.shelter_candidates import get_shelter_names
+from src.hydrology.dam_intelligence import get_dam_intelligence_for_district
 from src.hydrology.unified_intelligence import unified_intelligence
 from src.hydrology.weather_forecast import weather_forecast
 
@@ -196,6 +197,13 @@ async def get_situation(request: SituationRequest):
         # but genuine places, not generic "{district} Senior High School"
         # placeholder text repeated for every district.
         "shelter_names": get_shelter_names(request.location),
+        # Honest dam/reservoir disclosure (src/hydrology/dam_intelligence.py)
+        # for the 3 tracked districts genuinely downstream of a dam this
+        # platform knows about - [] for the other 6. Each entry is either
+        # real data (Akosombo, if DAHITI_API_KEY is configured) or an
+        # explicit available=False with the real reason no live feed
+        # exists, never a fabricated reservoir level.
+        "dam_intelligence": get_dam_intelligence_for_district(request.location),
     }
 
     if impact:
