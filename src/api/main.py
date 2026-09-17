@@ -21,6 +21,7 @@ from src.api.routes.situation import router as situation_router
 from src.api.routes.alert_review import router as alert_review_router
 from src.api.routes.cap_export import router as cap_export_router
 from src.api.routes.decision_card import router as decision_card_router
+from src.api.v1 import router as v1_router
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
@@ -207,6 +208,7 @@ app.include_router(situation_router)
 app.include_router(alert_review_router)
 app.include_router(cap_export_router)
 app.include_router(decision_card_router)
+app.include_router(v1_router)
 
 # Ensure database is initialized on startup
 from src.database.alert_db import init_db
