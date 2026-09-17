@@ -23,6 +23,12 @@ plotly>=5.17.0
 twilio>=8.0.0
 python-dotenv>=1.0.0
 
+# Real OASIS CAP v1.2 XML export (src/api/routes/cap_export.py) - typed
+# dataclass bindings for the exact CAP schema (identifier/sender/status/
+# msgType/severity/urgency/certainty/area/...), serialized via xsdata
+# rather than hand-built XML strings.
+cap-tools>=3.1.0
+
 # Remote sensing (src/hydrology/sentinel_processor.py needs `import ee` -
 # environment.yml has this via conda-forge for the conda-based workflows,
 # but ci.yml installs via plain pip, which never got this package)

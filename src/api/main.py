@@ -19,6 +19,7 @@ from src.api.routes.explain_fusion import router as explain_fusion_router
 from src.api.routes.subscriptions import router as subscriptions_router
 from src.api.routes.situation import router as situation_router
 from src.api.routes.alert_review import router as alert_review_router
+from src.api.routes.cap_export import router as cap_export_router
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
@@ -203,6 +204,7 @@ app.include_router(explain_router)
 app.include_router(health_router)
 app.include_router(situation_router)
 app.include_router(alert_review_router)
+app.include_router(cap_export_router)
 
 # Ensure database is initialized on startup
 from src.database.alert_db import init_db

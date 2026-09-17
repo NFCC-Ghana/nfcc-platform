@@ -7,6 +7,15 @@ from src.alerts.providers.sms_provider import SMSAlertProvider
 from src.alerts.providers.whatsapp_provider import WhatsAppAlertProvider
 from src.alerts.providers.email_provider import EmailAlertProvider
 
+# SMSAlertProvider/WhatsAppAlertProvider._has_valid_credentials() requires an
+# account_sid starting with "AC" and >20 chars before it will touch a real
+# (here, patched) twilio.rest.Client at all - anything else, including the
+# literal "test_sid" these tests used to pass, silently short-circuits into
+# the provider's own MOCK MODE branch, which never calls the client the test
+# just set up. That's why patch("twilio.rest.Client") had no effect: the
+# code path that would use it was never reached.
+_FAKE_TWILIO_SID = "AC" + "0" * 32
+
 
 class TestSMSProvider:
     """Basic SMS provider tests."""
@@ -21,7 +30,7 @@ class TestSMSProvider:
             mock_client.messages.create.return_value = mock_message
 
             provider = SMSAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="+1234567890",
                 to_numbers=["+1234567890"],
@@ -80,7 +89,7 @@ class TestWhatsAppProvider:
             mock_client.messages.create.return_value = mock_message
 
             provider = WhatsAppAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="whatsapp:+14155238886",
                 to_numbers=["whatsapp:+1234567890"],

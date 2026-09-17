@@ -7,6 +7,14 @@ from src.alerts.providers.sms_provider import SMSAlertProvider
 from src.alerts.providers.whatsapp_provider import WhatsAppAlertProvider
 from src.alerts.providers.email_provider import EmailAlertProvider
 
+# See tests/unit/test_providers_mock.py's comment on this same constant -
+# SMSAlertProvider/WhatsAppAlertProvider only ever touch the (here, patched)
+# twilio.rest.Client if account_sid looks like a real Twilio SID
+# ("AC" + >20 chars); "test_sid" fails that check and silently falls back to
+# the provider's own MOCK MODE branch instead, which is why patching
+# twilio.rest.Client had no effect on these tests.
+_FAKE_TWILIO_SID = "AC" + "0" * 32
+
 # ============================================================
 # SMS Provider Tests
 # ============================================================
@@ -25,7 +33,7 @@ class TestSMSProviderComplete:
             mock_client.messages.create.return_value = mock_message
 
             provider = SMSAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="+1234567890",
                 to_numbers=["+1234567890"],
@@ -59,7 +67,7 @@ class TestSMSProviderComplete:
             mock_client.messages.create.return_value = mock_message
 
             provider = SMSAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="+1234567890",
                 to_numbers=["+1234567890", "+1987654321"],
@@ -94,7 +102,7 @@ class TestSMSProviderComplete:
             ]
 
             provider = SMSAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="+1234567890",
                 to_numbers=["+1234567890"],
@@ -125,7 +133,7 @@ class TestSMSProviderComplete:
             mock_client.messages.create.side_effect = Exception("Network error")
 
             provider = SMSAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="+1234567890",
                 to_numbers=["+1234567890"],
@@ -144,7 +152,12 @@ class TestSMSProviderComplete:
             result = provider.send(alert)
 
             assert result["success"] is False
-            assert mock_client.messages.create.call_count == 3  # Initial + 2 retries
+            # SMSAlertProvider._send_to_number treats max_retries as the
+            # TOTAL attempt count (range(1, max_retries + 1), and its own
+            # log message says "after {max_retries} attempts") - not
+            # "retries after the first" - so max_retries=2 means 2 calls,
+            # not 3.
+            assert mock_client.messages.create.call_count == 2
 
 
 # ============================================================
@@ -165,7 +178,7 @@ class TestWhatsAppProviderComplete:
             mock_client.messages.create.return_value = mock_message
 
             provider = WhatsAppAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="whatsapp:+14155238886",
                 to_numbers=["whatsapp:+1234567890"],
@@ -195,7 +208,7 @@ class TestWhatsAppProviderComplete:
             mock_client.messages.create.return_value = mock_message
 
             provider = WhatsAppAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="whatsapp:+14155238886",
                 to_numbers=["whatsapp:+1234567890", "whatsapp:+1987654321"],
@@ -229,7 +242,7 @@ class TestWhatsAppProviderComplete:
             ]
 
             provider = WhatsAppAlertProvider(
-                account_sid="test_sid",
+                account_sid=_FAKE_TWILIO_SID,
                 auth_token="test_token",
                 from_number="whatsapp:+14155238886",
                 to_numbers=["whatsapp:+1234567890"],
@@ -290,6 +303,13 @@ class TestEmailProviderComplete:
         with patch("smtplib.SMTP") as MockSMTP:
             mock_smtp = MagicMock()
             MockSMTP.return_value = mock_smtp
+            # EmailAlertProvider.send() does `with smtplib.SMTP(...) as
+            # server:` - a MagicMock's __enter__() returns a *different*
+            # auto-generated MagicMock by default, not mock_smtp itself, so
+            # without this line `server` inside send() is never the object
+            # this test configures below, and mock_smtp.send_message is
+            # never actually called no matter what the code does.
+            mock_smtp.__enter__.return_value = mock_smtp
 
             # Mock the send_message to fail first, then succeed
             mock_smtp.send_message.side_effect = [Exception("Connection error"), None]
@@ -298,8 +318,15 @@ class TestEmailProviderComplete:
                 recipients=["test@example.com"],
                 smtp_host="smtp.gmail.com",
                 smtp_port=587,
-                smtp_user="test@gmail.com",
+                # "test@gmail.com" is EmailAlertProvider's own explicit
+                # placeholder-detection value (see _mock_mode in
+                # email_provider.py) - using it here forces MOCK MODE,
+                # which returns success without ever calling smtplib.SMTP
+                # at all. Any other value takes the real (here, patched)
+                # SMTP path this test actually means to exercise.
+                smtp_user="ci-test-sender@example.com",
                 smtp_password="test_password",
+                retry_delay=0.05,
             )
 
             alert = AlertPayload(

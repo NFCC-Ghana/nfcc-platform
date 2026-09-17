@@ -13,6 +13,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 # Add project root to path BEFORE other imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))  # noqa: E402
@@ -113,6 +114,20 @@ def call_api(
         return {"error": "Cannot connect to API"}
     except Exception as e:
         return {"error": str(e)}
+
+
+def fetch_cap_xml(alert_id: int) -> Optional[str]:
+    """Real OASIS CAP v1.2 XML for one review-queue alert (see
+    src/api/routes/cap_export.py) - a plain XML body, not JSON, so this
+    bypasses call_api's response.json() and just returns the raw text (or
+    None on any failure, so a broken export never crashes the queue view)."""
+    try:
+        response = requests.get(
+            f"{API_URL}/alerts/pending/{alert_id}/cap.xml", timeout=15
+        )
+        return response.text if response.status_code == 200 else None
+    except requests.exceptions.RequestException:
+        return None
 
 
 @st.cache_data(ttl=900)
@@ -1475,6 +1490,22 @@ def render_alert_review_queue():
                             {"reviewed_by": "dashboard-operator"},
                         )
                         st.rerun()
+                    # Real OASIS CAP v1.2 XML (src/api/routes/cap_export.py)
+                    # for this exact alert - the same schema FEMA IPAWS/EU/
+                    # Japan/Canada distributors consume, so this could be
+                    # handed to a real CAP-compliant system without a
+                    # bespoke integration. Read-only export; never sent
+                    # anywhere by this button.
+                    cap_xml = fetch_cap_xml(alert["id"])
+                    if cap_xml:
+                        st.download_button(
+                            "📄 CAP XML",
+                            data=cap_xml,
+                            file_name=f"nfcc-alert-{alert['id']}.cap.xml",
+                            mime="application/cap+xml",
+                            key=f"cap_xml_{alert['id']}",
+                            use_container_width=True,
+                        )
 
     # Retraction (CAP msgType=Cancel) for already-sent alerts - directly
     # motivated by South Korea's May 2023 false missile alert, where the
@@ -1522,6 +1553,16 @@ def render_alert_review_queue():
                             {"reviewed_by": "dashboard-operator", "reason": reason},
                         )
                         st.rerun()
+                    cap_xml = fetch_cap_xml(alert["id"])
+                    if cap_xml:
+                        st.download_button(
+                            "📄 CAP XML",
+                            data=cap_xml,
+                            file_name=f"nfcc-alert-{alert['id']}.cap.xml",
+                            mime="application/cap+xml",
+                            key=f"cap_xml_sent_{alert['id']}",
+                            use_container_width=True,
+                        )
 
 
 def weather_forecast_24h(district: str) -> float:
