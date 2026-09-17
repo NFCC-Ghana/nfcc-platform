@@ -168,10 +168,67 @@ def get_akosombo_status() -> Dict:
         }
 
 
+_NAKEMBE_DAHITI_ID = 19006  # Nakembé, River - ~22.4km from Bagre Dam
+_NAKEMBE_DISTANCE_KM = 22.4
+
+
+def _get_bagre_upstream_proxy() -> Dict:
+    """Bagre Dam sits on the Nakambé river (Burkina Faso's name for the
+    White Volta, upstream of where it enters Ghana) - DAHITI has a real,
+    populated satellite altimetry station on that exact river system,
+    "Nakembé, River" (id 19006), only 22.4km from the dam - confirmed
+    live with 98 readings, the freshest of any station this project uses
+    (16 days old at the time this was found, vs. 45 for Lake Volta/White
+    Volta). This is NOT official Bagre operator data (no such feed
+    exists, see get_bagre_status below) - it's real upstream river level
+    on the same watershed, usable as an early-warning proxy for water
+    heading toward the dam and, eventually, Tamale."""
+    api_key = os.getenv("DAHITI_API_KEY")
+    if not api_key:
+        return {"available": False, "reason": "DAHITI_API_KEY not configured"}
+
+    try:
+        resp = requests.get(
+            _DAHITI_API_URL,
+            params={
+                "api_key": api_key,
+                "dahiti_id": _NAKEMBE_DAHITI_ID,
+                "format": "json",
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        readings = resp.json().get("data") or []
+        if not readings:
+            return {"available": False, "reason": "No readings returned"}
+        latest = readings[-1]
+        return {
+            "available": True,
+            "river": "Nakembé (upper White Volta, Burkina Faso)",
+            "water_surface_elevation_m": latest.get("wse"),
+            "observation_date": latest.get("datetime"),
+            "distance_km": _NAKEMBE_DISTANCE_KM,
+            "source": "DAHITI satellite altimetry",
+            "note": (
+                "Real upstream river level, same watershed as Bagre Dam - "
+                "NOT official dam operator data (none exists); a proxy "
+                "signal for water conditions approaching the dam, not the "
+                "reservoir's own level."
+            ),
+        }
+    except Exception as e:
+        logger.warning(f"DAHITI Nakembé request failed: {e}")
+        return {"available": False, "reason": f"DAHITI request failed: {e}"}
+
+
 def get_bagre_status() -> Dict:
-    """Bagre Dam (Burkina Faso) has no automatable real-time data source -
-    always honestly reports unavailable, since Tamale is directly exposed
-    to uncoordinated releases from it."""
+    """Bagre Dam (Burkina Faso) itself has no automatable real-time data
+    source - always honestly reports the dam's own status as unavailable,
+    since Tamale is directly exposed to uncoordinated releases from it.
+    Includes a real upstream_proxy reading where available (see
+    _get_bagre_upstream_proxy) as genuinely useful supplementary
+    evidence, kept structurally separate from `available` so it's never
+    mistaken for official dam telemetry."""
     return {
         "dam": "Bagre",
         "available": False,
@@ -184,6 +241,7 @@ def get_bagre_status() -> Dict:
             "warning chain."
         ),
         "downstream_communities": ["Tamale", "Yendi", "Gushegu"],
+        "upstream_proxy": _get_bagre_upstream_proxy(),
     }
 
 

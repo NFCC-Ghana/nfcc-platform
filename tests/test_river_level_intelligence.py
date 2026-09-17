@@ -18,19 +18,30 @@ def test_tamale_has_real_coverage_registered():
     coverage registered even if the key itself isn't configured here."""
     result = get_river_level_for_district("Tamale")
     if not result["available"]:
-        assert "80km" not in result["reason"]
+        assert "65km" not in result["reason"]
 
 
 def test_other_districts_honestly_unavailable():
     for district in ("Accra Central", "Kumasi", "Cape Coast", "Sunyani", "Ho"):
         result = get_river_level_for_district(district)
         assert result["available"] is False
-        assert "80km" in result["reason"]
+        assert "65km" in result["reason"]
 
 
 def test_unknown_district_honestly_unavailable():
     result = get_river_level_for_district("Atlantis")
     assert result["available"] is False
+
+
+def test_accra_west_has_specific_weija_reason():
+    """Accra West's nearest real reservoir (Weija Dam, on the Densu
+    River) was checked specifically - too small (5.5M m3) for satellite
+    altimetry to resolve at all, a different and more specific reason
+    than the generic "nearest target is 65km+ away" given to districts
+    with no nearby reservoir at all."""
+    result = get_river_level_for_district("Accra West")
+    assert result["available"] is False
+    assert "Weija" in result["reason"]
 
 
 def test_situation_includes_river_gauge_field(api_client):
@@ -39,6 +50,29 @@ def test_situation_includes_river_gauge_field(api_client):
     )
     assert resp.status_code == 200
     assert "river_gauge" in resp.json()
+
+
+def test_situation_river_level_m_none_for_unavailable_districts(api_client):
+    """river_level_m used to always be a fabricated number for every
+    district - it must now be explicitly None wherever real coverage
+    doesn't exist, never silently falling back to a fake value."""
+    resp = api_client.post(
+        "/situation", json={"location": "Kumasi", "precipitation": 60}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["river_level_m"] is None
+
+
+def test_situation_river_level_m_is_real_number_for_tamale_when_available(api_client):
+    resp = api_client.post(
+        "/situation", json={"location": "Tamale", "precipitation": 60}
+    )
+    data = resp.json()
+    river_gauge = data["river_gauge"]
+    if river_gauge["available"]:
+        assert data["river_level_m"] == river_gauge["level_above_baseline_m"]
+    else:
+        assert data["river_level_m"] is None
 
 
 def test_decision_card_never_claims_river_level_without_real_gauge(api_client):

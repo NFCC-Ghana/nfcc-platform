@@ -605,15 +605,39 @@ def render_evidence_panel(state):
             ),
             "confidence": state.evidence_rainfall_confidence,
         },
+        # river_level_m is None for 8 of the 9 tracked districts - real
+        # DAHITI satellite altimetry coverage exists only for Tamale (see
+        # src/hydrology/river_level_intelligence.py); it used to always be
+        # a number (np.random.seed(hash(gauge_id)) fabricated with zero
+        # real signal behind it) shown here as if genuine for every
+        # district. Labeled "(no real gauge nearby)" rather than removed,
+        # matching the same disclosure convention already used for
+        # simulated satellite detection below.
         {
-            "name": "River Levels",
-            "score": min(100, (state.river_level_m / 3) * 100),
-            "stars": (
-                "★★★★★"
-                if state.river_level_m > 2.0
-                else "★★★★☆" if state.river_level_m > 1.0 else "★★★☆☆"
+            "name": (
+                "River Levels"
+                if state.river_level_m is not None
+                else "River Levels (no real gauge nearby)"
             ),
-            "confidence": state.evidence_river_confidence,
+            "score": (
+                min(100, (state.river_level_m / 3) * 100)
+                if state.river_level_m is not None
+                else 0
+            ),
+            "stars": (
+                "☆☆☆☆☆"
+                if state.river_level_m is None
+                else (
+                    "★★★★★"
+                    if state.river_level_m > 2.0
+                    else "★★★★☆" if state.river_level_m > 1.0 else "★★★☆☆"
+                )
+            ),
+            "confidence": (
+                state.evidence_river_confidence
+                if state.river_level_m is not None
+                else 0
+            ),
         },
         {
             "name": "Soil Saturation",
@@ -736,7 +760,11 @@ def render_impact_panel(state, district_data):
         agricultural_loss = getattr(state, "agricultural_loss_ghs", 0)
         total_loss = getattr(state, "total_loss_ghs", 0)
         soil_saturation = getattr(state, "soil_saturation_percent", 0)
-        river_level = getattr(state, "river_level_m", 0)
+        # river_level_m is None for 8 of the 9 tracked districts (real
+        # DAHITI coverage exists only for Tamale) - getattr's default only
+        # applies when the attribute is missing, not when its value is
+        # None, so this stays None here rather than silently becoming 0.
+        river_level = getattr(state, "river_level_m", None)
 
     # People - Visual population display
     render_population_visual(
@@ -800,12 +828,16 @@ def render_impact_panel(state, district_data):
         )
     with col2:
         render_visual_metric_card(
-            value=river_level,
-            label="River Level",
+            value=river_level if river_level is not None else 0,
+            label="River Level" if river_level is not None else "River Level (no real gauge nearby)",
             emoji="🌊",
             color="#4299e1",
             max_value=3.0,
-            subtitle=f"{river_level:.1f}m / 3.0m",
+            subtitle=(
+                f"{river_level:.1f}m above typical low"
+                if river_level is not None
+                else "No real gauge close enough to this district"
+            ),
         )
 
     # Affected communities - Visual list
@@ -1427,9 +1459,14 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
         if state.satellite_water_detected
         else "🛰️ No water detected"
     )
+    river_note = (
+        f"🌊 River: {state.river_level_m:.1f}m above typical low"
+        if state.river_level_m is not None
+        else "🌊 River: no real gauge nearby"
+    )
     st.caption(
         f"🌧️ Rainfall: {state.rainfall_mm:.0f}mm  •  "
-        f"🌊 River: {state.river_level_m:.1f}m  •  "
+        f"{river_note}  •  "
         f"💧 Soil saturation: {state.soil_saturation_percent:.0f}%  •  "
         f"{sat_note} ({state.satellite_source})"
     )

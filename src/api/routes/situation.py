@@ -254,16 +254,17 @@ async def get_situation(request: SituationRequest):
 
     if hydrology:
         response["rainfall_mm"] = request.precipitation
-        # river_level_m (via src/hydrology/river_intelligence.py's
-        # get_river_status) is entirely np.random.seed(hash(gauge_id))
-        # fabricated - a sine wave plus noise around a static threshold,
-        # with zero connection to any real input. Kept here unchanged for
-        # the several existing dashboard displays that already read this
-        # field (out of scope for this fix - a separate, larger cleanup);
-        # src/api/routes/decision_card.py's evidence gathering no longer
-        # trusts it - see response["river_gauge"] below for the real
-        # replacement used there.
-        response["river_level_m"] = hydrology["river"].get("current_level_m", 0)
+        # river_level_m used to come from src/hydrology/river_intelligence.py's
+        # get_river_status(), which is entirely
+        # np.random.seed(hash(gauge_id))-fabricated - a sine wave plus
+        # noise around a static threshold, with zero connection to any
+        # real input. Now sourced from response["river_gauge"] (real
+        # DAHITI data for Tamale, honestly None for the other 8 tracked
+        # districts) instead - see src/hydrology/river_level_intelligence.py.
+        river_gauge = response["river_gauge"]
+        response["river_level_m"] = (
+            river_gauge.get("level_above_baseline_m") if river_gauge["available"] else None
+        )
         response["soil_saturation_percent"] = hydrology["soil"].get(
             "saturation_percent", 0
         )
