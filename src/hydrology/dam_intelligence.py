@@ -53,6 +53,7 @@ staying silent about the gap.
 
 import logging
 import os
+from datetime import datetime
 from typing import Dict, List
 
 import requests
@@ -110,18 +111,52 @@ def get_akosombo_status() -> Dict:
                 "reason": "DAHITI returned no water level readings for Lake Volta",
             }
         latest = readings[-1]
+        observation_date = latest.get("datetime")
+
+        # Disclosed freshness, computed rather than left for a reviewer to
+        # work out from a raw timestamp - the "timestamped" half of this
+        # platform's real->traceable->validated->explainable->timestamped
+        # ->actionable goal. 45 days = the disclosed worst-case revisit
+        # (35 days) plus processing delay (2 days) plus an 8-day margin;
+        # beyond that, treat the reading as stale enough to flag loudly
+        # rather than presenting a months-old level as current.
+        age_days = None
+        stale = False
+        if observation_date:
+            try:
+                obs_dt = datetime.fromisoformat(observation_date)
+                age_days = (datetime.utcnow() - obs_dt).days
+                stale = age_days > 45
+            except ValueError:
+                pass
+
         return {
             "dam": "Akosombo",
             "available": True,
             "water_surface_elevation_m": latest.get("wse"),
             "uncertainty_m": latest.get("wse_u"),
-            "observation_date": latest.get("date"),
+            # DAHITI's real response field is "datetime" (verified against
+            # the live API), not "date" as an earlier approximate summary
+            # of their docs said - the wrong key silently returned None
+            # here (Python dict.get(), no error) rather than failing
+            # loudly, so this was live in production before being caught
+            # by directly inspecting the raw response.
+            "observation_date": observation_date,
+            "age_days": age_days,
+            "stale": stale,
             "source": "DAHITI satellite altimetry (Lake Volta)",
             "downstream_communities": ["Kpong", "Akuse", "Ada", "Tema"],
             "note": (
                 "Satellite altimetry, not real-time - revisit interval "
                 "depends on the satellite mission (10-35 days) with a "
                 "1-2 day processing delay after each pass"
+                + (
+                    f". This reading is {age_days} days old, beyond the "
+                    "normal revisit window - treat as an indicative "
+                    "reservoir trend, not a current level."
+                    if stale
+                    else ""
+                )
             ),
         }
     except Exception as e:
