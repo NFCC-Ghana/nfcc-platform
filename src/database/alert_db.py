@@ -221,6 +221,34 @@ def init_pending_alerts_table() -> None:
                 )
             except Exception:
                 pass  # column already exists
+
+        # cap_status is CAP's OWN status axis (Actual vs. Exercise/Test/
+        # Draft) - deliberately a different column from the existing
+        # `status` field above, which tracks this app's *workflow* state
+        # (pending/approved/dismissed/cancelled) and would collide in
+        # meaning if reused. An 'Exercise' row lets the team practice the
+        # full review workflow with zero risk of a real message going out
+        # (see approve_pending_alert's cap_status check in
+        # src/api/routes/alert_review.py).
+        try:
+            cursor.execute(
+                "ALTER TABLE pending_alerts ADD COLUMN cap_status TEXT "
+                "NOT NULL DEFAULT 'Actual'"
+            )
+        except Exception:
+            pass
+
+        # Geotargeting (real named communities, not just a district name)
+        # and JMA-style tiered response guidance (who specifically should
+        # act) - stored as JSON text / plain text respectively so a
+        # reviewer sees this context without recomputing it every render.
+        for column in ("affected_communities", "response_guidance"):
+            try:
+                cursor.execute(
+                    f"ALTER TABLE pending_alerts ADD COLUMN {column} TEXT"
+                )
+            except Exception:
+                pass
         conn.commit()
 
 
@@ -233,6 +261,9 @@ def save_pending_alert(
     severity: str = None,
     urgency: str = None,
     certainty: str = None,
+    cap_status: str = "Actual",
+    affected_communities: Optional[List[str]] = None,
+    response_guidance: str = None,
 ) -> int:
     """Queue an automated assessment for human review. Returns the new row's id.
 
@@ -242,16 +273,27 @@ def save_pending_alert(
     optional here so existing callers/tests that don't compute them yet
     keep working, but src/api/routes/alert_review.py's real assessment
     path always sets all three.
+
+    cap_status is CAP's Actual/Exercise axis - 'Exercise' rows are drills
+    the review workflow can be practiced on without ever reaching
+    AlertEngine.process() (see approve_pending_alert). affected_communities
+    (real named neighborhoods, src/exposure/community_names.py) and
+    response_guidance (JMA-style "who should act") are stored as-computed
+    so the review card can show them without recomputing on every read.
     """
     now = datetime.now().isoformat()
+    communities_json = (
+        json.dumps(affected_communities) if affected_communities else None
+    )
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """
             INSERT INTO pending_alerts (
                 location, score, risk_tier, precipitation, message,
-                status, created_at, severity, urgency, certainty
-            ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+                status, created_at, severity, urgency, certainty,
+                cap_status, affected_communities, response_guidance
+            ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 location,
@@ -263,10 +305,25 @@ def save_pending_alert(
                 severity,
                 urgency,
                 certainty,
+                cap_status,
+                communities_json,
+                response_guidance,
             ),
         )
         conn.commit()
         return cursor.lastrowid
+
+
+def _decode_pending_alert(row: Dict[str, Any]) -> Dict[str, Any]:
+    """affected_communities is stored as a JSON string (see save_pending_alert)
+    - decode it back to a real list for API consumers, defaulting to []
+    for rows saved before this column existed or with nothing stored."""
+    raw = row.get("affected_communities")
+    try:
+        row["affected_communities"] = json.loads(raw) if raw else []
+    except (TypeError, ValueError):
+        row["affected_communities"] = []
+    return row
 
 
 def get_pending_alerts(status: str = "pending") -> List[Dict[str, Any]]:
@@ -281,7 +338,7 @@ def get_pending_alerts(status: str = "pending") -> List[Dict[str, Any]]:
             )
         else:
             cursor.execute("SELECT * FROM pending_alerts ORDER BY created_at DESC")
-        return [dict(row) for row in cursor.fetchall()]
+        return [_decode_pending_alert(dict(row)) for row in cursor.fetchall()]
 
 
 def get_pending_alert(alert_id: int) -> Optional[Dict[str, Any]]:
@@ -290,7 +347,7 @@ def get_pending_alert(alert_id: int) -> Optional[Dict[str, Any]]:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM pending_alerts WHERE id = ?", (alert_id,))
         row = cursor.fetchone()
-        return dict(row) if row else None
+        return _decode_pending_alert(dict(row)) if row else None
 
 
 def update_pending_alert_status(

@@ -1366,6 +1366,36 @@ def render_alert_review_queue():
             f"district(s) for review."
         )
 
+    # CAP status=Exercise: lets the team practice the full review workflow
+    # (assess -> queue -> approve -> retract) on demand, for any district/
+    # tier, without waiting for real rain - approving or cancelling one of
+    # these never calls AlertEngine.process() (see src/api/routes/
+    # alert_review.py), so it is physically impossible for a drill to
+    # reach a real recipient.
+    with st.expander("🎓 Create Practice Exercise (training drill, never sent for real)"):
+        ex_col1, ex_col2, ex_col3 = st.columns([2, 2, 1])
+        with ex_col1:
+            ex_district = st.selectbox(
+                "District", ALL_TRACKED_DISTRICTS, key="exercise_district"
+            )
+        with ex_col2:
+            ex_tier = st.selectbox(
+                "Simulated tier",
+                ["MODERATE", "HIGH", "CRITICAL", "EXTREME"],
+                index=1,
+                key="exercise_tier",
+            )
+        with ex_col3:
+            st.write("")
+            st.write("")
+            if st.button("Queue Drill", use_container_width=True):
+                call_api(
+                    "/alerts/exercise",
+                    "POST",
+                    {"location": ex_district, "risk_tier": ex_tier},
+                )
+                st.rerun()
+
     pending = call_api("/alerts/pending", "GET")
     alerts = pending.get("alerts", [])
 
@@ -1379,7 +1409,14 @@ def render_alert_review_queue():
         st.markdown(f"### {len(alerts)} awaiting review")
         for alert in alerts:
             style = get_risk_tier_style(tier=alert["risk_tier"])
+            is_exercise = alert.get("cap_status") == "Exercise"
             with st.container(border=True):
+                if is_exercise:
+                    st.warning(
+                        "🎓 **EXERCISE — THIS IS A DRILL.** Approving this "
+                        "cannot send a real message to anyone.",
+                        icon="🎓",
+                    )
                 c1, c2, c3 = st.columns([2, 2, 1])
                 with c1:
                     st.markdown(
@@ -1400,9 +1437,21 @@ def render_alert_review_queue():
                             f"**{alert['urgency']}** urgency • "
                             f"**{alert['certainty']}** certainty"
                         )
+                    # Geotargeting - the real named communities within this
+                    # district (src/exposure/community_names.py), not just
+                    # the district name, so a reviewer sees exactly who
+                    # this would reach.
+                    communities = alert.get("affected_communities") or []
+                    if communities:
+                        st.caption(f"📍 Targets: {', '.join(communities)}")
                 with c2:
                     st.markdown(f"*{alert['message']}*")
                     st.caption(f"Queued: {alert['created_at'][:19]}")
+                    # JMA-style tiered response guidance - who specifically
+                    # should act at this severity, not just a generic
+                    # "take precautions" line.
+                    if alert.get("response_guidance"):
+                        st.caption(f"🎯 {alert['response_guidance']}")
                 with c3:
                     if st.button(
                         "✅ Approve & Send",
@@ -1444,9 +1493,15 @@ def render_alert_review_queue():
             with st.container(border=True):
                 c1, c2 = st.columns([3, 1])
                 with c1:
+                    exercise_tag = (
+                        " 🎓 EXERCISE (drill only, nothing was sent)"
+                        if alert.get("cap_status") == "Exercise"
+                        else ""
+                    )
                     st.markdown(
                         f"{style['emoji']} **{alert['location']}** — "
                         f"{alert['risk_tier']} • sent {alert['reviewed_at'][:19]}"
+                        f"{exercise_tag}"
                     )
                     reason = st.text_input(
                         "Retraction reason (required)",
