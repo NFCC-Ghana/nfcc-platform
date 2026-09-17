@@ -21,6 +21,7 @@ from src.api.v1.decision import router as decision_router
 from src.api.v1.districts import router as districts_router
 from src.api.v1.evidence import router as evidence_router
 from src.api.v1.forecast import router as forecast_router
+from src.api.v1.health import router as v1_health_router
 from src.api.v1.resources import router as resources_router
 from src.api.v1.risk import router as risk_router
 from src.api.v1.risk_history import router as risk_history_router
@@ -34,3 +35,4 @@ router.include_router(resources_router)
 router.include_router(decision_router)
 router.include_router(risk_history_router)
 router.include_router(alerts_router)
+router.include_router(v1_health_router)
