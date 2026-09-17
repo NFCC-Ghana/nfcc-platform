@@ -24,6 +24,7 @@ from src.community.community_memory import community_memory
 from src.exposure.impact_estimator import impact_estimator
 from src.exposure.shelter_candidates import get_shelter_names
 from src.hydrology.dam_intelligence import get_dam_intelligence_for_district
+from src.hydrology.river_level_intelligence import get_river_level_for_district
 from src.hydrology.unified_intelligence import unified_intelligence
 from src.hydrology.weather_forecast import weather_forecast
 
@@ -204,6 +205,14 @@ async def get_situation(request: SituationRequest):
         # explicit available=False with the real reason no live feed
         # exists, never a fabricated reservoir level.
         "dam_intelligence": get_dam_intelligence_for_district(request.location),
+        # Real river water level via DAHITI satellite altimetry
+        # (src/hydrology/river_level_intelligence.py) - available=True
+        # only for Tamale (the one tracked district with a real gauge
+        # close enough to be meaningful), available=False with an honest
+        # reason for the other 8. Independent of the unified_intelligence
+        # hydrology call below, so this is set unconditionally rather
+        # than nested inside `if hydrology:`.
+        "river_gauge": get_river_level_for_district(request.location),
     }
 
     if impact:
@@ -245,6 +254,15 @@ async def get_situation(request: SituationRequest):
 
     if hydrology:
         response["rainfall_mm"] = request.precipitation
+        # river_level_m (via src/hydrology/river_intelligence.py's
+        # get_river_status) is entirely np.random.seed(hash(gauge_id))
+        # fabricated - a sine wave plus noise around a static threshold,
+        # with zero connection to any real input. Kept here unchanged for
+        # the several existing dashboard displays that already read this
+        # field (out of scope for this fix - a separate, larger cleanup);
+        # src/api/routes/decision_card.py's evidence gathering no longer
+        # trusts it - see response["river_gauge"] below for the real
+        # replacement used there.
         response["river_level_m"] = hydrology["river"].get("current_level_m", 0)
         response["soil_saturation_percent"] = hydrology["soil"].get(
             "saturation_percent", 0

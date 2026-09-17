@@ -106,17 +106,35 @@ def build_evidence(tier: str, situation: dict):
     if forecast_24h:
         reason_parts.append(f"Forecast next 24h: {forecast_24h:.0f}mm additional")
 
-    river_level = situation.get("river_level_m")
+    # river_level_m itself (src/hydrology/unified_intelligence.py) is
+    # entirely np.random.seed(hash(gauge_id))-fabricated with no real
+    # input behind it at all (confirmed by reading river_intelligence.py's
+    # _generate_gauge_data - a sine wave plus noise, never driven by real
+    # rainfall or any other real signal) - it used to be cited here as
+    # available=True unconditionally, the same undisclosed-fabrication
+    # bug already fixed for satellite/dam evidence elsewhere in this
+    # function, just undiscovered until directly checked. Real coverage
+    # (src/hydrology/river_level_intelligence.py, DAHITI satellite
+    # altimetry) exists only for Tamale; every other district honestly
+    # reports available=False instead.
+    river_gauge = situation.get("river_gauge") or {}
+    river_available = river_gauge.get("available", False)
     evidence.append(
         EvidenceItem(
-            field="river_level_m",
-            value=river_level,
-            source="src/hydrology/unified_intelligence.py",
-            available=river_level is not None,
+            field="river_water_level",
+            value=river_gauge.get("water_surface_elevation_m"),
+            source=river_gauge.get("source", "unavailable"),
+            available=river_available,
+            as_of=river_gauge.get("observation_date"),
         )
     )
-    if river_level:
-        reason_parts.append(f"River level: {river_level:.1f}m")
+    if river_available:
+        reason_parts.append(
+            f"{river_gauge['river']} water surface elevation: "
+            f"{river_gauge['water_surface_elevation_m']}m "
+            f"(real gauge {river_gauge['distance_km']}km from this district, "
+            f"as of {river_gauge.get('observation_date', 'unknown date')})"
+        )
 
     soil = situation.get("soil_saturation_percent")
     evidence.append(
