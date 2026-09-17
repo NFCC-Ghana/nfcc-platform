@@ -66,90 +66,18 @@ class EvidenceItem(BaseModel):
     as_of: Optional[str] = None
 
 
-class ConfidenceBlock(BaseModel):
-    value: int
-    basis: List[str]
-    method: str = (
-        "Weighted agreement across available real signals on top of a "
-        "conservative baseline - not the forecast's own uncertainty, "
-        "since the risk score is a deterministic function of real "
-        "rainfall. See src/api/routes/decision_card.py for the exact "
-        "weights and why overconfidence here is treated as a real risk."
-    )
+def build_evidence(tier: str, situation: dict):
+    """The single place evidence/reason/data_gaps are derived from a
+    /situation response - shared by get_decision_card (this file) and
+    GET /v1/districts/{district}/evidence (src/api/v1/evidence.py) so
+    there is exactly one evidence-gathering implementation, not two that
+    could drift the way this platform's district lists and lead-time
+    tables already have.
 
-
-class LocationBlock(BaseModel):
-    district: str
-    communities: List[str]
-    source: str = "src/exposure/community_names.py"
-
-
-class ActionBlock(BaseModel):
-    type: str
-    label: str
-
-
-class ExpectedImpact(BaseModel):
-    population_exposed: Optional[int] = None
-    children_exposed: Optional[int] = None
-    elderly_exposed: Optional[int] = None
-    estimated_cost_ghs: Optional[float] = None
-    cost_basis: str = "Illustrative per-person estimate - no calibrated operations-cost model exists"
-
-
-class DecisionCard(BaseModel):
-    decision_id: str
-    generated_at: str
-    # Real risk_tier/score from the same /situation call this card is
-    # built from (src/alerts/formatter.py:get_risk_tier) - included so a
-    # consumer (the dashboard) can render the same tier badge/color/emoji
-    # used everywhere else on the platform without recomputing it, rather
-    # than having two independent "what tier is this" implementations
-    # that could drift apart.
-    risk_tier: str
-    score: float
-    location: LocationBlock
-    action: ActionBlock
-    priority: str
-    time_window_hours: Optional[int] = None
-    confidence: ConfidenceBlock
-    evidence: List[EvidenceItem]
-    expected_impact: ExpectedImpact
-    reason: str
-    data_gaps: List[str]
-    status: str = "DRAFT"
-
-
-class DecisionCardRequest(BaseModel):
-    location: str = Field(..., description="District location")
-    precipitation: float = Field(..., description="Precipitation in mm", ge=0)
-
-
-# Cost-per-person multipliers by tier - same illustrative figures
-# originally in hackathon/app/pages/dashboard.py's render_ai_decision_center
-# before it was migrated to call this endpoint instead of computing its
-# own. LOW has no multiplier because LOW's cost isn't population-scaled -
-# see the flat _LOW_TIER_FLAT_COST_GHS below, matching the dashboard's
-# original "routine monitoring has a baseline cost even if exposure is
-# near zero" behavior, which population_exposed * 0 would have silently
-# dropped to zero.
-_COST_PER_PERSON_BY_TIER = {
-    "EXTREME": 15,
-    "CRITICAL": 15,
-    "HIGH": 8,
-    "MODERATE": 1.25,
-}
-_LOW_TIER_FLAT_COST_GHS = 5000
-
-
-@router.post("/card", response_model=DecisionCard)
-async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
-    """Grounded decision output for one district - see module docstring."""
-    situation = await get_situation(
-        SituationRequest(location=request.location, precipitation=request.precipitation)
-    )
-
-    tier = situation.get("risk_tier", "LOW")
+    Returns (evidence: List[EvidenceItem], reason: str,
+    data_gaps: List[str], sat_confirmed: bool, verified: int) - the last
+    two are returned alongside because _compute_confidence below needs
+    them too, without re-deriving satellite/report logic a second time."""
     evidence: List[EvidenceItem] = []
     reason_parts: List[str] = []
     data_gaps: List[str] = []
@@ -257,10 +185,16 @@ async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
             "no additional corroborating signals available"
         )
 
-    # Confidence: conservative baseline, real corroboration raises it,
-    # capped well short of certainty - see ConfidenceBlock.method and
-    # module docstring for why overconfidence here is treated as a real
-    # risk, not a hypothetical one.
+    return evidence, ". ".join(reason_parts) + ".", data_gaps, sat_confirmed, verified
+
+
+def compute_confidence(sat_confirmed: bool, verified: int):
+    """Confidence: conservative baseline, real corroboration raises it,
+    capped well short of certainty - see ConfidenceBlock.method and
+    module docstring for why overconfidence here is treated as a real
+    risk, not a hypothetical one. Shared by get_decision_card and GET
+    /v1/districts/{district}/evidence for the same reason build_evidence
+    is shared above."""
     confidence = 60
     basis = ["Rainfall-driven risk score"]
     if sat_confirmed:
@@ -272,7 +206,95 @@ async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
     elif verified > 0:
         confidence += 7
         basis.append(f"{verified} verified citizen report")
-    confidence = min(confidence, 95)
+    return min(confidence, 95), basis
+
+
+class ConfidenceBlock(BaseModel):
+    value: int
+    basis: List[str]
+    method: str = (
+        "Weighted agreement across available real signals on top of a "
+        "conservative baseline - not the forecast's own uncertainty, "
+        "since the risk score is a deterministic function of real "
+        "rainfall. See src/api/routes/decision_card.py for the exact "
+        "weights and why overconfidence here is treated as a real risk."
+    )
+
+
+class LocationBlock(BaseModel):
+    district: str
+    communities: List[str]
+    source: str = "src/exposure/community_names.py"
+
+
+class ActionBlock(BaseModel):
+    type: str
+    label: str
+
+
+class ExpectedImpact(BaseModel):
+    population_exposed: Optional[int] = None
+    children_exposed: Optional[int] = None
+    elderly_exposed: Optional[int] = None
+    estimated_cost_ghs: Optional[float] = None
+    cost_basis: str = "Illustrative per-person estimate - no calibrated operations-cost model exists"
+
+
+class DecisionCard(BaseModel):
+    decision_id: str
+    generated_at: str
+    # Real risk_tier/score from the same /situation call this card is
+    # built from (src/alerts/formatter.py:get_risk_tier) - included so a
+    # consumer (the dashboard) can render the same tier badge/color/emoji
+    # used everywhere else on the platform without recomputing it, rather
+    # than having two independent "what tier is this" implementations
+    # that could drift apart.
+    risk_tier: str
+    score: float
+    location: LocationBlock
+    action: ActionBlock
+    priority: str
+    time_window_hours: Optional[int] = None
+    confidence: ConfidenceBlock
+    evidence: List[EvidenceItem]
+    expected_impact: ExpectedImpact
+    reason: str
+    data_gaps: List[str]
+    status: str = "DRAFT"
+
+
+class DecisionCardRequest(BaseModel):
+    location: str = Field(..., description="District location")
+    precipitation: float = Field(..., description="Precipitation in mm", ge=0)
+
+
+# Cost-per-person multipliers by tier - same illustrative figures
+# originally in hackathon/app/pages/dashboard.py's render_ai_decision_center
+# before it was migrated to call this endpoint instead of computing its
+# own. LOW has no multiplier because LOW's cost isn't population-scaled -
+# see the flat _LOW_TIER_FLAT_COST_GHS below, matching the dashboard's
+# original "routine monitoring has a baseline cost even if exposure is
+# near zero" behavior, which population_exposed * 0 would have silently
+# dropped to zero.
+_COST_PER_PERSON_BY_TIER = {
+    "EXTREME": 15,
+    "CRITICAL": 15,
+    "HIGH": 8,
+    "MODERATE": 1.25,
+}
+_LOW_TIER_FLAT_COST_GHS = 5000
+
+
+@router.post("/card", response_model=DecisionCard)
+async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
+    """Grounded decision output for one district - see module docstring."""
+    situation = await get_situation(
+        SituationRequest(location=request.location, precipitation=request.precipitation)
+    )
+
+    tier = situation.get("risk_tier", "LOW")
+    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(tier, situation)
+    confidence, basis = compute_confidence(sat_confirmed, verified)
 
     action_type, action_label = _ACTION_BY_TIER.get(tier, _ACTION_BY_TIER["LOW"])
     priority = _PRIORITY_BY_TIER.get(tier, "ROUTINE")
@@ -305,7 +327,7 @@ async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
             elderly_exposed=situation.get("elderly_exposed"),
             estimated_cost_ghs=cost,
         ),
-        reason=". ".join(reason_parts) + ".",
+        reason=reason,
         data_gaps=data_gaps,
         status="DRAFT",
     )
