@@ -116,6 +116,27 @@ def _check_open_meteo() -> DataSourceStatus:
         )
 
 
+def _check_river_gauges() -> DataSourceStatus:
+    """src/hydrology/river_gauge_api.py's real API integration was never
+    completed - self.api_key is hardcoded None (never loaded from an env
+    var; no such var exists), and its configured base_url
+    (hydrology.gov.gh) doesn't publicly resolve. Every reading it returns
+    today comes from _generate_realistic_data() (simulated fallback).
+    Reported here as not_configured rather than a live reachability
+    check against a domain already established not to resolve - that
+    would just add a guaranteed-timeout delay to every call of this
+    endpoint for no new information."""
+    return DataSourceStatus(
+        name="Ghana River Gauges (Hydrological Services)",
+        status="not_configured",
+        detail=(
+            "No API key configured and no public endpoint confirmed - "
+            "src/hydrology/river_gauge_api.py currently always falls "
+            "back to simulated gauge readings"
+        ),
+    )
+
+
 def _check_community_reports_db() -> DataSourceStatus:
     """A cheap real query against the actual SQLite file
     (src/community/community_memory.py), not just a file-existence
@@ -143,6 +164,7 @@ async def get_data_source_health() -> DataSourceHealthResponse:
         _check_earth_engine(),
         _check_dahiti(),
         _check_open_meteo(),
+        _check_river_gauges(),
         _check_community_reports_db(),
     ]
     # DAHITI's "not_configured" is expected/optional (a real degraded-but-

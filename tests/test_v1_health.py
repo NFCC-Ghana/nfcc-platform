@@ -16,7 +16,17 @@ def test_data_source_health_schema(api_client):
     assert any("Earth Engine" in n for n in names)
     assert any("DAHITI" in n for n in names)
     assert any("Open-Meteo" in n for n in names)
+    assert any("River Gauges" in n for n in names)
     assert any("Community reports" in n for n in names)
+
+
+def test_river_gauges_reported_as_not_configured():
+    """No credential mechanism exists for this integration at all - it
+    must never be reported as 'connected'."""
+    from src.api.v1.health import _check_river_gauges
+
+    result = _check_river_gauges()
+    assert result.status == "not_configured"
 
 
 def test_dahiti_not_configured_is_not_degraded(monkeypatch):

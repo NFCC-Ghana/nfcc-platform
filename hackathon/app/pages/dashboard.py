@@ -142,6 +142,48 @@ def get_national_summary() -> dict:
     return call_api("/national/summary", "GET")
 
 
+@st.cache_data(ttl=300)
+def get_data_source_health() -> dict:
+    """Real per-source status from GET /v1/health/data-sources
+    (src/api/v1/health.py) - Earth Engine, DAHITI, Open-Meteo, Ghana
+    River Gauges, community reports DB. Cached for 5 minutes: this makes
+    one live network call (to Open-Meteo) itself, and the sidebar
+    re-renders on every widget interaction (slider drag, district
+    change) - without caching, every one of those would re-trigger that
+    live call for a status view that doesn't need per-second freshness."""
+    return call_api("/v1/health/data-sources", "GET")
+
+
+# Previously a hardcoded list of 6 sources, all unconditionally shown as
+# green regardless of anything real - "NASA SMAP" had no backing code
+# anywhere in this repo, and "Ghana River Gauges" was marked healthy
+# despite src/hydrology/river_gauge_api.py never having had a real API
+# key wired in at all. Same fabrication pattern already fixed in the AI
+# Decision Center, just in the sidebar instead.
+_STATUS_BADGE = {
+    "connected": "🟢",
+    "configured": "🟢",
+    "not_configured": "🟡",
+    "unavailable": "🔴",
+}
+
+
+def render_data_source_status() -> None:
+    health = get_data_source_health()
+    if "error" in health:
+        st.caption(f"⚠️ Could not reach health endpoint: {health['error']}")
+        return
+
+    for source in health.get("sources", []):
+        badge = _STATUS_BADGE.get(source["status"], "⚪")
+        st.markdown(f"{badge} {source['name']}")
+        st.caption(source["detail"])
+
+    checked_at = health.get("checked_at", "")
+    if checked_at:
+        st.caption(f"Checked: {checked_at[:19]}")
+
+
 # Single source of truth for tier -> (summary text, color, recommendation),
 # matching the backend's real 5-tier system. Used by both the full
 # dashboard's AI Situation Summary and the compact broadcast view - was
@@ -399,16 +441,7 @@ def render_control_panel():
 
         st.divider()
         st.markdown("### 📡 Data Sources")
-        sources = [
-            "🛰️ CHIRPS Rainfall",
-            "🌤️ Open-Meteo Forecast",
-            "💧 NASA SMAP",
-            "📡 Sentinel-1 SAR",
-            "🌊 Ghana River Gauges",
-            "🏗️ Dam Database",
-        ]
-        for source in sources:
-            st.markdown(f"🟢 {source}")
+        render_data_source_status()
 
         st.divider()
         st.caption("🏆 Ghana AI Innovation Challenge 2026")
@@ -1041,6 +1074,72 @@ def render_risk_timeline(state):
     st.divider()
 
 
+def render_risk_history_chart(state):
+    """Real recorded risk history (GET /v1/districts/{district}/risk/
+    history, src/api/v1/risk_history.py) - a genuinely new capability,
+    distinct from render_risk_timeline above: that panel projects what
+    the score is EXPECTED to do over the next 24h; this one shows what
+    it ACTUALLY was, recorded by the scheduled automated assessment
+    (scripts/automated_risk_assessment.py, every 3 hours) - past fact
+    vs. future projection, not two views of the same thing."""
+    st.markdown("## 📊 Risk History (Recorded)")
+    st.caption("*What has actually been recorded for this district over time?*")
+
+    history = call_api(f"/v1/districts/{state.district}/risk/history", "GET")
+    if "error" in history:
+        st.caption(f"⚠️ Could not reach risk history: {history['error']}")
+        st.divider()
+        return
+
+    points = history.get("history", [])
+    if not points:
+        st.info(
+            "No recorded history yet for this district - snapshots are "
+            "taken automatically every 3 hours by the scheduled risk "
+            "assessment job. Check back after it next runs."
+        )
+        st.divider()
+        return
+
+    import plotly.graph_objects as go
+
+    timestamps = [p["recorded_at"] for p in points]
+    scores = [p["score"] for p in points]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=timestamps,
+            y=scores,
+            mode="lines+markers",
+            line=dict(color="#0f3460", width=3),
+            name="Risk score",
+        )
+    )
+    # Same 30/50/70/85 tier thresholds used everywhere else
+    # (src/alerts/formatter.py:get_risk_tier) - not a separate scale.
+    for threshold, label, color in (
+        (85, "EXTREME", "#cc0000"),
+        (70, "CRITICAL", "#ff0000"),
+        (50, "HIGH", "#ff6600"),
+        (30, "MODERATE", "#ffaa00"),
+    ):
+        fig.add_hline(
+            y=threshold, line_dash="dash", line_color=color, annotation_text=label
+        )
+    fig.update_layout(
+        height=280,
+        yaxis_range=[0, 100],
+        yaxis_title="Risk Score (%)",
+        xaxis_title="Recorded at",
+        margin=dict(l=10, r=10, t=10, b=10),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(f"{len(points)} recorded snapshot(s) shown")
+
+    st.divider()
+
+
 def render_ai_copilot(state):
     """AI Copilot - Answer any question."""
     st.markdown("## 🤖 AI Copilot")
@@ -1221,6 +1320,7 @@ def render_situation(
         render_ai_decision_center(state)
 
     render_risk_timeline(state)
+    render_risk_history_chart(state)
     if show_copilot:
         render_ai_copilot(state)
 
