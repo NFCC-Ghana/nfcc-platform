@@ -108,6 +108,29 @@ def test_window_dates_computed_from_predicted_at():
     mock_rw.assert_called_once_with("Tamale", "2026-01-01", "2026-01-11")
 
 
+def test_satellite_check_never_queries_a_future_date():
+    """Real bug caught by live production testing: for a recent
+    prediction, window_end (predicted_at + window_days) can land in the
+    future - asking a real satellite for future imagery trivially finds
+    nothing, which looks identical to "Earth Engine unavailable" but
+    means something different. The satellite check must be capped at
+    today."""
+    from datetime import date, timedelta
+
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    p1, p2, p3, p4 = _patched()
+    with p1, p2, p3, patch(
+        "src.verification.outcome_verifier.sentinel_processor.detect_flood",
+        return_value={"source": "Sentinel-1 (simulated)"},
+    ) as mock_detect:
+        # predicted "today" with a 1-day window -> window_end is tomorrow
+        verify_outcome("Tamale", date.today().isoformat() + "T00:00:00", window_days=1)
+
+    called_date = mock_detect.call_args.kwargs.get("date") or mock_detect.call_args.args[1]
+    assert called_date != tomorrow
+    assert called_date <= date.today().isoformat()
+
+
 def test_multiple_confirmations_all_listed():
     p1, p2, p3, p4 = _patched(
         reliefweb={"available": True, "count": 1, "matched_reports": [{}]},

@@ -95,7 +95,16 @@ def verify_outcome(district: str, predicted_at: str, window_days: int = _DEFAULT
         checks["citizen_reports"] = {"available": False, "reason": str(e)}
 
     try:
-        satellite = sentinel_processor.detect_flood(district, date=end_date)
+        # Real bug caught by live production testing: end_date (predicted
+        # date + window_days) can land in the future relative to today
+        # for a recently-made prediction, and asking a real satellite
+        # for imagery of a date that hasn't happened yet trivially finds
+        # nothing - which looks identical to "Earth Engine unavailable"
+        # (both fall back to simulated) but means something completely
+        # different. Capping at today ensures this checks real, already-
+        # captured imagery, never a future date.
+        satellite_check_date = min(end_date, date.today().isoformat())
+        satellite = sentinel_processor.detect_flood(district, date=satellite_check_date)
         checks["satellite"] = satellite
         if satellite.get("source") == "Sentinel-1 SAR" and satellite.get("water_detected"):
             confirmations.append(("Sentinel-1 SAR", satellite))
