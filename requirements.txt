@@ -1,7 +1,13 @@
 # Core Framework
 fastapi==0.115.0
 uvicorn[standard]==0.24.0
-pydantic==2.5.0
+# Bumped from 2.5.0: anthropic's beta_tool/beta_async_tool decorators
+# (src/copilot/tools.py) crash on 2.5.0 - TypeAdapter over a
+# ValidateCallWrapper raises "unhashable type" - fixed by pydantic's own
+# later 2.x internals. Verified against the full existing test suite
+# (444 passed) before bumping; no other code in this repo depends on
+# anything specific to 2.5.0.
+pydantic==2.9.2
 python-multipart==0.0.6
 email-validator>=2.0.0
 
@@ -22,6 +28,9 @@ plotly>=5.17.0
 # Alert Providers
 twilio>=8.0.0
 python-dotenv>=1.0.0
+
+# AI Copilot (src/copilot/) - Claude API, tool-calling Tool Runner beta
+anthropic>=0.116.0
 
 # Real OASIS CAP v1.2 XML export (src/api/routes/cap_export.py) - typed
 # dataclass bindings for the exact CAP schema (identifier/sender/status/

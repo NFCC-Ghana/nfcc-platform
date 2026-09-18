@@ -1247,60 +1247,30 @@ def render_ai_copilot(state):
         st.session_state["copilot_query"] = query
 
     if "copilot_query" in st.session_state:
-        query = st.session_state["copilot_query"]
-        response = f"Based on current data for {state.district}:\n\n"
-
-        if "evacuate" in query.lower():
-            response += "🚨 **Evacuation Assessment**\n\n"
-            response += f"• Risk Level: {state.risk_score:.0f}% "
-            response += f"({state.risk_category})\n"
-            response += f"• Lead Time: {state.lead_time_hours} hours\n"
-            response += f"• Recommended Action: {state.lead_time_action}\n\n"
-            response += "**Nearest Shelter:** Accra High School (1.2 km)\n"
-            response += "**Capacity:** 1,200 people\n"
-            response += "**Route:** Ring Road → Independence Avenue"
-
-        elif "road" in query.lower():
-            response += "🛣️ **Road Intelligence**\n\n"
-            response += f"• Current Risk: {state.risk_score:.0f}%\n"
-            affected = state.affected_communities[:3]
-            if not affected:
-                affected = ["Accra Central"]
-            response += f"• Affected Areas: {', '.join(affected)}\n\n"
-            response += "**Safe Routes:**\n"
-            response += "• Ring Road (Open)\n"
-            response += "• Independence Avenue (Open)\n"
-            response += "• Liberation Road (Open)\n\n"
-            response += "**Avoid:**\n"
-            response += "• Alajo Main Street (Water logging)\n"
-            response += "• Kaneshie Market Road (Flooding reported)"
-
-        elif "rain" in query.lower():
-            response += "🌧️ **Rainfall Forecast**\n\n"
-            response += f"• Current: {state.rainfall_mm}mm\n"
-            response += f"• 24h Forecast: {state.forecast_24h_mm:.0f}mm\n"
-            response += f"• 48h Forecast: {state.forecast_48h_mm:.0f}mm\n"
-            response += f"• 72h Forecast: {state.forecast_72h_mm:.0f}mm\n\n"
-            trend = (
-                "increase" if state.forecast_24h_mm > state.rainfall_mm else "decrease"
+        # Popped (not just read) so a real, paid LLM call fires exactly
+        # once per question - previously this branch just re-formatted a
+        # static string, so re-running it on every unrelated Streamlit
+        # rerun (e.g. a slider drag elsewhere on the page) was free; now
+        # it's a live call to POST /v1/copilot/ask, so it must not
+        # re-fire on reruns that aren't a new question.
+        query = st.session_state.pop("copilot_query")
+        with st.spinner("Checking the platform's live data..."):
+            result = call_api(
+                "/v1/copilot/ask",
+                "POST",
+                {"question": query, "district": state.district},
+                timeout=60,
             )
-            response += f"Rain will {trend} in the next 24 hours."
 
+        if "error" in result:
+            st.error(f"Copilot could not reach the platform's live data: {result['error']}")
         else:
-            response += "📊 **Situation Summary**\n\n"
-            response += f"• Location: {state.district}\n"
-            response += f"• Risk: {state.risk_score:.0f}% "
-            response += f"({state.risk_category})\n"
-            response += f"• Population Affected: "
-            response += f"{state.population_exposed:,}\n"
-            response += f"• Communities: {state.communities_affected}\n"
-            response += f"• Lead Time: {state.lead_time_hours}h\n\n"
-            response += "**What would you like to know?**\n"
-            response += "• Try: 'What roads will flood?'\n"
-            response += "• Try: 'Should we evacuate?'\n"
-            response += "• Try: 'When will rain stop?'"
-
-        st.info(response)
+            st.info(result.get("answer", "No answer returned."))
+            tool_calls = result.get("tool_calls", [])
+            if tool_calls:
+                with st.expander(f"🔎 Evidence used - {len(tool_calls)} live platform call(s)"):
+                    for call in tool_calls:
+                        st.code(f"{call['tool']}({call['input']})", language="text")
 
 
 # ============================================================
