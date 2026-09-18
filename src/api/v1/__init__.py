@@ -26,6 +26,7 @@ from src.api.v1.health import router as v1_health_router
 from src.api.v1.resources import router as resources_router
 from src.api.v1.risk import router as risk_router
 from src.api.v1.risk_history import router as risk_history_router
+from src.api.v1.verification import router as verification_router
 
 router = APIRouter(prefix="/v1")
 router.include_router(districts_router)
@@ -38,3 +39,4 @@ router.include_router(risk_history_router)
 router.include_router(alerts_router)
 router.include_router(v1_health_router)
 router.include_router(backtest_router)
+router.include_router(verification_router)
