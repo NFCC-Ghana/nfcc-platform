@@ -23,6 +23,8 @@ def test_history_posted_for_every_district():
         script, "get_forecast_precipitation", return_value=42.0
     ), patch.object(
         script, "get_antecedent_precipitation", return_value=None
+    ), patch.object(
+        script, "get_observed_past_precipitation", return_value=None
     ), patch("requests.post") as mock_post:
         mock_post.return_value = _mock_response({"queued": False, "score": 50})
 
@@ -53,6 +55,8 @@ def test_history_post_failure_does_not_fail_district():
         script, "get_forecast_precipitation", return_value=10.0
     ), patch.object(
         script, "get_antecedent_precipitation", return_value=None
+    ), patch.object(
+        script, "get_observed_past_precipitation", return_value=None
     ), patch("requests.post", side_effect=post_side_effect):
         exit_code = script.run("https://fake-api.example")
 
@@ -104,6 +108,8 @@ def test_antecedent_unavailable_still_assesses_forecast():
         script, "get_forecast_precipitation", return_value=15.0
     ), patch.object(
         script, "get_antecedent_precipitation", return_value=None
+    ), patch.object(
+        script, "get_observed_past_precipitation", return_value=None
     ), patch("requests.post") as mock_post:
         mock_post.return_value = _mock_response({"queued": False, "score": 50})
 
@@ -141,6 +147,41 @@ def test_get_antecedent_precipitation_returns_real_value():
             "https://fake-api.example", "Accra Central"
         )
     assert result == 33.5
+
+
+def test_stale_chirps_falls_back_to_open_meteo_observed_past():
+    """When the CHIRPS-based antecedent value is stale, the pipeline
+    must not just drop the signal - it should fall back to Open-Meteo's
+    real observed past_days rainfall, tagged with a different basis so
+    the distinction from the actually-backtested CHIRPS signal isn't
+    lost."""
+
+    def get_side_effect(url, **kwargs):
+        if "antecedent-rainfall" in url:
+            return _mock_response(
+                {"available": True, "rolling_3d_mm": 90.0, "stale": True, "data_age_days": 20}
+            )
+        # Open-Meteo forecast endpoint with past_days
+        return _mock_response({"hourly": {"rain": [1.0] * 72 + [0.0] * 24}})
+
+    with patch.object(
+        script, "get_forecast_precipitation", return_value=5.0
+    ), patch("requests.get", side_effect=get_side_effect), patch(
+        "requests.post"
+    ) as mock_post:
+        mock_post.return_value = _mock_response({"queued": False, "score": 50})
+        script.run("https://fake-api.example")
+
+        assess_calls = [
+            c for c in mock_post.call_args_list if "/alerts/assess" in c.args[0]
+        ]
+        fallback_calls = [
+            c
+            for c in assess_calls
+            if c.kwargs["json"]["basis"] == "antecedent_3d_observed_fallback"
+        ]
+        assert len(fallback_calls) == len(script.DISTRICT_COORDS)
+        assert all(c.kwargs["json"]["precipitation"] == 72.0 for c in fallback_calls)
 
 
 def test_get_antecedent_precipitation_skips_stale_data():

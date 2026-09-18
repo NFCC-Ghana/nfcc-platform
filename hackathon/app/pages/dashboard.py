@@ -1498,7 +1498,8 @@ ALL_TRACKED_DISTRICTS = [
 # same thing.
 _BASIS_LABELS = {
     "forecast_next_24h": "🔮 Forecast (next 24h)",
-    "antecedent_3d_accumulation": "🌧️ Observed accumulation (last 3 days)",
+    "antecedent_3d_accumulation": "🌧️ Observed accumulation (last 3 days, CHIRPS)",
+    "antecedent_3d_observed_fallback": "🌧️ Observed accumulation (last 3 days, fallback)",
 }
 
 

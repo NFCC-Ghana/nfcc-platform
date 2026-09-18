@@ -7,21 +7,27 @@ rainfall signals and posts each to the deployed API's POST /alerts/assess:
 
 1. forecast_next_24h - Open-Meteo's next-24h forecast (anticipatory:
    what's coming).
-2. antecedent_3d_accumulation - a real 3-day rolling SUM of observed
-   CHIRPS rainfall (retrospective: what's already fallen and already
-   accumulating in soil/rivers), fetched via GET
-   /v1/districts/{district}/antecedent-rainfall since Earth Engine auth
-   only works inside the API's own Cloud Run identity, not this GitHub
-   Actions runner.
+2. a real 3-day antecedent rainfall accumulation (retrospective: what's
+   already fallen and already accumulating in soil/rivers) - preferring
+   real CHIRPS via GET /v1/districts/{district}/antecedent-rainfall
+   (basis=antecedent_3d_accumulation; Earth Engine auth only works
+   inside the API's own Cloud Run identity, not this GitHub Actions
+   runner, so this fetches the already-computed value over HTTP), with
+   a fallback to Open-Meteo's own past_days rainfall
+   (basis=antecedent_3d_observed_fallback) when CHIRPS's real-world
+   publication lag makes its value too stale (confirmed in production:
+   CHIRPS's near-real-time product can lag 18+ days) - a real, lower-
+   latency substitute rather than skipping the signal entirely, though
+   it wasn't the exact product backtested (see get_observed_past_precipitation).
 
 Both signals matter and neither replaces the other - but they're not
-interchangeable, and this second signal isn't decorative: real
+interchangeable, and the antecedent signal isn't decorative: real
 backtesting against 36.7 years of CHIRPS data
-(src/models/rare_event_verification.py) found it has meaningfully
-better rare-event skill (SEDI) than same-day/forecast-only scoring in
-every backtested district, roughly doubling probability of detection
-at the same false-alarm rate. Before this, the automated pipeline only
-ever looked forward.
+(src/models/rare_event_verification.py) found a real 3-day rolling
+accumulation has meaningfully better rare-event skill (SEDI) than
+same-day/forecast-only scoring in every backtested district, roughly
+doubling probability of detection at the same false-alarm rate. Before
+this, the automated pipeline only ever looked forward.
 
 /alerts/assess computes a real score/tier per signal and - if at least
 MODERATE - queues it in the pending_alerts review table
@@ -122,10 +128,47 @@ def get_antecedent_precipitation(api_url: str, district: str) -> Optional[float]
         logger.info(
             f"Antecedent rainfall for {district} is stale "
             f"({data.get('data_age_days')} days old, freshest={data.get('freshest_date')})"
-            " - skipping this signal rather than assessing risk against old data"
+            " - falling back to Open-Meteo's observed past rainfall instead"
         )
         return None
     return data["rolling_3d_mm"]
+
+
+def get_observed_past_precipitation(
+    lat: float, lon: float, days: int = 3
+) -> Optional[float]:
+    """Real observed rainfall for the past `days` days, via Open-Meteo's
+    `past_days` parameter on the same forecast endpoint already used for
+    get_forecast_precipitation - Open-Meteo blends real recent
+    observations into this window with far lower latency than CHIRPS's
+    near-real-time product currently has (confirmed in production: an
+    18-day lag). Needs no Earth Engine credentials, so it runs directly
+    in this script as the fallback when the CHIRPS-based antecedent
+    value is stale or unavailable.
+
+    This is a real, low-latency substitute, not a like-for-like
+    replacement: the SEDI backtest (src/models/rare_event_verification.py)
+    validated a 3-day rolling sum of real CHIRPS rainfall specifically,
+    not Open-Meteo's ERA5-blended recent-observation estimate - it's
+    tagged with a different `basis` (antecedent_3d_observed_fallback)
+    precisely so this distinction isn't lost."""
+    resp = requests.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "hourly": "rain",
+            "past_days": days,
+            "forecast_days": 1,
+        },
+        timeout=25,
+    )
+    resp.raise_for_status()
+    rain = resp.json().get("hourly", {}).get("rain", [])
+    observed_hours = days * 24
+    if len(rain) < observed_hours:
+        return None
+    return round(sum(rain[:observed_hours]), 1)
 
 
 def _assess(
@@ -157,6 +200,13 @@ def run(api_url: str) -> int:
             failures += 1
 
         antecedent_precip = get_antecedent_precipitation(api_url, district)
+        antecedent_basis = "antecedent_3d_accumulation"
+        if antecedent_precip is None:
+            try:
+                antecedent_precip = get_observed_past_precipitation(lat, lon)
+                antecedent_basis = "antecedent_3d_observed_fallback"
+            except Exception as e:
+                logger.warning(f"Observed-past-rainfall fallback failed for {district}: {e}")
 
         if forecast_precip is None and antecedent_precip is None:
             continue
@@ -181,22 +231,21 @@ def run(api_url: str) -> int:
                 )
 
         if antecedent_precip is not None:
-            result = _assess(
-                api_url, district, antecedent_precip, "antecedent_3d_accumulation"
-            )
+            result = _assess(api_url, district, antecedent_precip, antecedent_basis)
             if result is None:
                 failures += 1
             elif result.get("queued"):
                 district_queued = True
                 logger.warning(
-                    f"QUEUED FOR REVIEW: {district} | antecedent 3d {antecedent_precip}mm -> "
-                    f"score={result['score']} tier={result['risk_tier']} "
-                    f"(id={result['id']})"
+                    f"QUEUED FOR REVIEW: {district} | antecedent 3d {antecedent_precip}mm "
+                    f"({antecedent_basis}) -> score={result['score']} "
+                    f"tier={result['risk_tier']} (id={result['id']})"
                 )
             else:
                 logger.info(
-                    f"{district} | antecedent 3d {antecedent_precip}mm -> "
-                    f"score={result.get('score')} - {result.get('reason')}"
+                    f"{district} | antecedent 3d {antecedent_precip}mm "
+                    f"({antecedent_basis}) -> score={result.get('score')} - "
+                    f"{result.get('reason')}"
                 )
 
         if district_queued:
