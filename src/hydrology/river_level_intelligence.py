@@ -101,6 +101,18 @@ def _compute_relative_thresholds(readings: List[dict]) -> Optional[Dict[str, flo
     }
 
 
+def has_river_coverage(district: str) -> bool:
+    """Whether real river-gauge coverage structurally exists for this
+    district at all - distinct from get_river_level_for_district()
+    returning available=False, which also covers the case where
+    coverage exists but is temporarily down (DAHITI unreachable,
+    API key missing). A confidence/fusion caller needs this
+    distinction: a district with no gauge was never going to have one
+    (not a degradation), while Tamale's gauge going down IS a real
+    degradation worth flagging."""
+    return district in _DISTRICT_RIVER_COVERAGE
+
+
 def get_river_level_for_district(district: str) -> Dict:
     """Real river water level for a district, or an honest
     available=False when no sufficiently close real gauge exists."""

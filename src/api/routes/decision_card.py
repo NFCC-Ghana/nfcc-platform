@@ -35,6 +35,17 @@ from pydantic import BaseModel, Field
 
 from src.api.routes.situation import SituationRequest, get_situation
 from src.exposure.community_names import get_affected_communities
+from src.hydrology.river_level_intelligence import has_river_coverage
+from src.models.multi_source_confidence import (
+    CITIZEN_REPORTS_PARTIAL_WEIGHT,
+    CITIZEN_REPORTS_VERIFIED_WEIGHT,
+    RAINFALL_WEIGHT,
+    RIVER_GAUGE_WEIGHT,
+    SATELLITE_CONFIRMED_WEIGHT,
+    FusionResult,
+    SourceReading,
+    fuse_sources,
+)
 
 router = APIRouter(prefix="/decision", tags=["decision-intelligence"])
 
@@ -206,36 +217,164 @@ def build_evidence(tier: str, situation: dict):
     return evidence, ". ".join(reason_parts) + ".", data_gaps, sat_confirmed, verified
 
 
-def compute_confidence(sat_confirmed: bool, verified: int):
-    """Confidence: conservative baseline, real corroboration raises it,
-    capped well short of certainty - see ConfidenceBlock.method and
-    module docstring for why overconfidence here is treated as a real
-    risk, not a hypothetical one. Shared by get_decision_card and GET
-    /v1/districts/{district}/evidence for the same reason build_evidence
-    is shared above."""
-    confidence = 60
-    basis = ["Rainfall-driven risk score"]
+# River-gauge status (real, data-derived: percentile thresholds from
+# the river's own historical DAHITI series - see
+# river_level_intelligence.py) mapped to a comparable 0-100 risk band,
+# the same way get_risk_tier() bands the platform's own score.
+_RIVER_STATUS_RISK = {
+    "NORMAL": 15.0,
+    "WARNING": 45.0,
+    "DANGER": 75.0,
+    "FLOOD": 95.0,
+}
+
+# Satellite SAR with no confirmed water is real evidence, but weak:
+# Sentinel-1's revisit interval (days, not continuous) means "no
+# detection" doesn't strongly imply "no flood" the way a confirmed
+# detection strongly implies one does exist - real remote-sensing
+# flood-mapping practice values SAR confirmation far more than SAR
+# absence. See SATELLITE_CONFIRMED_WEIGHT for the positive case.
+_SATELLITE_NO_DETECTION_RISK = 20.0
+_SATELLITE_NO_DETECTION_WEIGHT = 0.3
+
+
+def build_confidence(
+    district: str, situation: dict, sat_confirmed: bool, verified: int
+) -> FusionResult:
+    """Real skill-weighted, coverage+agreement confidence
+    (src/models/multi_source_confidence.py) - replaces the old fixed
+    `60 + 20·sat + 15·reports` heuristic, which never actually used
+    rainfall, river, or dam evidence in the number itself despite
+    ConfidenceBlock.method's old wording claiming it did. Shared by
+    get_decision_card and GET /v1/districts/{district}/evidence for the
+    same reason build_evidence is shared above.
+
+    Known, disclosed limitation: dam water levels (Akosombo/Bagre
+    upstream proxy) are NOT yet voting sources here, even though they
+    appear in `evidence`/`data_gaps` unchanged. Turning a dam's raw
+    elevation into a comparable 0-100 risk needs the same real,
+    data-derived percentile-threshold approach already built for river
+    gauges (river_level_intelligence.py's _compute_relative_thresholds)
+    applied to each dam's own historical series - not yet done, and
+    deliberately not faked with an arbitrary elevation cutoff in the
+    meantime."""
+    sources: List[SourceReading] = []
+
+    score = situation.get("score")
+    sources.append(
+        SourceReading(
+            name="rainfall",
+            display_name="rainfall forecasts",
+            applicable=True,
+            available=score is not None,
+            risk_0_100=score,
+            weight=RAINFALL_WEIGHT,
+            unavailable_reason="no precipitation input" if score is None else None,
+        )
+    )
+
+    river_gauge = situation.get("river_gauge") or {}
+    river_status = river_gauge.get("status")
+    river_risk = _RIVER_STATUS_RISK.get(river_status)
+    sources.append(
+        SourceReading(
+            name="river_gauge",
+            display_name="river levels",
+            applicable=has_river_coverage(district),
+            available=bool(river_gauge.get("available")) and river_risk is not None,
+            risk_0_100=river_risk,
+            weight=RIVER_GAUGE_WEIGHT,
+            unavailable_reason=river_gauge.get("reason"),
+        )
+    )
+
+    satellite = situation.get("satellite") or {}
+    sat_source = satellite.get("source", "")
+    sat_ran_for_real = "SAR" in sat_source
     if sat_confirmed:
-        confidence += 20
-        basis.append("Satellite confirmation")
+        sat_reading = SourceReading(
+            name="satellite_sar",
+            display_name="satellite-derived indicators",
+            applicable=True,
+            available=True,
+            risk_0_100=95.0,
+            weight=SATELLITE_CONFIRMED_WEIGHT,
+        )
+    elif sat_ran_for_real:
+        # A real check ran and found nothing - weak, non-degrading
+        # evidence (see module comment above), not a missing source.
+        sat_reading = SourceReading(
+            name="satellite_sar",
+            display_name="satellite-derived indicators",
+            applicable=False,
+            available=True,
+            risk_0_100=_SATELLITE_NO_DETECTION_RISK,
+            weight=_SATELLITE_NO_DETECTION_WEIGHT,
+        )
+    else:
+        sat_reading = SourceReading(
+            name="satellite_sar",
+            display_name="satellite-derived indicators",
+            applicable=True,
+            available=False,
+            unavailable_reason="Earth Engine unavailable",
+        )
+    sources.append(sat_reading)
+
     if verified >= 3:
-        confidence += 15
-        basis.append(f"{verified} verified citizen reports")
+        sources.append(
+            SourceReading(
+                name="citizen_reports",
+                display_name="verified citizen reports",
+                applicable=True,
+                available=True,
+                risk_0_100=90.0,
+                weight=CITIZEN_REPORTS_VERIFIED_WEIGHT,
+            )
+        )
     elif verified > 0:
-        confidence += 7
-        basis.append(f"{verified} verified citizen report")
-    return min(confidence, 95), basis
+        sources.append(
+            SourceReading(
+                name="citizen_reports",
+                display_name="verified citizen reports",
+                applicable=True,
+                available=True,
+                risk_0_100=65.0,
+                weight=CITIZEN_REPORTS_PARTIAL_WEIGHT,
+            )
+        )
+    else:
+        # Zero verified reports is a real, working check that came back
+        # non-informative - not a missing source (see satellite comment
+        # above for the same asymmetry).
+        sources.append(
+            SourceReading(
+                name="citizen_reports",
+                display_name="verified citizen reports",
+                applicable=False,
+                available=True,
+            )
+        )
+
+    return fuse_sources(sources)
 
 
 class ConfidenceBlock(BaseModel):
     value: int
     basis: List[str]
+    coverage: float
+    agreement: float
+    degraded: bool
+    explanation: str
     method: str = (
-        "Weighted agreement across available real signals on top of a "
-        "conservative baseline - not the forecast's own uncertainty, "
+        "Skill-and-coverage-weighted fusion across available real "
+        "signals (src/models/multi_source_confidence.py) - agreement "
+        "among sources raises confidence, missing high-trust sources "
+        "lower it, direct measurements (river/satellite) are weighted "
+        "above rainfall alone. Not the forecast's own uncertainty, "
         "since the risk score is a deterministic function of real "
         "rainfall. See src/api/routes/decision_card.py for the exact "
-        "weights and why overconfidence here is treated as a real risk."
+        "weights and their real-world justification."
     )
 
 
@@ -303,6 +442,13 @@ _COST_PER_PERSON_BY_TIER = {
 _LOW_TIER_FLAT_COST_GHS = 5000
 
 
+def basis_from_fusion(result: FusionResult) -> List[str]:
+    basis = [f"{r.display_name.capitalize()} available" for r in result.present]
+    if result.degraded:
+        basis += [f"{r.display_name.capitalize()} unavailable" for r in result.missing]
+    return basis or ["No real evidence sources available"]
+
+
 @router.post("/card", response_model=DecisionCard)
 async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
     """Grounded decision output for one district - see module docstring."""
@@ -312,7 +458,7 @@ async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
 
     tier = situation.get("risk_tier", "LOW")
     evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(tier, situation)
-    confidence, basis = compute_confidence(sat_confirmed, verified)
+    fusion = build_confidence(request.location, situation, sat_confirmed, verified)
 
     action_type, action_label = _ACTION_BY_TIER.get(tier, _ACTION_BY_TIER["LOW"])
     priority = _PRIORITY_BY_TIER.get(tier, "ROUTINE")
@@ -337,7 +483,14 @@ async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
         action=ActionBlock(type=action_type, label=action_label),
         priority=priority,
         time_window_hours=lead_time_hours,
-        confidence=ConfidenceBlock(value=confidence, basis=basis),
+        confidence=ConfidenceBlock(
+            value=round(fusion.confidence),
+            basis=basis_from_fusion(fusion),
+            coverage=fusion.coverage_factor,
+            agreement=fusion.agreement_factor,
+            degraded=fusion.degraded,
+            explanation=fusion.explanation,
+        ),
         evidence=evidence,
         expected_impact=ExpectedImpact(
             population_exposed=population_exposed,

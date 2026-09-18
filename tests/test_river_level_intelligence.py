@@ -6,7 +6,16 @@ np.random.seed(hash(gauge_id))-fabricated with zero connection to any
 real input, but was cited as available=True unconditionally in every
 Decision Card built before this fix."""
 
-from src.hydrology.river_level_intelligence import get_river_level_for_district
+from src.hydrology.river_level_intelligence import (
+    get_river_level_for_district,
+    has_river_coverage,
+)
+
+
+def test_has_river_coverage_true_only_for_tamale():
+    assert has_river_coverage("Tamale") is True
+    for district in ("Accra Central", "Accra West", "Kumasi", "Cape Coast", "Sunyani", "Ho"):
+        assert has_river_coverage(district) is False
 
 
 def test_tamale_has_real_coverage_registered():

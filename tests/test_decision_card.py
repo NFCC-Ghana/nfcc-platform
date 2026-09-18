@@ -97,6 +97,35 @@ def test_decision_card_no_dam_gap_for_unexposed_district(api_client):
     )
 
 
+def test_decision_card_confidence_has_real_fusion_fields(api_client):
+    """The redesigned confidence (src/models/multi_source_confidence.py)
+    must expose coverage/agreement/degraded/explanation - not just a
+    bare number the way the old fixed heuristic did."""
+    resp = api_client.post(
+        "/decision/card", json={"location": "Accra Central", "precipitation": 60}
+    )
+    assert resp.status_code == 200
+    confidence = resp.json()["confidence"]
+    for key in ("value", "basis", "coverage", "agreement", "degraded", "explanation"):
+        assert key in confidence
+    assert 0 <= confidence["value"] <= 100
+    assert isinstance(confidence["degraded"], bool)
+    assert "%" in confidence["explanation"]
+
+
+def test_decision_card_confidence_reflects_missing_river_coverage_honestly(api_client):
+    """Kumasi has no real river gauge coverage at all - that must be
+    excluded from the confidence engine's coverage denominator (not
+    applicable), never counted as a "missing" degradation, since it was
+    never going to be there."""
+    resp = api_client.post(
+        "/decision/card", json={"location": "Kumasi", "precipitation": 60}
+    )
+    assert resp.status_code == 200
+    basis = resp.json()["confidence"]["basis"]
+    assert not any("river" in b.lower() and "unavailable" in b.lower() for b in basis)
+
+
 def test_decision_card_satellite_claim_requires_real_confirmation(api_client):
     """A satellite evidence item with available=False must never be used
     to justify a 'satellite confirms' claim in the reason text, even if

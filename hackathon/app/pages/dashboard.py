@@ -477,7 +477,10 @@ def render_executive_summary(state):
                     "label": "Confidence",
                     "value": f"{state.risk_confidence * 100:.0f}%",
                     "emoji": "🎯",
-                    "color": "#38a169",
+                    # Real signal, not decorative: degraded (missing
+                    # high-trust sources) shows orange, healthy shows
+                    # green - src/models/multi_source_confidence.py.
+                    "color": "#dd6b20" if state.confidence_degraded else "#38a169",
                 },
                 {
                     "label": "Lead Time",
@@ -501,6 +504,11 @@ def render_executive_summary(state):
             ],
             columns=4,
         )
+        # The real "why" behind the Confidence tile above - generated
+        # from actual source agreement/coverage
+        # (src/models/multi_source_confidence.py), not a static caption.
+        if state.confidence_explanation:
+            st.caption(f"💡 {state.confidence_explanation}")
 
     with col2:
         st.markdown("🤖 **AI Situation Summary**")
@@ -700,7 +708,7 @@ def render_evidence_panel(state):
                 "label": "Overall Confidence",
                 "value": f"{state.risk_confidence * 100:.0f}%",
                 "emoji": "🎯",
-                "color": "#38a169",
+                "color": "#dd6b20" if state.confidence_degraded else "#38a169",
             },
             {
                 "label": "Data Quality",
@@ -717,6 +725,8 @@ def render_evidence_panel(state):
         ],
         columns=3,
     )
+    if state.confidence_explanation:
+        st.caption(f"💡 {state.confidence_explanation}")
 
     st.divider()
 
@@ -1257,6 +1267,24 @@ def render_ai_copilot(state):
 # ============================================================
 
 
+def apply_confidence_to_state(state, confidence_data) -> None:
+    """Maps GET /v1/districts/{district}/evidence's real confidence
+    block (src/models/multi_source_confidence.py) onto a DashboardState
+    in place - pulled out of fetch_situation_state so this mapping is
+    testable without a Streamlit runtime. Leaves state untouched (its
+    dataclass defaults stand) if the call failed or returned no
+    confidence block, rather than crashing the whole page render."""
+    if not isinstance(confidence_data, dict):
+        return
+    confidence_block = confidence_data.get("confidence")
+    if not confidence_block:
+        return
+    state.risk_confidence = confidence_block["value"] / 100.0
+    state.evidence_overall_confidence = confidence_block["value"]
+    state.confidence_explanation = confidence_block["explanation"]
+    state.confidence_degraded = confidence_block["degraded"]
+
+
 def fetch_situation_state(district: str, rainfall_mm: float):
     """Real fetch-and-build-state logic, shared by the full detailed
     dashboard (render_situation) and the compact broadcast view
@@ -1295,6 +1323,16 @@ def fetch_situation_state(district: str, rainfall_mm: float):
     state.elevation_m = district_data.get("elevation", 10)
     state.area_km2 = district_data.get("area_km2", 45.5)
     state.api_connected = "error" not in api_data
+
+    # Real multi-source fusion confidence (src/models/multi_source_
+    # confidence.py) - replaces the fixed 0.80 DashboardState default,
+    # which no code path ever overwrote before this. /situation doesn't
+    # carry a confidence field, so this is a second, real call rather
+    # than something derivable from api_data above.
+    confidence_data = call_api(
+        f"/v1/districts/{district}/evidence?precipitation_mm={rainfall_mm}", "GET"
+    )
+    apply_confidence_to_state(state, confidence_data)
 
     if state.lead_time_hours == 0:
         tier = tier_from_score(state.risk_score)
@@ -1441,6 +1479,8 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
         ],
         columns=4,
     )
+    if state.confidence_explanation:
+        st.caption(f"💡 {state.confidence_explanation}")
 
     st.markdown(
         f"<div style='background:#f0f2f6;padding:16px 20px;"

@@ -5,7 +5,12 @@ inside POST /decision/card's larger response.
 Calls the exact same build_evidence() (src/api/routes/decision_card.py)
 that POST /decision/card uses - one evidence-gathering implementation,
 not two that could drift the way this platform's district lists and
-lead-time tables already have before being consolidated.
+lead-time tables already have before being consolidated. Now also
+includes the same real multi-source confidence fusion
+(src/models/multi_source_confidence.py) that /decision/card returns -
+previously this endpoint had no confidence field at all, forcing a
+caller who only wanted evidence to also call /decision/card just to
+learn how much to trust it.
 """
 
 from typing import List
@@ -13,7 +18,13 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.api.routes.decision_card import EvidenceItem, build_evidence
+from src.api.routes.decision_card import (
+    ConfidenceBlock,
+    EvidenceItem,
+    basis_from_fusion,
+    build_confidence,
+    build_evidence,
+)
 from src.api.routes.situation import SituationRequest, get_situation
 from src.exposure.districts import get_district
 
@@ -26,6 +37,7 @@ class EvidenceResponse(BaseModel):
     evidence: List[EvidenceItem]
     reason: str
     data_gaps: List[str]
+    confidence: ConfidenceBlock
 
 
 @router.get("/{district}/evidence", response_model=EvidenceResponse)
@@ -46,7 +58,8 @@ async def get_district_evidence(
         SituationRequest(location=district, precipitation=precipitation_mm)
     )
     tier = situation.get("risk_tier", "LOW")
-    evidence, reason, data_gaps, _sat_confirmed, _verified = build_evidence(tier, situation)
+    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(tier, situation)
+    fusion = build_confidence(district, situation, sat_confirmed, verified)
 
     return EvidenceResponse(
         district=district,
@@ -54,4 +67,12 @@ async def get_district_evidence(
         evidence=evidence,
         reason=reason,
         data_gaps=data_gaps,
+        confidence=ConfidenceBlock(
+            value=round(fusion.confidence),
+            basis=basis_from_fusion(fusion),
+            coverage=fusion.coverage_factor,
+            agreement=fusion.agreement_factor,
+            degraded=fusion.degraded,
+            explanation=fusion.explanation,
+        ),
     )

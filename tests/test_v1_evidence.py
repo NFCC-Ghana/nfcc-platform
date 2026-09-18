@@ -22,6 +22,21 @@ def test_evidence_matches_decision_card_evidence(api_client):
     assert evidence["data_gaps"] == card["data_gaps"]
     assert evidence["risk_tier"] == card["risk_tier"]
     assert len(evidence["evidence"]) == len(card["evidence"])
+    # Same real fusion engine, called with the same inputs -> identical
+    # confidence, not two independently-drifting implementations.
+    assert evidence["confidence"] == card["confidence"]
+
+
+def test_evidence_includes_confidence_block(api_client):
+    """Previously this endpoint had no confidence field at all, forcing
+    a caller who only wanted evidence to also call /decision/card."""
+    resp = api_client.get(
+        "/v1/districts/Accra%20Central/evidence", params={"precipitation_mm": 60}
+    )
+    assert resp.status_code == 200
+    confidence = resp.json()["confidence"]
+    for key in ("value", "basis", "coverage", "agreement", "degraded", "explanation"):
+        assert key in confidence
 
 
 def test_evidence_unknown_district_404(api_client):

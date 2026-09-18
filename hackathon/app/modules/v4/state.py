@@ -135,12 +135,22 @@ class DashboardState:
     # ============================================================
     # EVIDENCE CONFIDENCE SCORES
     # ============================================================
+    # Per-source values below remain fixed priors (fetch_situation_state
+    # in dashboard.py doesn't yet map them to real per-source data -
+    # a disclosed limitation, see src/models/multi_source_confidence.py's
+    # own docstring for the same honesty standard applied there).
+    # evidence_overall_confidence, risk_confidence, confidence_explanation
+    # and confidence_degraded (below) ARE real: fetch_situation_state
+    # overwrites them from GET /v1/districts/{district}/evidence's real
+    # multi-source fusion confidence after this dataclass is constructed.
     evidence_rainfall_confidence: float = 85.0
     evidence_river_confidence: float = 78.0
     evidence_soil_confidence: float = 72.0
     evidence_satellite_confidence: float = 80.0
     evidence_citizen_confidence: float = 65.0
     evidence_overall_confidence: float = 80.0
+    confidence_explanation: str = ""
+    confidence_degraded: bool = False
 
     # ============================================================
     # AI DECISION CENTER
@@ -234,10 +244,13 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.total_reports = api_data.get("total_reports", 0)
     state.verified_reports = api_data.get("verified_reports", 0)
 
-    # Evidence confidence - these represent fixed trust in each data
-    # source's general reliability (e.g. "how much do we trust CHIRPS
-    # satellite rainfall data"), not a per-request measurement, so there's
-    # no live value to pull from the API; defaults stand deliberately.
+    # Per-source evidence confidence - /situation (api_data here) doesn't
+    # carry these, so they stand at their documented-prior defaults; the
+    # real, computed overall confidence (evidence_overall_confidence,
+    # risk_confidence, confidence_explanation, confidence_degraded) is
+    # set afterward by fetch_situation_state() in dashboard.py from a
+    # real GET /v1/districts/{district}/evidence call - not fabricated,
+    # just not available on this particular response.
     state.evidence_rainfall_confidence = api_data.get("rainfall_confidence", 85.0)
     state.evidence_river_confidence = api_data.get("river_confidence", 78.0)
     state.evidence_soil_confidence = api_data.get("soil_confidence", 72.0)
