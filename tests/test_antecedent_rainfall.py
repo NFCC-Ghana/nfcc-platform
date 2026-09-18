@@ -27,6 +27,22 @@ def test_graceful_when_ee_unavailable():
     assert "Earth Engine unavailable" in result["reason"]
 
 
+def test_uses_near_real_time_collection_not_the_delayed_final_product():
+    """Real production bug this guards against: UCSB-CHG/CHIRPS/DAILY
+    (the gauge-corrected 'Final' product used for backtesting) has real
+    publication latency of weeks to months and returned zero images
+    ('No bands in collection') when queried for the last 14 days in
+    production. This live signal must use the near-real-time collection
+    instead, or it can never return a value at all."""
+    with patch(
+        "src.hydrology.antecedent_rainfall.fetch_historical_chirps_series",
+        return_value=[],
+    ) as mock_fetch:
+        get_antecedent_rainfall("Tamale")
+    _, kwargs = mock_fetch.call_args
+    assert kwargs["collection_id"] == "UCSB-CHC/CHIRPS/V3/DAILY_SAT"
+
+
 def test_uses_most_recent_three_real_days_even_with_a_data_gap():
     """CHIRPS publication latency means the freshest 1-3 calendar days
     might not exist yet - this must use whichever 3 real days it

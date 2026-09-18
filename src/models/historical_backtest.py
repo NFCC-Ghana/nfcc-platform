@@ -61,7 +61,11 @@ _LOOKBACK_DAYS = 60
 
 
 def fetch_historical_chirps_series(
-    lat: float, lon: float, start_date: str, end_date: str
+    lat: float,
+    lon: float,
+    start_date: str,
+    end_date: str,
+    collection_id: str = _CHIRPS_COLLECTION,
 ) -> List[Dict]:
     """Real daily CHIRPS rainfall for a point over a date range, via one
     Earth Engine getRegion() call (a real per-pixel time series query,
@@ -69,7 +73,16 @@ def fetch_historical_chirps_series(
     present, so this reaches every event in flood_polygons.py's database.
     Returns [] if Earth Engine isn't reachable, rather than raising -
     the same graceful-degradation contract every other real data source
-    in this codebase follows."""
+    in this codebase follows.
+
+    collection_id defaults to UCSB-CHG/CHIRPS/DAILY, the gauge-corrected
+    "Final" product - the right choice for backtesting real historical
+    events, but it has real publication latency of weeks to months, so
+    it has NO data at all for the last few weeks. A live "what's the
+    real weather right now" caller (src/hydrology/antecedent_rainfall.py)
+    must pass a near-real-time collection instead (confirmed by a real
+    production error - "No bands in collection" - when the Final
+    product was queried for the last 14 days)."""
     if not initialize_earth_engine():
         logger.warning("Earth Engine unavailable - cannot fetch historical CHIRPS series")
         return []
@@ -79,7 +92,7 @@ def fetch_historical_chirps_series(
     try:
         point = ee.Geometry.Point(lon, lat)
         collection = (
-            ee.ImageCollection(_CHIRPS_COLLECTION)
+            ee.ImageCollection(collection_id)
             .filterDate(start_date, end_date)
             .select("precipitation")
         )
@@ -100,7 +113,9 @@ def fetch_historical_chirps_series(
         series.sort(key=lambda r: r["date"])
         return series
     except Exception as e:
-        logger.warning(f"CHIRPS historical fetch failed for ({lat},{lon}): {e}")
+        logger.warning(
+            f"CHIRPS fetch failed for ({lat},{lon}) from {collection_id}: {e}"
+        )
         return []
 
 

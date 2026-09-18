@@ -19,12 +19,20 @@ account's ADC + IAM grant); the GitHub Actions runner that calls this
 has no such credential, so it fetches this value over HTTP instead of
 calling Earth Engine itself.
 
-CHIRPS has real publication latency (the most recent 1-3 days often
-aren't available yet), so this doesn't assume "the last 3 calendar
-days" are actually present - it fetches a wider real window and uses
-whichever 3 most-recent real days it actually got, honestly reporting
-their dates and how stale the freshest one is rather than silently
-padding gaps with zeros.
+The "Final" CHIRPS product used for backtesting (UCSB-CHG/CHIRPS/DAILY,
+gauge-corrected) has real publication latency of weeks to months -
+confirmed in production ("No bands in collection" for the last 14
+days) - so it can never serve a live "what's the weather right now"
+query. This module instead uses UCSB-CHC/CHIRPS/V3/DAILY_SAT, the
+official near-real-time CHIRPS v3 product (daily precipitation
+partitioned from pentadal CHIRPS-v3 totals using NASA IMERG Late V07),
+which trades a little of the Final product's gauge-corrected accuracy
+for actually having data from the last few days - the only way this
+signal can be "live" at all. It still doesn't assume the very latest
+1-3 calendar days are present - it fetches a wider real window and
+uses whichever 3 most-recent real days it actually got, honestly
+reporting their dates and how stale the freshest one is rather than
+silently padding gaps with zeros.
 """
 
 import logging
@@ -36,7 +44,11 @@ from src.models.historical_backtest import fetch_historical_chirps_series
 
 logger = logging.getLogger("nfcc.hydrology.antecedent_rainfall")
 
-# CHIRPS "final" product typically lags several days; widening the
+# Near-real-time CHIRPS v3 (IMERG-partitioned) - see module docstring
+# for why the gauge-corrected "Final" product can't be used here.
+_LIVE_CHIRPS_COLLECTION = "UCSB-CHC/CHIRPS/V3/DAILY_SAT"
+
+# Even the near-real-time product can lag a few days; widening the
 # fetch window well past 3 days means a real recent value is still
 # found even when the latest 1-3 days aren't published yet.
 _FETCH_WINDOW_DAYS = 14
@@ -59,7 +71,11 @@ def get_antecedent_rainfall(district_name: str) -> Dict:
     end_date = (date.today() + timedelta(days=1)).isoformat()
     start_date = (date.today() - timedelta(days=_FETCH_WINDOW_DAYS)).isoformat()
     series = fetch_historical_chirps_series(
-        district_info.lat, district_info.lon, start_date, end_date
+        district_info.lat,
+        district_info.lon,
+        start_date,
+        end_date,
+        collection_id=_LIVE_CHIRPS_COLLECTION,
     )
     if not series:
         return {
