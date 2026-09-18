@@ -149,17 +149,20 @@ def build_evidence(tier: str, situation: dict):
             f"as of {river_gauge.get('observation_date', 'unknown date')})"
         )
 
-    soil = situation.get("soil_saturation_percent")
+    soil_moisture = situation.get("soil_moisture") or {}
+    soil_available = bool(soil_moisture.get("available"))
+    soil = soil_moisture.get("saturation_percent_estimate")
     evidence.append(
         EvidenceItem(
             field="soil_saturation_percent",
             value=soil,
-            source="src/hydrology/unified_intelligence.py",
-            available=soil is not None,
+            source=soil_moisture.get("source", "unavailable"),
+            available=soil_available,
+            as_of=soil_moisture.get("observation_date"),
         )
     )
-    if soil:
-        reason_parts.append(f"Soil saturation: {soil:.0f}%")
+    if soil_available and soil is not None:
+        reason_parts.append(f"Soil moisture (NASA SMAP): {soil:.0f}% of sensor range")
 
     satellite = situation.get("satellite") or {}
     sat_source = satellite.get("source", "")

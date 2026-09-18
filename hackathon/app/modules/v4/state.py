@@ -54,6 +54,15 @@ class DashboardState:
     rainfall_mm: float = 75.0
     river_level_m: float = 1.5
     soil_saturation_percent: float = 65.0
+    # Real NASA SMAP satellite soil moisture (src/hydrology/
+    # smap_soil_moisture.py) is honestly unavailable when Earth Engine
+    # can't reach a reading - False here means soil_saturation_percent
+    # above is stale/default, not a real current reading, so UI
+    # consumers must show "N/A" rather than a number (the same
+    # is-not-None discipline river_level_m already gets, since a bare
+    # float default here can't itself distinguish "real 0%" from "no
+    # data").
+    soil_moisture_available: bool = True
     forecast_24h_mm: float = 45.0
     forecast_48h_mm: float = 60.0
     forecast_72h_mm: float = 30.0
@@ -266,9 +275,16 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     # Weather
     state.rainfall_mm = api_data.get("rainfall_mm", 75.0)
     state.river_level_m = api_data.get("river_level_m", state.river_level_m)
-    state.soil_saturation_percent = api_data.get(
-        "soil_saturation_percent", state.soil_saturation_percent
-    )
+    # soil_saturation_percent is honestly None when real NASA SMAP data
+    # is unavailable (src/hydrology/smap_soil_moisture.py) - .get()'s
+    # default only applies when the key is absent, not when it's
+    # explicitly None, so that case is handled here explicitly rather
+    # than silently letting None flow into UI code that does arithmetic
+    # on this value.
+    real_soil = api_data.get("soil_saturation_percent")
+    state.soil_moisture_available = real_soil is not None
+    if real_soil is not None:
+        state.soil_saturation_percent = real_soil
     state.forecast_24h_mm = api_data.get("forecast_24h_mm", 45.0)
     state.forecast_48h_mm = api_data.get("forecast_48h_mm", 60.0)
     state.forecast_72h_mm = api_data.get("forecast_72h_mm", 30.0)

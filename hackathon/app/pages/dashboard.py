@@ -648,14 +648,24 @@ def render_evidence_panel(state):
             ),
         },
         {
-            "name": "Soil Saturation",
-            "score": state.soil_saturation_percent,
-            "stars": (
-                "★★★★★"
-                if state.soil_saturation_percent > 70
-                else "★★★★☆" if state.soil_saturation_percent > 50 else "★★★☆☆"
+            "name": (
+                "Soil Saturation"
+                if state.soil_moisture_available
+                else "Soil Saturation (no real SMAP reading)"
             ),
-            "confidence": state.evidence_soil_confidence,
+            "score": state.soil_saturation_percent if state.soil_moisture_available else 0,
+            "stars": (
+                "☆☆☆☆☆"
+                if not state.soil_moisture_available
+                else (
+                    "★★★★★"
+                    if state.soil_saturation_percent > 70
+                    else "★★★★☆" if state.soil_saturation_percent > 50 else "★★★☆☆"
+                )
+            ),
+            "confidence": (
+                state.evidence_soil_confidence if state.soil_moisture_available else 0
+            ),
         },
         {
             # Real Sentinel-1 SAR satellite flood detection (Google Earth
@@ -769,7 +779,15 @@ def render_impact_panel(state, district_data):
         infrastructure_loss = getattr(state, "infrastructure_loss_ghs", 0)
         agricultural_loss = getattr(state, "agricultural_loss_ghs", 0)
         total_loss = getattr(state, "total_loss_ghs", 0)
-        soil_saturation = getattr(state, "soil_saturation_percent", 0)
+        # 0 (not the possibly-stale default) when real NASA SMAP data
+        # is unavailable - render_visual_metric_card divides by
+        # max_value and would crash on None, and showing the stale
+        # default number would misrepresent it as a current reading.
+        soil_saturation = (
+            getattr(state, "soil_saturation_percent", 0)
+            if getattr(state, "soil_moisture_available", True)
+            else 0
+        )
         # river_level_m is None for 8 of the 9 tracked districts (real
         # DAHITI coverage exists only for Tamale) - getattr's default only
         # applies when the attribute is missing, not when its value is
@@ -834,7 +852,11 @@ def render_impact_panel(state, district_data):
             emoji="💧",
             color="#38a169",
             max_value=100,
-            subtitle="Current saturation level",
+            subtitle=(
+                "Current saturation level (NASA SMAP)"
+                if getattr(state, "soil_moisture_available", True)
+                else "No real SMAP reading available"
+            ),
         )
     with col2:
         render_visual_metric_card(
@@ -1523,10 +1545,15 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
         if state.river_level_m is not None
         else "🌊 River: no real gauge nearby"
     )
+    soil_note = (
+        f"💧 Soil saturation: {state.soil_saturation_percent:.0f}%"
+        if getattr(state, "soil_moisture_available", True)
+        else "💧 Soil saturation: no real SMAP reading"
+    )
     st.caption(
         f"🌧️ Rainfall: {state.rainfall_mm:.0f}mm  •  "
         f"{river_note}  •  "
-        f"💧 Soil saturation: {state.soil_saturation_percent:.0f}%  •  "
+        f"{soil_note}  •  "
         f"{sat_note} ({state.satellite_source})"
     )
 

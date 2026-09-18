@@ -19,6 +19,7 @@ from fastapi import APIRouter
 from src.api.v1.alerts import router as alerts_router
 from src.api.v1.antecedent_rainfall import router as antecedent_rainfall_router
 from src.api.v1.backtest import router as backtest_router
+from src.api.v1.data_quality import router as data_quality_router
 from src.api.v1.decision import router as decision_router
 from src.api.v1.districts import router as districts_router
 from src.api.v1.evidence import router as evidence_router
@@ -44,3 +45,4 @@ router.include_router(backtest_router)
 router.include_router(verification_router)
 router.include_router(antecedent_rainfall_router)
 router.include_router(fluvial_risk_router)
+router.include_router(data_quality_router)

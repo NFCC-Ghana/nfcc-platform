@@ -25,6 +25,7 @@ from src.exposure.impact_estimator import impact_estimator
 from src.exposure.shelter_candidates import get_shelter_names
 from src.hydrology.dam_intelligence import get_dam_intelligence_for_district
 from src.hydrology.river_level_intelligence import get_river_level_for_district
+from src.hydrology.smap_soil_moisture import get_soil_moisture_for_district
 from src.hydrology.unified_intelligence import unified_intelligence
 from src.hydrology.weather_forecast import weather_forecast
 
@@ -265,8 +266,21 @@ async def get_situation(request: SituationRequest):
         response["river_level_m"] = (
             river_gauge.get("level_above_baseline_m") if river_gauge["available"] else None
         )
-        response["soil_saturation_percent"] = hydrology["soil"].get(
-            "saturation_percent", 0
+        # Real NASA SMAP satellite soil moisture (src/hydrology/
+        # smap_soil_moisture.py), replacing hydrology["soil"] -
+        # src/hydrology/soil_moisture.py's get_soil_moisture(), which
+        # generates "saturation_percent" via
+        # random.seed(hash(f"{district}_{date}")) with zero connection
+        # to any real input - the same undisclosed-fabrication pattern
+        # already fixed this session for river levels and satellite
+        # confidence. Honestly None (not the old fabricated number)
+        # when Earth Engine can't reach a real SMAP reading.
+        soil_moisture = get_soil_moisture_for_district(request.location)
+        response["soil_moisture"] = soil_moisture
+        response["soil_saturation_percent"] = (
+            soil_moisture.get("saturation_percent_estimate")
+            if soil_moisture.get("available")
+            else None
         )
         response["recommendations"] = hydrology.get("recommendations", [])
         # Real Sentinel-1 SAR satellite flood detection (Google Earth
