@@ -186,6 +186,28 @@ class CommunityMemoryEngine:
             "validation_rate": validated / total if total > 0 else 0,
         }
 
+    def get_validated_report_count_in_window(
+        self, district: str, start_iso: str, end_iso: str
+    ) -> int:
+        """Real count of VALIDATED reports for a district within a real
+        time window - used by src/verification/outcome_verifier.py to
+        automatically check whether real citizen reports corroborate a
+        past prediction, without a human needing to look each one up
+        manually."""
+        conn = sqlite3.connect(str(self.db_path))
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT COUNT(*) FROM reports
+            WHERE district = ? AND validated = 1
+            AND report_time >= ? AND report_time <= ?
+            """,
+            (district, start_iso, end_iso),
+        )
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+
 
 # Singleton instance
 community_memory = CommunityMemoryEngine()

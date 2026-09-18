@@ -1,0 +1,29 @@
+name: Automated Prediction Outcome Verification
+
+on:
+  schedule:
+    # Daily - real news/citizen-report confirmation of a past flood
+    # doesn't need the 3-hourly cadence automated_risk_assessment.yml
+    # uses; predictions also need real days to accumulate a check-worthy
+    # age (see scripts/verify_predictions.py's _MIN_AGE_DAYS).
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  verify-predictions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run automated outcome verification
+        run: python scripts/verify_predictions.py

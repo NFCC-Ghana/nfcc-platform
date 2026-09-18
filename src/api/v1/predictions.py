@@ -30,6 +30,7 @@ from src.database.prediction_ledger_db import (
     save_prediction,
 )
 from src.exposure.districts import get_district
+from src.verification.outcome_verifier import verify_outcome
 
 router = APIRouter(prefix="/predictions", tags=["v1"])
 
@@ -136,3 +137,31 @@ async def record_prediction_outcome(
     if not success:
         raise HTTPException(status_code=404, detail=f"No prediction #{prediction_id}")
     return get_prediction(prediction_id)
+
+
+@router.post("/{prediction_id}/auto-verify")
+async def auto_verify_prediction(prediction_id: int) -> dict:
+    """Runs the real automated outcome check (src/verification/
+    outcome_verifier.py - ReliefWeb, GDELT, verified citizen reports,
+    Sentinel-1 SAR) for this prediction and records the result -
+    replacing what was previously a fully manual curation step.
+
+    Must run server-side, not from scripts/verify_predictions.py
+    directly: the verifier calls real Earth Engine (Sentinel-1) and
+    this platform's own SQLite database (verified citizen reports),
+    both of which only work inside this Cloud Run service's own
+    identity/filesystem, the same reason every other Earth-Engine- or
+    DB-touching operation in this platform is server-side with the
+    scheduled scripts calling it over HTTP."""
+    prediction = get_prediction(prediction_id)
+    if prediction is None:
+        raise HTTPException(status_code=404, detail=f"No prediction #{prediction_id}")
+
+    result = verify_outcome(prediction["district"], prediction["predicted_at"])
+    record_outcome(prediction_id, result["outcome"], result["outcome_source"])
+
+    return {
+        "prediction_id": prediction_id,
+        "verification": result,
+        "prediction": get_prediction(prediction_id),
+    }

@@ -2,6 +2,8 @@
 the prediction ledger: what happened, predicted, why, and (eventually)
 what happened."""
 
+from unittest.mock import patch
+
 
 def test_unknown_district_404(api_client):
     resp = api_client.post(
@@ -85,3 +87,33 @@ def test_pending_outcome_filter(api_client):
     ids = [p["id"] for p in resp.json()["predictions"]]
     assert pending_created.json()["id"] in ids
     assert resolved_created.json()["id"] not in ids
+
+
+def test_auto_verify_records_real_outcome(api_client):
+    created = api_client.post(
+        "/v1/predictions/record",
+        json={"district": "Tamale", "evidence_snapshot": {}, "risk_score": 40.0},
+    )
+    pred_id = created.json()["id"]
+
+    with patch(
+        "src.api.v1.predictions.verify_outcome",
+        return_value={
+            "outcome": "flood_confirmed",
+            "outcome_source": "ReliefWeb",
+            "confirmations": ["ReliefWeb"],
+            "checks": {},
+        },
+    ):
+        resp = api_client.post(f"/v1/predictions/{pred_id}/auto-verify")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["verification"]["outcome"] == "flood_confirmed"
+    assert data["prediction"]["outcome"] == "flood_confirmed"
+    assert data["prediction"]["outcome_source"] == "ReliefWeb"
+
+
+def test_auto_verify_unknown_prediction_404(api_client):
+    resp = api_client.post("/v1/predictions/999999999/auto-verify")
+    assert resp.status_code == 404
