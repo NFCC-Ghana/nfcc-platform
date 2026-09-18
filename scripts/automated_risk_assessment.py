@@ -118,6 +118,13 @@ def get_antecedent_precipitation(api_url: str, district: str) -> Optional[float]
             f"Antecedent rainfall unavailable for {district}: {data.get('reason')}"
         )
         return None
+    if data.get("stale"):
+        logger.info(
+            f"Antecedent rainfall for {district} is stale "
+            f"({data.get('data_age_days')} days old, freshest={data.get('freshest_date')})"
+            " - skipping this signal rather than assessing risk against old data"
+        )
+        return None
     return data["rolling_3d_mm"]
 
 

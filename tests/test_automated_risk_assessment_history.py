@@ -133,9 +133,33 @@ def test_get_antecedent_precipitation_returns_none_when_unavailable():
 def test_get_antecedent_precipitation_returns_real_value():
     with patch(
         "requests.get",
-        return_value=_mock_response({"available": True, "rolling_3d_mm": 33.5}),
+        return_value=_mock_response(
+            {"available": True, "rolling_3d_mm": 33.5, "stale": False}
+        ),
     ):
         result = script.get_antecedent_precipitation(
             "https://fake-api.example", "Accra Central"
         )
     assert result == 33.5
+
+
+def test_get_antecedent_precipitation_skips_stale_data():
+    """A weeks-old '3-day accumulation' no longer represents current
+    ground conditions - assessing live risk against it would be
+    misleading, so it must be skipped rather than treated as now."""
+    with patch(
+        "requests.get",
+        return_value=_mock_response(
+            {
+                "available": True,
+                "rolling_3d_mm": 90.0,
+                "stale": True,
+                "data_age_days": 25,
+                "freshest_date": "2026-08-24",
+            }
+        ),
+    ):
+        result = script.get_antecedent_precipitation(
+            "https://fake-api.example", "Accra Central"
+        )
+    assert result is None

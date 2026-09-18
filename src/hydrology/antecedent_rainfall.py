@@ -48,11 +48,23 @@ logger = logging.getLogger("nfcc.hydrology.antecedent_rainfall")
 # for why the gauge-corrected "Final" product can't be used here.
 _LIVE_CHIRPS_COLLECTION = "UCSB-CHC/CHIRPS/V3/DAILY_SAT"
 
-# Even the near-real-time product can lag a few days; widening the
-# fetch window well past 3 days means a real recent value is still
-# found even when the latest 1-3 days aren't published yet.
-_FETCH_WINDOW_DAYS = 14
+# Even the near-real-time product's actual real-world lag can run
+# several weeks despite being far fresher than the Final product's
+# months-long lag (confirmed in production: a 14-day window still
+# returned zero images for UCSB-CHC/CHIRPS/V3/DAILY_SAT). 60 days -
+# matching the same real fix already applied to the backtest's own
+# lookback window in src/models/historical_backtest.py - gives real
+# room to find whatever the actual most-recent published data is,
+# rather than guessing a fixed lag; data_age_days (below) then reports
+# exactly how stale the found value really is instead of hiding it.
+_FETCH_WINDOW_DAYS = 60
 _ACCUMULATION_DAYS = 3
+
+# Beyond this, the found "3-day accumulation" is old enough that it no
+# longer represents current ground conditions, and callers (the
+# automated pipeline, the dashboard) need to know that explicitly
+# rather than silently treating a weeks-old figure as "now".
+_STALE_AFTER_DAYS = 10
 
 
 def get_antecedent_rainfall(district_name: str) -> Dict:
@@ -81,7 +93,11 @@ def get_antecedent_rainfall(district_name: str) -> Dict:
         return {
             "district": district_name,
             "available": False,
-            "reason": "No real CHIRPS data returned (Earth Engine unavailable)",
+            "reason": (
+                f"No real CHIRPS data returned for the last {_FETCH_WINDOW_DAYS} "
+                "days (Earth Engine unavailable or no data published for this "
+                "period)"
+            ),
         }
 
     recent = series[-_ACCUMULATION_DAYS:]
@@ -96,4 +112,5 @@ def get_antecedent_rainfall(district_name: str) -> Dict:
         "days_used": [d["date"] for d in recent],
         "freshest_date": recent[-1]["date"],
         "data_age_days": data_age_days,
+        "stale": data_age_days > _STALE_AFTER_DAYS,
     }

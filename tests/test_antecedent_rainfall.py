@@ -64,3 +64,32 @@ def test_uses_most_recent_three_real_days_even_with_a_data_gap():
     assert result["days_used"] == ["2026-09-10", "2026-09-11", "2026-09-12"]
     assert result["freshest_date"] == "2026-09-12"
     assert isinstance(result["data_age_days"], int)
+    assert isinstance(result["stale"], bool)
+
+
+def test_marks_result_stale_when_freshest_data_is_old():
+    from datetime import date, timedelta
+
+    old_date = (date.today() - timedelta(days=25)).isoformat()
+    series = [{"date": old_date, "precipitation_mm": 5.0}]
+    with patch(
+        "src.hydrology.antecedent_rainfall.fetch_historical_chirps_series",
+        return_value=series,
+    ):
+        result = get_antecedent_rainfall("Tamale")
+    assert result["available"] is True
+    assert result["stale"] is True
+
+
+def test_not_stale_when_freshest_data_is_recent():
+    from datetime import date, timedelta
+
+    recent_date = (date.today() - timedelta(days=2)).isoformat()
+    series = [{"date": recent_date, "precipitation_mm": 5.0}]
+    with patch(
+        "src.hydrology.antecedent_rainfall.fetch_historical_chirps_series",
+        return_value=series,
+    ):
+        result = get_antecedent_rainfall("Tamale")
+    assert result["available"] is True
+    assert result["stale"] is False
