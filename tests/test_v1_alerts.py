@@ -107,6 +107,27 @@ def test_v1_assess_basis_passes_through_when_set(api_client):
     assert row["basis"] == "antecedent_3d_accumulation"
 
 
+def test_v1_assess_score_override_bypasses_precipitation_curve(api_client):
+    """A fluvial/dam-river reading is already a 0-100 risk score, not a
+    rainfall depth - feeding it through calculate_score(precipitation)
+    would silently distort it (e.g. a WARNING=45 risk would inflate to
+    ~92 via the rainfall-mm curve, meant for depths not risk points).
+    score_override must be used verbatim instead."""
+    resp = api_client.post(
+        "/v1/alerts/assess",
+        json={
+            "location": "Kumasi",
+            "precipitation": 45.0,
+            "score_override": 45.0,
+            "basis": "dam_river_pathway",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["score"] == 45.0
+    assert data["basis"] == "dam_river_pathway"
+
+
 def test_v1_history_and_stats_schema(api_client):
     resp = api_client.get("/v1/alerts/history")
     assert resp.status_code == 200

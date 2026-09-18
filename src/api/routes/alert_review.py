@@ -133,7 +133,23 @@ def _certainty_from_satellite(satellite: dict) -> str:
 
 class AssessRequest(BaseModel):
     location: str = Field(..., description="District location")
-    precipitation: float = Field(..., description="Precipitation in mm", ge=0)
+    precipitation: float = Field(default=0.0, description="Precipitation in mm", ge=0)
+    score_override: Optional[float] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description=(
+            "A pre-computed 0-100 risk score, bypassing "
+            "calculate_score(precipitation) entirely - for signals that "
+            "are already a risk score, not a rainfall depth (e.g. the "
+            "fluvial/dam-river pathway, src/hydrology/fluvial_pathway.py: "
+            "feeding a dam's WARNING/DANGER/FLOOD-derived risk number "
+            "through the rainfall-mm curve would silently distort it, "
+            "since that curve was fit to precipitation depths, not risk "
+            "points). When set, `precipitation` is not used for scoring "
+            "and is stored as-is only for display."
+        ),
+    )
     exercise: bool = Field(
         default=False,
         description=(
@@ -145,14 +161,20 @@ class AssessRequest(BaseModel):
     basis: str = Field(
         default="forecast_next_24h",
         description=(
-            "Which real rainfall signal `precipitation` represents - "
-            "'forecast_next_24h' (anticipatory, Open-Meteo) or "
-            "'antecedent_3d_accumulation' (real rainfall already fallen "
-            "over the last 3 days, CHIRPS). Real backtesting "
-            "(src/models/rare_event_verification.py) found the latter "
-            "has meaningfully better rare-event skill (SEDI) than "
-            "same-day/forecast-only scoring, so the automated pipeline "
-            "now assesses both signals independently per district."
+            "Which real signal this assessment used - 'forecast_next_24h' "
+            "(anticipatory rainfall, Open-Meteo), 'antecedent_3d_accumulation' "
+            "/'antecedent_3d_observed_fallback' (real rainfall already "
+            "fallen, CHIRPS/Open-Meteo), or 'dam_river_pathway' (real "
+            "river/dam levels via score_override, independent of local "
+            "rainfall - see src/hydrology/fluvial_pathway.py's module "
+            "docstring for why dam-driven flooding needs its own signal "
+            "rather than only ever being visible through a rainfall "
+            "number). Real backtesting "
+            "(src/models/rare_event_verification.py) found rainfall "
+            "accumulation has meaningfully better rare-event skill (SEDI) "
+            "than same-day/forecast-only scoring, so the automated "
+            "pipeline assesses every independent signal separately per "
+            "district."
         ),
     )
 
@@ -167,7 +189,11 @@ class ReviewDecision(BaseModel):
 async def assess_district(request: AssessRequest):
     """Run a real risk assessment and, if it's at least MODERATE, queue it
     for human review - never sends anything itself."""
-    score = calculate_score(request.precipitation)
+    score = (
+        request.score_override
+        if request.score_override is not None
+        else calculate_score(request.precipitation)
+    )
     risk_tier = get_risk_tier(score)
 
     if score < _REVIEW_THRESHOLD:

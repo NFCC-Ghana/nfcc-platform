@@ -68,6 +68,47 @@ researched specifically for this redesign, not assumed:
   handedly clear the CRITICAL/EXTREME confidence range without
   corroboration - a real, cited reason, not an arbitrary discount.
 
+CRITICAL correction made after real-world causal review: rainfall and
+dam/river levels are NOT redundant estimates of one quantity that
+should "agree" - they are INDEPENDENT causal pathways to the same
+outcome (flooding). Real flood science is explicit about this: rain
+alone can flood a district with no dam upstream (pluvial flooding);
+rain feeding a dam that then overflows can flood a downstream district
+(compound fluvial); and a dam release ALONE - misoperation, an
+upstream storm the district itself never felt - can flood a district
+with zero local rainfall (pure fluvial/reservoir-release flooding,
+exactly what happened in Ghana's own 2023 Akosombo spillage and the
+2021/2010 Bagre-driven Tamale floods already in this platform's
+flood_polygons.py history). A published review of compound pluvial-
+fluvial flooding found that combining independent flood hazards by
+averaging or summing their levels "cannot give realistic outcomes" -
+the actual combined risk depends on which independent driver(s) are
+active, not their mean. Real dam-release flood warnings (e.g., US
+National Weather Service bulletins) list "Dam operator" as a distinct
+SOURCE from rainfall-driven warnings for exactly this reason.
+
+This module therefore fuses sources in two stages, and it matters
+which stage a disagreement happens at:
+
+1. WITHIN a causal pathway (e.g. a river gauge and a dam level, both
+   real manifestations of "is this watercourse/reservoir system
+   dangerously high" regardless of what's driving it upstream):
+   fuse_sources()'s weighted-mean + agreement/spread confidence is
+   correct here, unchanged from before - real disagreement between two
+   readings of the connected same mechanism IS genuine measurement
+   uncertainty (the ECMWF ensemble spread-skill principle cited below).
+
+2. ACROSS independent pathways (pluvial vs. fluvial vs. direct
+   observation): combine_pathways() below uses a noisy-OR gate instead
+   - P(flood) = 1 - prod(1 - p_i) - the standard probabilistic model
+   for independent causes of one common binary effect (Good 1961;
+   well-established in Bayesian network "causal independence"
+   literature). A pathway reading LOW does not average down a
+   different pathway reading HIGH; either alone can be sufficient, and
+   disagreement between pathways is not treated as reduced confidence -
+   it is the normal, expected signature of "one real threat is active,
+   another currently is not."
+
 Honest limitation, disclosed rather than hidden: base weights below are
 priors grounded in the literature and in this platform's own hierarchy
 of direct-measurement vs. derived signals - they are NOT yet backed by
@@ -90,7 +131,7 @@ historical ground truth exists.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # Rainfall is capped here specifically because of the real, cited
 # finding above (near-zero POD for extreme rain in satellite/model
@@ -273,4 +314,171 @@ def fuse_sources(
         missing=missing,
         not_applicable=not_applicable,
         explanation=explanation,
+    )
+
+
+@dataclass(frozen=True)
+class Pathway:
+    """A group of SourceReadings that measure the SAME independent
+    causal flood mechanism - see module docstring's pluvial/fluvial/
+    noisy-OR section for why grouping matters: agreement is meaningful
+    WITHIN a pathway (e.g. river gauge + dam level both reflecting one
+    watercourse system), never claimed BETWEEN pathways."""
+
+    name: str
+    display_name: str
+    sources: List[SourceReading]
+
+
+@dataclass(frozen=True)
+class OverallFusionResult:
+    unified_risk: Optional[float]
+    confidence: float
+    coverage_factor: float
+    agreement_factor: float
+    degraded: bool
+    pathways: Dict[str, FusionResult]
+    dominant_pathway: Optional[str]
+    explanation: str
+    risk_attribution: str
+
+
+def _noisy_or(risks_0_100: List[float]) -> float:
+    """Combines INDEPENDENT causal pathways the way a noisy-OR gate
+    combines independent causes of one binary effect (Good 1961;
+    standard "causal independence" model in Bayesian network
+    literature): P(flood) = 1 - prod(1 - p_i). A low-risk pathway does
+    not average down a high-risk one - either alone can be sufficient,
+    matching real flood science's finding that summing/averaging
+    independent pluvial and fluvial hazards does not give realistic
+    outcomes (see module docstring)."""
+    prob_no_flood = 1.0
+    for r in risks_0_100:
+        p = max(0.0, min(1.0, r / 100.0))
+        prob_no_flood *= 1.0 - p
+    return round((1.0 - prob_no_flood) * 100.0, 1)
+
+
+def _describe_pathway(name: str, result: FusionResult) -> Optional[str]:
+    if result.unified_risk is None:
+        return None
+    if result.unified_risk >= 70:
+        level = "high"
+    elif result.unified_risk >= 40:
+        level = "elevated"
+    else:
+        level = "low"
+    return f"{name} is {level} ({result.unified_risk:.0f}%)"
+
+
+def _describe_risk_attribution(
+    pathways: Dict[str, FusionResult], dominant_pathway: Optional[str]
+) -> str:
+    """Answers a genuinely different question from the confidence
+    explanation: not "how much do we trust this," but "what is
+    actually driving this risk number" - the exact distinction the
+    pluvial/fluvial/dam-release causal split above exists to make
+    clear, rather than collapsing into one undifferentiated score."""
+    descriptions = [
+        d
+        for name, result in pathways.items()
+        if (d := _describe_pathway(name, result)) is not None
+    ]
+    if not descriptions:
+        return "No independent flood-risk pathway could be assessed."
+
+    active = [
+        name
+        for name, result in pathways.items()
+        if result.unified_risk is not None and result.unified_risk >= 40
+    ]
+    if len(active) >= 2:
+        prefix = "Compound risk - more than one independent pathway is elevated: "
+    elif len(active) == 1:
+        prefix = f"Risk is driven by the {active[0]} pathway: "
+    else:
+        prefix = "All assessed pathways are currently low: "
+
+    return prefix + "; ".join(descriptions) + "."
+
+
+def combine_pathways(pathways: List[Pathway]) -> OverallFusionResult:
+    """Fuses independent causal pathways (see module docstring) into
+    one overall risk + confidence. Each pathway is fused internally by
+    fuse_sources() (agreement is meaningful there); pathways are then
+    combined by noisy-OR (agreement is NOT meaningful across them - see
+    _noisy_or's docstring). Confidence reflects how many of the
+    applicable pathways were actually checked (coverage) and how
+    internally consistent each checked pathway's own reading was
+    (agreement) - never whether pathways agree with each other."""
+    results: Dict[str, Tuple[str, FusionResult]] = {
+        p.name: (p.display_name, fuse_sources(p.sources)) for p in pathways
+    }
+
+    applicable = {
+        name: (label, r)
+        for name, (label, r) in results.items()
+        if r.present or r.missing
+    }
+    present = {
+        name: (label, r)
+        for name, (label, r) in applicable.items()
+        if r.unified_risk is not None
+    }
+
+    unified_risk = (
+        _noisy_or([r.unified_risk for _, r in present.values()]) if present else None
+    )
+
+    coverage_factor = (
+        round(100.0 * len(present) / len(applicable), 1) if applicable else 0.0
+    )
+    agreement_factor = (
+        round(sum(r.agreement_factor for _, r in present.values()) / len(present), 1)
+        if present
+        else 0.0
+    )
+
+    confidence = round(max(0.0, min(100.0, (coverage_factor * agreement_factor) ** 0.5)), 1)
+    degraded = coverage_factor < _DEGRADED_COVERAGE_THRESHOLD
+
+    dominant_pathway = (
+        max(present.items(), key=lambda kv: kv[1][1].unified_risk)[0] if present else None
+    )
+
+    pathway_results = {name: r for name, (_, r) in results.items()}
+
+    missing_labels = [label for name, (label, r) in applicable.items() if r.unified_risk is None]
+    present_labels = [label for _, (label, r) in present.items()]
+    if not present_labels:
+        confidence_explanation = f"Confidence is {round(confidence)}% - no independent flood-risk pathway could be assessed."
+    elif missing_labels and degraded:
+        confidence_explanation = (
+            f"Confidence has fallen to {round(confidence)}% because the "
+            f"{', '.join(missing_labels)} pathway"
+            f"{'s are' if len(missing_labels) > 1 else ' is'} unavailable, "
+            f"leaving only {', '.join(present_labels)} assessed."
+        )
+    else:
+        agree_word = "agree" if agreement_factor >= 75 else (
+            "broadly agree" if agreement_factor >= 45 else "disagree internally"
+        )
+        confidence_explanation = (
+            f"Confidence is {round(confidence)}% because "
+            f"{', '.join(present_labels)} {agree_word} within "
+            f"{'each pathway' if len(present_labels) > 1 else 'itself'}"
+            + (f" ({', '.join(missing_labels)} unavailable)" if missing_labels else "")
+            + "."
+        )
+
+    return OverallFusionResult(
+        unified_risk=unified_risk,
+        confidence=confidence,
+        coverage_factor=coverage_factor,
+        agreement_factor=agreement_factor,
+        degraded=degraded,
+        pathways=pathway_results,
+        dominant_pathway=dominant_pathway,
+        explanation=confidence_explanation,
+        risk_attribution=_describe_risk_attribution(pathway_results, dominant_pathway),
     )

@@ -47,6 +47,8 @@ from typing import Dict, List, Optional
 
 import requests
 
+from src.hydrology.altimetry_thresholds import classify_level, compute_relative_thresholds
+
 logger = logging.getLogger("nfcc.hydrology.river_level_intelligence")
 
 _DAHITI_API_URL = "https://dahiti.dgfi.tum.de/api/v2/download-water-level/"
@@ -76,29 +78,6 @@ _DEFAULT_UNAVAILABLE_REASON = (
     "nearest real dam's own coordinates); the nearest real target is "
     "65km+ away"
 )
-
-
-def _compute_relative_thresholds(readings: List[dict]) -> Optional[Dict[str, float]]:
-    """Real, data-derived reference levels from this river's own full
-    historical DAHITI series - not arbitrary constants. baseline = 5th
-    percentile (typical dry-season low); warning/danger/flood_stage =
-    75th/90th/95th percentiles of the same real distribution, expressed
-    relative to baseline."""
-    elevations = sorted(r["wse"] for r in readings if r.get("wse") is not None)
-    n = len(elevations)
-    if n < 20:
-        return None
-
-    def pct(p: float) -> float:
-        return elevations[min(int(n * p), n - 1)]
-
-    baseline = pct(0.05)
-    return {
-        "baseline_m": round(baseline, 3),
-        "warning_level_m": round(pct(0.75) - baseline, 3),
-        "danger_level_m": round(pct(0.90) - baseline, 3),
-        "flood_stage_m": round(pct(0.95) - baseline, 3),
-    }
 
 
 def has_river_coverage(district: str) -> bool:
@@ -160,19 +139,13 @@ def get_river_level_for_district(district: str) -> Dict:
             except ValueError:
                 pass
 
-        thresholds = _compute_relative_thresholds(readings)
+        thresholds = compute_relative_thresholds(readings)
         level_above_baseline_m = None
         status = "UNKNOWN"
         if thresholds and elevation is not None:
-            level_above_baseline_m = round(elevation - thresholds["baseline_m"], 3)
-            if level_above_baseline_m >= thresholds["flood_stage_m"]:
-                status = "FLOOD"
-            elif level_above_baseline_m >= thresholds["danger_level_m"]:
-                status = "DANGER"
-            elif level_above_baseline_m >= thresholds["warning_level_m"]:
-                status = "WARNING"
-            else:
-                status = "NORMAL"
+            classified = classify_level(elevation, thresholds)
+            level_above_baseline_m = classified["level_above_baseline_m"]
+            status = classified["status"]
 
         result = {
             "available": True,

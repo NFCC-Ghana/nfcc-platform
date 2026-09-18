@@ -58,6 +58,8 @@ from typing import Dict, List
 
 import requests
 
+from src.hydrology.altimetry_thresholds import classify_level, compute_relative_thresholds
+
 logger = logging.getLogger("nfcc.hydrology.dam_intelligence")
 
 _DAHITI_API_URL = "https://dahiti.dgfi.tum.de/api/v2/download-water-level/"
@@ -130,10 +132,30 @@ def get_akosombo_status() -> Dict:
             except ValueError:
                 pass
 
+        # Real, data-derived reservoir status - the same real percentile-
+        # threshold methodology already built for river gauges
+        # (src/hydrology/altimetry_thresholds.py), applied to Lake
+        # Volta's own real historical DAHITI series. Without this, a
+        # dam nearing/at its own historical flood-stage percentile had
+        # no way to register as a real, independent flood-risk pathway
+        # (src/models/multi_source_confidence.py's causal-independence
+        # redesign) - it would silently look identical to a normal pool
+        # level to anything consuming this data.
+        elevation = latest.get("wse")
+        thresholds = compute_relative_thresholds(readings)
+        level_above_baseline_m = None
+        status = "UNKNOWN"
+        if thresholds and elevation is not None:
+            classified = classify_level(elevation, thresholds)
+            level_above_baseline_m = classified["level_above_baseline_m"]
+            status = classified["status"]
+
         return {
             "dam": "Akosombo",
             "available": True,
-            "water_surface_elevation_m": latest.get("wse"),
+            "water_surface_elevation_m": elevation,
+            "level_above_baseline_m": level_above_baseline_m,
+            "status": status,
             "uncertainty_m": latest.get("wse_u"),
             # DAHITI's real response field is "datetime" (verified against
             # the live API), not "date" as an earlier approximate summary
@@ -202,10 +224,22 @@ def _get_bagre_upstream_proxy() -> Dict:
         if not readings:
             return {"available": False, "reason": "No readings returned"}
         latest = readings[-1]
+
+        elevation = latest.get("wse")
+        thresholds = compute_relative_thresholds(readings)
+        level_above_baseline_m = None
+        status = "UNKNOWN"
+        if thresholds and elevation is not None:
+            classified = classify_level(elevation, thresholds)
+            level_above_baseline_m = classified["level_above_baseline_m"]
+            status = classified["status"]
+
         return {
             "available": True,
             "river": "Nakembé (upper White Volta, Burkina Faso)",
-            "water_surface_elevation_m": latest.get("wse"),
+            "water_surface_elevation_m": elevation,
+            "level_above_baseline_m": level_above_baseline_m,
+            "status": status,
             "observation_date": latest.get("datetime"),
             "distance_km": _NAKEMBE_DISTANCE_KM,
             "source": "DAHITI satellite altimetry",

@@ -1015,6 +1015,25 @@ def render_ai_decision_center(state):
         st.progress(confidence / 100, text=f"Confidence: {confidence}%")
         st.caption(f"Based on: {' • '.join(card['confidence']['basis'])}")
 
+        # fused_risk_score is a real, independent noisy-OR combination
+        # of rainfall (pluvial) and river/dam (fluvial) pathways
+        # (src/models/multi_source_confidence.py) - score above is
+        # rainfall-only. When fused_risk_score is meaningfully higher,
+        # a real threat (almost always a dam/river one, since that's
+        # the only other pathway that can outrun rainfall) is active
+        # that the rainfall-only tier above cannot see on its own -
+        # exactly the "dam overflow floods a district with no rain"
+        # case this platform must never leave silent.
+        fused_score = card.get("fused_risk_score")
+        if fused_score is not None and fused_score > card.get("score", 0) + 10:
+            st.warning(
+                f"⚠️ **Independent pathway check**: {card.get('risk_attribution', '')} "
+                f"Fused risk is **{card.get('fused_risk_tier', '?')}** "
+                f"({fused_score:.0f}%) even though rainfall alone is only {tier}."
+            )
+        elif card.get("risk_attribution"):
+            st.caption(f"🔎 {card['risk_attribution']}")
+
         st.markdown("**Why?**")
         # `reason` is a single real, period-joined sentence from the
         # backend - split purely for bullet-point display, never
@@ -1530,16 +1549,20 @@ ALL_TRACKED_DISTRICTS = [
 ]
 
 
-# basis distinguishes real forward-looking forecast rainfall from real
-# backward-looking antecedent accumulation
-# (src/hydrology/antecedent_rainfall.py) - two independent signals with
-# different meaning, so a reviewer needs to know which one queued a
-# given item rather than assuming "precipitation" always means the
-# same thing.
+# basis distinguishes independent CAUSAL PATHWAYS, not just data
+# sources: forward-looking forecast rainfall, backward-looking
+# antecedent accumulation (src/hydrology/antecedent_rainfall.py), and
+# dam/river levels (src/hydrology/fluvial_pathway.py) - the last one is
+# NOT a rainfall signal at all (its "precipitation" field is really a
+# 0-100 risk score, see score_override), it's real evidence of a
+# dam/river-driven flood that can occur with zero local rain. A
+# reviewer needs to know which pathway queued a given item, since they
+# carry genuinely different meaning and different required response.
 _BASIS_LABELS = {
     "forecast_next_24h": "🔮 Forecast (next 24h)",
     "antecedent_3d_accumulation": "🌧️ Observed accumulation (last 3 days, CHIRPS)",
     "antecedent_3d_observed_fallback": "🌧️ Observed accumulation (last 3 days, fallback)",
+    "dam_river_pathway": "🌊 Dam/river level (independent of local rainfall)",
 }
 
 

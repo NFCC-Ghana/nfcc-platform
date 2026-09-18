@@ -22,6 +22,7 @@ from src.api.v1.backtest import router as backtest_router
 from src.api.v1.decision import router as decision_router
 from src.api.v1.districts import router as districts_router
 from src.api.v1.evidence import router as evidence_router
+from src.api.v1.fluvial_risk import router as fluvial_risk_router
 from src.api.v1.forecast import router as forecast_router
 from src.api.v1.health import router as v1_health_router
 from src.api.v1.resources import router as resources_router
@@ -42,3 +43,4 @@ router.include_router(v1_health_router)
 router.include_router(backtest_router)
 router.include_router(verification_router)
 router.include_router(antecedent_rainfall_router)
+router.include_router(fluvial_risk_router)

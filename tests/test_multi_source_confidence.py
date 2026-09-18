@@ -5,7 +5,9 @@ decision_card.py's old fixed `60 + 20·sat + 15·reports` heuristic."""
 from src.models.multi_source_confidence import (
     RIVER_GAUGE_WEIGHT,
     SATELLITE_CONFIRMED_WEIGHT,
+    Pathway,
     SourceReading,
+    combine_pathways,
     fuse_sources,
 )
 
@@ -146,3 +148,117 @@ def test_confidence_never_exceeds_100_or_goes_negative():
     ]
     result = fuse_sources(sources)
     assert 0.0 <= result.confidence <= 100.0
+
+
+# ============================================================
+# combine_pathways() - independent causal pathways (pluvial rainfall
+# vs. fluvial dam/river vs. direct observation), combined via noisy-OR,
+# NOT weighted-mean-with-agreement-penalty. See module docstring for
+# the real-world causal reasoning (rain alone, dam alone, or both
+# together can each independently cause flooding).
+# ============================================================
+
+
+def _pathway(name, sources):
+    return Pathway(name=name, display_name=name, sources=sources)
+
+
+def test_dam_alone_high_risk_is_not_averaged_down_by_low_rainfall():
+    """The exact scenario the user described: a dam overflowing with no
+    local rainfall must still produce a HIGH overall risk - not a
+    diluted middle-of-the-road number from averaging with calm
+    rainfall."""
+    pathways = [
+        _pathway("rainfall", [_reading("rainfall", 5.0, weight=1.0)]),
+        _pathway("dam_river", [_reading("dam", 90.0, weight=RIVER_GAUGE_WEIGHT)]),
+    ]
+    result = combine_pathways(pathways)
+    assert result.unified_risk > 85  # noisy-OR: dominated by the dam pathway
+    assert result.dominant_pathway == "dam_river"
+
+
+def test_rainfall_alone_high_risk_with_no_dam_coverage():
+    """A district with no dam/river coverage at all can still flood
+    from rainfall alone - that pathway being inapplicable must not
+    drag down the risk or count as a missing/degraded source."""
+    pathways = [
+        _pathway("rainfall", [_reading("rainfall", 88.0, weight=1.0)]),
+        _pathway("dam_river", [_reading("dam", None, weight=RIVER_GAUGE_WEIGHT, applicable=False)]),
+    ]
+    result = combine_pathways(pathways)
+    assert result.unified_risk > 80
+    assert result.degraded is False
+    assert result.coverage_factor == 100.0
+
+
+def test_both_pathways_elevated_gives_compound_risk_higher_than_either_alone():
+    pathways = [
+        _pathway("rainfall", [_reading("rainfall", 60.0, weight=1.0)]),
+        _pathway("dam_river", [_reading("dam", 60.0, weight=RIVER_GAUGE_WEIGHT)]),
+    ]
+    result = combine_pathways(pathways)
+    assert result.unified_risk > 60.0  # noisy-OR: compounds, doesn't average to 60
+
+
+def test_pathway_disagreement_does_not_reduce_confidence():
+    """The core bug this redesign fixes: rainfall=LOW and dam=HIGH is
+    not measurement noise to be penalized - it's two different real
+    threats. Confidence should reflect coverage/internal-agreement, not
+    cross-pathway disagreement."""
+    disagreeing = combine_pathways(
+        [
+            _pathway("rainfall", [_reading("rainfall", 5.0, weight=1.0)]),
+            _pathway("dam_river", [_reading("dam", 95.0, weight=RIVER_GAUGE_WEIGHT)]),
+        ]
+    )
+    agreeing = combine_pathways(
+        [
+            _pathway("rainfall", [_reading("rainfall", 50.0, weight=1.0)]),
+            _pathway("dam_river", [_reading("dam", 50.0, weight=RIVER_GAUGE_WEIGHT)]),
+        ]
+    )
+    # Both pathways present and internally single-source in both cases -
+    # confidence should be essentially the same regardless of whether
+    # the two pathways happen to agree with each other.
+    assert abs(disagreeing.confidence - agreeing.confidence) < 1.0
+
+
+def test_pathway_genuinely_unavailable_reduces_coverage_and_confidence():
+    """Unlike structural inapplicability, a pathway that SHOULD be
+    checkable but isn't right now (e.g. Earth Engine down) is a real
+    degradation."""
+    pathways = [
+        _pathway("rainfall", [_reading("rainfall", 60.0, weight=1.0)]),
+        _pathway(
+            "dam_river",
+            [
+                _reading(
+                    "dam", None, weight=RIVER_GAUGE_WEIGHT, available=False, reason="EE down"
+                )
+            ],
+        ),
+    ]
+    result = combine_pathways(pathways)
+    assert result.coverage_factor == 50.0
+    assert result.degraded is True
+    assert "unavailable" in result.explanation.lower()
+
+
+def test_risk_attribution_names_dominant_pathway():
+    pathways = [
+        _pathway("rainfall", [_reading("rainfall", 10.0, weight=1.0)]),
+        _pathway("dam_river", [_reading("dam", 95.0, weight=RIVER_GAUGE_WEIGHT)]),
+    ]
+    result = combine_pathways(pathways)
+    assert "dam_river" in result.risk_attribution
+    assert "rainfall" in result.risk_attribution
+
+
+def test_no_pathways_present_is_honestly_reported():
+    pathways = [
+        _pathway("rainfall", [_reading("rainfall", None, weight=1.0, available=False)]),
+    ]
+    result = combine_pathways(pathways)
+    assert result.unified_risk is None
+    assert result.confidence == 0.0
+    assert "no independent flood-risk pathway" in result.risk_attribution.lower()

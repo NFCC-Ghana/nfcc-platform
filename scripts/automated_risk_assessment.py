@@ -2,8 +2,9 @@
 Automated flood risk assessment for NFCC.
 
 Runs on a schedule (.github/workflows/automated_risk_assessment.yml) and,
-for every district this platform tracks, assesses TWO independent real
-rainfall signals and posts each to the deployed API's POST /alerts/assess:
+for every district this platform tracks, assesses THREE independent
+real signals and posts each to the deployed API's POST /alerts/assess -
+two rainfall-driven (pluvial), one dam/river-driven (fluvial):
 
 1. forecast_next_24h - Open-Meteo's next-24h forecast (anticipatory:
    what's coming).
@@ -20,14 +21,28 @@ rainfall signals and posts each to the deployed API's POST /alerts/assess:
    latency substitute rather than skipping the signal entirely, though
    it wasn't the exact product backtested (see get_observed_past_precipitation).
 
-Both signals matter and neither replaces the other - but they're not
-interchangeable, and the antecedent signal isn't decorative: real
-backtesting against 36.7 years of CHIRPS data
-(src/models/rare_event_verification.py) found a real 3-day rolling
-accumulation has meaningfully better rare-event skill (SEDI) than
-same-day/forecast-only scoring in every backtested district, roughly
-doubling probability of detection at the same false-alarm rate. Before
-this, the automated pipeline only ever looked forward.
+3. dam_river_pathway - real river gauge + dam/upstream-proxy levels
+   (src/hydrology/fluvial_pathway.py), fetched via GET
+   /v1/districts/{district}/fluvial-risk and submitted with
+   score_override (it's already a 0-100 risk score, not a rainfall
+   depth). Runs and can queue an alert REGARDLESS of what the rainfall
+   signals above found - real flood science treats rainfall-driven
+   (pluvial) and dam/river-driven (fluvial) flooding as independent
+   causal pathways (src/models/multi_source_confidence.py's module
+   docstring has the citations): a dam release can flood a district
+   with zero local rain. Before this signal existed, a pure dam-driven
+   flood - like Ghana's own real 2023 Akosombo spillage or 2021/2010
+   Bagre-driven Tamale floods - could never have crossed this
+   pipeline's review threshold at all.
+
+Neither pluvial signal replaces the other, and neither replaces the
+fluvial one - the antecedent signal isn't decorative: real backtesting
+against 36.7 years of CHIRPS data (src/models/rare_event_verification.py)
+found a real 3-day rolling accumulation has meaningfully better rare-
+event skill (SEDI) than same-day/forecast-only scoring in every
+backtested district, roughly doubling probability of detection at the
+same false-alarm rate. Before this, the automated pipeline only ever
+looked forward, and only ever looked at rainfall.
 
 /alerts/assess computes a real score/tier per signal and - if at least
 MODERATE - queues it in the pending_alerts review table
@@ -171,13 +186,43 @@ def get_observed_past_precipitation(
     return round(sum(rain[:observed_hours]), 1)
 
 
+def get_fluvial_risk(api_url: str, district: str) -> Optional[float]:
+    """Real river/dam-driven risk (0-100) for a district, independent
+    of any rainfall input, via the API's own GET /v1/districts/
+    {district}/fluvial-risk (src/hydrology/fluvial_pathway.py) - Earth
+    Engine and DAHITI calls both only work inside the API's own Cloud
+    Run identity, so this fetches the already-computed value over HTTP
+    rather than calling either from this GitHub Actions runner. Returns
+    None (not 0.0) when no real river/dam pathway could be assessed for
+    this district (e.g. no dam exposure and no river coverage) - a
+    fabricated 0.0 would silently claim "checked, no risk" for a
+    district this platform genuinely has no fluvial signal for."""
+    try:
+        resp = requests.get(
+            f"{api_url}/v1/districts/{district}/fluvial-risk", timeout=30
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.warning(f"Fluvial risk fetch failed for {district}: {e}")
+        return None
+    return data.get("risk_0_100")
+
+
 def _assess(
-    api_url: str, district: str, precipitation: float, basis: str
+    api_url: str,
+    district: str,
+    precipitation: float,
+    basis: str,
+    score_override: Optional[float] = None,
 ) -> Optional[dict]:
+    payload = {"location": district, "precipitation": precipitation, "basis": basis}
+    if score_override is not None:
+        payload["score_override"] = score_override
     try:
         resp = requests.post(
             f"{api_url}/alerts/assess",
-            json={"location": district, "precipitation": precipitation, "basis": basis},
+            json=payload,
             timeout=20,
         )
         resp.raise_for_status()
@@ -208,7 +253,13 @@ def run(api_url: str) -> int:
             except Exception as e:
                 logger.warning(f"Observed-past-rainfall fallback failed for {district}: {e}")
 
-        if forecast_precip is None and antecedent_precip is None:
+        # Independent of both rainfall signals above - a district with
+        # no dam exposure and no river coverage honestly has no fluvial
+        # pathway (fluvial_risk is None), which is expected, not a
+        # failure; see get_fluvial_risk's docstring.
+        fluvial_risk = get_fluvial_risk(api_url, district)
+
+        if forecast_precip is None and antecedent_precip is None and fluvial_risk is None:
             continue
 
         district_queued = False
@@ -248,6 +299,30 @@ def run(api_url: str) -> int:
                     f"{result.get('reason')}"
                 )
 
+        if fluvial_risk is not None:
+            result = _assess(
+                api_url,
+                district,
+                fluvial_risk,
+                "dam_river_pathway",
+                score_override=fluvial_risk,
+            )
+            if result is None:
+                failures += 1
+            elif result.get("queued"):
+                district_queued = True
+                logger.warning(
+                    f"QUEUED FOR REVIEW: {district} | dam/river risk {fluvial_risk} "
+                    f"(dam_river_pathway) -> score={result['score']} "
+                    f"tier={result['risk_tier']} (id={result['id']})"
+                )
+            else:
+                logger.info(
+                    f"{district} | dam/river risk {fluvial_risk} "
+                    f"(dam_river_pathway) -> score={result.get('score')} - "
+                    f"{result.get('reason')}"
+                )
+
         if district_queued:
             queued_count += 1
 
@@ -275,7 +350,7 @@ def run(api_url: str) -> int:
         f"Done. {queued_count} district(s) queued for human review, "
         f"{failures} failure(s) out of {len(DISTRICT_COORDS)} checked."
     )
-    return 1 if failures >= len(DISTRICT_COORDS) * 2 else 0
+    return 1 if failures >= len(DISTRICT_COORDS) * 3 else 0
 
 
 def main() -> int:

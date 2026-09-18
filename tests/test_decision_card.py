@@ -126,6 +126,39 @@ def test_decision_card_confidence_reflects_missing_river_coverage_honestly(api_c
     assert not any("river" in b.lower() and "unavailable" in b.lower() for b in basis)
 
 
+def test_decision_card_dam_overflow_alone_drives_fused_risk_with_no_rain(api_client):
+    """The exact real-world scenario this redesign exists for: a dam at
+    real FLOOD status with zero local rainfall must show high FUSED
+    risk (independent fluvial pathway), even though the rainfall-only
+    risk_tier stays LOW - dam-driven flooding must never be invisible
+    just because the district itself saw no rain."""
+    from unittest.mock import patch
+
+    overflowing_dam = [
+        {
+            "dam": "Akosombo",
+            "available": True,
+            "status": "FLOOD",
+            "water_surface_elevation_m": 84.0,
+            "observation_date": "2026-09-01T00:00:00",
+        }
+    ]
+    with patch(
+        "src.api.routes.situation.get_dam_intelligence_for_district",
+        return_value=overflowing_dam,
+    ):
+        resp = api_client.post(
+            "/decision/card", json={"location": "Tema", "precipitation": 2}
+        )
+    assert resp.status_code == 200
+    card = resp.json()
+    assert card["risk_tier"] in ("LOW", "VERY_LOW")  # rainfall alone is calm
+    assert card["fused_risk_score"] is not None
+    assert card["fused_risk_score"] > 70  # dam pathway alone drives real risk
+    assert card["fused_risk_tier"] in ("HIGH", "CRITICAL", "EXTREME")
+    assert "fluvial" in card["risk_attribution"].lower()
+
+
 def test_decision_card_satellite_claim_requires_real_confirmation(api_client):
     """A satellite evidence item with available=False must never be used
     to justify a 'satellite confirms' claim in the reason text, even if

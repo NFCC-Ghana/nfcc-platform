@@ -25,6 +25,8 @@ def test_history_posted_for_every_district():
         script, "get_antecedent_precipitation", return_value=None
     ), patch.object(
         script, "get_observed_past_precipitation", return_value=None
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=None
     ), patch("requests.post") as mock_post:
         mock_post.return_value = _mock_response({"queued": False, "score": 50})
 
@@ -57,6 +59,8 @@ def test_history_post_failure_does_not_fail_district():
         script, "get_antecedent_precipitation", return_value=None
     ), patch.object(
         script, "get_observed_past_precipitation", return_value=None
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=None
     ), patch("requests.post", side_effect=post_side_effect):
         exit_code = script.run("https://fake-api.example")
 
@@ -72,6 +76,8 @@ def test_both_signals_assessed_and_tagged_with_basis():
         script, "get_forecast_precipitation", return_value=5.0
     ), patch.object(
         script, "get_antecedent_precipitation", return_value=40.0
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=None
     ), patch("requests.post") as mock_post:
         mock_post.return_value = _mock_response({"queued": False, "score": 50})
 
@@ -110,6 +116,8 @@ def test_antecedent_unavailable_still_assesses_forecast():
         script, "get_antecedent_precipitation", return_value=None
     ), patch.object(
         script, "get_observed_past_precipitation", return_value=None
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=None
     ), patch("requests.post") as mock_post:
         mock_post.return_value = _mock_response({"queued": False, "score": 50})
 
@@ -123,6 +131,64 @@ def test_antecedent_unavailable_still_assesses_forecast():
             c.kwargs["json"]["basis"] == "forecast_next_24h" for c in assess_calls
         )
     assert exit_code == 0
+
+
+def test_dam_river_pathway_assessed_independently_of_rainfall():
+    """The exact real-world scenario this signal exists for: a dam
+    overflowing with zero local rainfall must still be assessed and
+    able to queue an alert, using score_override rather than being run
+    through the rainfall-mm curve."""
+    with patch.object(
+        script, "get_forecast_precipitation", return_value=0.0
+    ), patch.object(
+        script, "get_antecedent_precipitation", return_value=None
+    ), patch.object(
+        script, "get_observed_past_precipitation", return_value=None
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=88.0
+    ), patch("requests.post") as mock_post:
+        mock_post.return_value = _mock_response(
+            {"queued": True, "score": 88.0, "risk_tier": "CRITICAL", "id": 7}
+        )
+
+        script.run("https://fake-api.example")
+
+        assess_calls = [
+            c for c in mock_post.call_args_list if "/alerts/assess" in c.args[0]
+        ]
+        fluvial_calls = [
+            c for c in assess_calls if c.kwargs["json"]["basis"] == "dam_river_pathway"
+        ]
+        assert len(fluvial_calls) == len(script.DISTRICT_COORDS)
+        assert all(c.kwargs["json"]["score_override"] == 88.0 for c in fluvial_calls)
+
+
+def test_fluvial_risk_unavailable_does_not_block_other_signals():
+    """Most districts have no dam exposure and no river coverage at all
+    - get_fluvial_risk correctly returning None there must not stop the
+    rainfall-based signals from being assessed."""
+    with patch.object(
+        script, "get_forecast_precipitation", return_value=20.0
+    ), patch.object(
+        script, "get_antecedent_precipitation", return_value=None
+    ), patch.object(
+        script, "get_observed_past_precipitation", return_value=None
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=None
+    ), patch("requests.post") as mock_post:
+        mock_post.return_value = _mock_response({"queued": False, "score": 50})
+
+        script.run("https://fake-api.example")
+
+        assess_calls = [
+            c for c in mock_post.call_args_list if "/alerts/assess" in c.args[0]
+        ]
+        assert not any(
+            c.kwargs["json"]["basis"] == "dam_river_pathway" for c in assess_calls
+        )
+        assert any(
+            c.kwargs["json"]["basis"] == "forecast_next_24h" for c in assess_calls
+        )
 
 
 def test_get_antecedent_precipitation_returns_none_when_unavailable():
@@ -182,6 +248,30 @@ def test_stale_chirps_falls_back_to_open_meteo_observed_past():
         ]
         assert len(fallback_calls) == len(script.DISTRICT_COORDS)
         assert all(c.kwargs["json"]["precipitation"] == 72.0 for c in fallback_calls)
+
+
+def test_get_fluvial_risk_returns_real_value():
+    with patch(
+        "requests.get",
+        return_value=_mock_response({"district": "Tema", "risk_0_100": 75.0}),
+    ):
+        result = script.get_fluvial_risk("https://fake-api.example", "Tema")
+    assert result == 75.0
+
+
+def test_get_fluvial_risk_returns_none_when_no_pathway():
+    with patch(
+        "requests.get",
+        return_value=_mock_response({"district": "Kumasi", "risk_0_100": None}),
+    ):
+        result = script.get_fluvial_risk("https://fake-api.example", "Kumasi")
+    assert result is None
+
+
+def test_get_fluvial_risk_returns_none_on_request_failure():
+    with patch("requests.get", side_effect=Exception("connection refused")):
+        result = script.get_fluvial_risk("https://fake-api.example", "Tema")
+    assert result is None
 
 
 def test_get_antecedent_precipitation_skips_stale_data():
