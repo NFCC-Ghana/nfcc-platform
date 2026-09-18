@@ -60,6 +60,7 @@ class PendingAlertResponse(BaseModel):
     cap_status: Optional[str] = None
     affected_communities: List[str] = []
     response_guidance: Optional[str] = None
+    basis: Optional[str] = None
 
 
 class PendingAlertListResponse(BaseModel):

@@ -249,6 +249,25 @@ def init_pending_alerts_table() -> None:
                 )
             except Exception:
                 pass
+
+        # basis = which real signal produced this assessment - real
+        # rare-event backtesting (src/models/rare_event_verification.py)
+        # found that a 3-day rolling accumulation of real observed
+        # rainfall has meaningfully better SEDI (rare-event skill) than
+        # same-day/forecast-only scoring, so the automated pipeline now
+        # runs both a forward-looking forecast assessment AND a backward-
+        # looking antecedent-accumulation assessment per district
+        # (scripts/automated_risk_assessment.py) - a reviewer needs to
+        # know which one triggered a given queued item, since they carry
+        # different meaning ("heavy rain is coming" vs "the ground/rivers
+        # are already saturated from the last 3 days").
+        try:
+            cursor.execute(
+                "ALTER TABLE pending_alerts ADD COLUMN basis TEXT "
+                "NOT NULL DEFAULT 'forecast_next_24h'"
+            )
+        except Exception:
+            pass
         conn.commit()
 
 
@@ -264,6 +283,7 @@ def save_pending_alert(
     cap_status: str = "Actual",
     affected_communities: Optional[List[str]] = None,
     response_guidance: str = None,
+    basis: str = "forecast_next_24h",
 ) -> int:
     """Queue an automated assessment for human review. Returns the new row's id.
 
@@ -280,6 +300,11 @@ def save_pending_alert(
     (real named neighborhoods, src/exposure/community_names.py) and
     response_guidance (JMA-style "who should act") are stored as-computed
     so the review card can show them without recomputing on every read.
+
+    basis records which real rainfall signal this assessment used -
+    'forecast_next_24h' (anticipatory) or 'antecedent_3d_accumulation'
+    (real observed rainfall already fallen) - see the pending_alerts
+    migration above for why this distinction matters to a reviewer.
     """
     now = datetime.now().isoformat()
     communities_json = (
@@ -292,8 +317,8 @@ def save_pending_alert(
             INSERT INTO pending_alerts (
                 location, score, risk_tier, precipitation, message,
                 status, created_at, severity, urgency, certainty,
-                cap_status, affected_communities, response_guidance
-            ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+                cap_status, affected_communities, response_guidance, basis
+            ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 location,
@@ -308,6 +333,7 @@ def save_pending_alert(
                 cap_status,
                 communities_json,
                 response_guidance,
+                basis,
             ),
         )
         conn.commit()

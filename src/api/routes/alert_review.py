@@ -142,6 +142,19 @@ class AssessRequest(BaseModel):
             "message can go out no matter what a reviewer clicks."
         ),
     )
+    basis: str = Field(
+        default="forecast_next_24h",
+        description=(
+            "Which real rainfall signal `precipitation` represents - "
+            "'forecast_next_24h' (anticipatory, Open-Meteo) or "
+            "'antecedent_3d_accumulation' (real rainfall already fallen "
+            "over the last 3 days, CHIRPS). Real backtesting "
+            "(src/models/rare_event_verification.py) found the latter "
+            "has meaningfully better rare-event skill (SEDI) than "
+            "same-day/forecast-only scoring, so the automated pipeline "
+            "now assesses both signals independently per district."
+        ),
+    )
 
 
 class ReviewDecision(BaseModel):
@@ -163,6 +176,7 @@ async def assess_district(request: AssessRequest):
             "location": request.location,
             "score": score,
             "risk_tier": risk_tier,
+            "basis": request.basis,
             "reason": f"Score {score} below review threshold ({_REVIEW_THRESHOLD})",
         }
 
@@ -212,10 +226,11 @@ async def assess_district(request: AssessRequest):
         cap_status=cap_status,
         affected_communities=affected_communities,
         response_guidance=response_guidance,
+        basis=request.basis,
     )
     logger.info(
         f"Queued pending alert #{alert_id} for {request.location} "
-        f"(score={score}, tier={risk_tier}, "
+        f"(score={score}, tier={risk_tier}, basis={request.basis}, "
         f"CAP: {severity}/{urgency}/{certainty}, status={cap_status})"
     )
     return {
@@ -231,6 +246,7 @@ async def assess_district(request: AssessRequest):
         "cap_status": cap_status,
         "affected_communities": affected_communities,
         "response_guidance": response_guidance,
+        "basis": request.basis,
     }
 
 

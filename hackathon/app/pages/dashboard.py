@@ -1490,6 +1490,18 @@ ALL_TRACKED_DISTRICTS = [
 ]
 
 
+# basis distinguishes real forward-looking forecast rainfall from real
+# backward-looking antecedent accumulation
+# (src/hydrology/antecedent_rainfall.py) - two independent signals with
+# different meaning, so a reviewer needs to know which one queued a
+# given item rather than assuming "precipitation" always means the
+# same thing.
+_BASIS_LABELS = {
+    "forecast_next_24h": "🔮 Forecast (next 24h)",
+    "antecedent_3d_accumulation": "🌧️ Observed accumulation (last 3 days)",
+}
+
+
 def render_alert_review_queue():
     """The human-in-the-loop screen: automated assessments wait here until
     a person explicitly approves or dismisses them - see
@@ -1585,7 +1597,8 @@ def render_alert_review_queue():
                         f"{style['emoji']} **{alert['location']}** — "
                         f"{alert['risk_tier']} ({alert['score']:.0f}%)"
                     )
-                    st.caption(f"Precipitation: {alert['precipitation']}mm")
+                    basis_label = _BASIS_LABELS.get(alert.get("basis"), "Precipitation")
+                    st.caption(f"{basis_label}: {alert['precipitation']}mm")
                     # Common Alerting Protocol's three independent
                     # decision axes (OASIS CAP standard) - Severity from
                     # the risk tier, Urgency from real lead-time

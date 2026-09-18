@@ -75,6 +75,38 @@ def test_v1_cap_xml_matches_legacy_route(api_client):
     assert v1_xml.text == legacy_xml.text
 
 
+def test_v1_assess_basis_defaults_to_forecast(api_client):
+    """basis distinguishes which real rainfall signal an assessment used
+    (src/models/rare_event_verification.py found antecedent accumulation
+    has meaningfully better rare-event skill than forecast/same-day
+    scoring, so the automated pipeline now runs both independently) -
+    existing callers that don't set it must keep working exactly as
+    before, defaulting to the original forecast-based behavior."""
+    resp = api_client.post(
+        "/v1/alerts/assess", json={"location": "Kumasi", "precipitation": 90}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["basis"] == "forecast_next_24h"
+
+
+def test_v1_assess_basis_passes_through_when_set(api_client):
+    resp = api_client.post(
+        "/v1/alerts/assess",
+        json={
+            "location": "Kumasi",
+            "precipitation": 90,
+            "basis": "antecedent_3d_accumulation",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["basis"] == "antecedent_3d_accumulation"
+
+    pending = api_client.get("/v1/alerts/pending")
+    row = next(a for a in pending.json()["alerts"] if a["id"] == data["id"])
+    assert row["basis"] == "antecedent_3d_accumulation"
+
+
 def test_v1_history_and_stats_schema(api_client):
     resp = api_client.get("/v1/alerts/history")
     assert resp.status_code == 200
