@@ -79,14 +79,19 @@ def get_risk_history(district: str, limit: int = 100) -> List[Dict[str, Any]]:
     order for plotting a trend), most recent `limit` points."""
     with get_db() as conn:
         cursor = conn.cursor()
+        # id as a tiebreaker on both the inner and outer ORDER BY - rapid
+        # inserts can share an identical datetime.now().isoformat()
+        # string, which would otherwise make "most/least recent" ties
+        # non-deterministic (the same real bug found and fixed in
+        # observation_history_db.py/prediction_ledger_db.py).
         cursor.execute(
             """
             SELECT * FROM (
                 SELECT * FROM risk_history
                 WHERE district = ?
-                ORDER BY recorded_at DESC
+                ORDER BY recorded_at DESC, id DESC
                 LIMIT ?
-            ) ORDER BY recorded_at ASC
+            ) ORDER BY recorded_at ASC, id ASC
             """,
             (district, limit),
         )

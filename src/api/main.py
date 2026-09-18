@@ -212,6 +212,10 @@ app.include_router(v1_router)
 
 # Ensure database is initialized on startup
 from src.database.alert_db import init_db
+from src.database.observation_history_db import init_observation_history_table
+from src.database.prediction_ledger_db import init_prediction_ledger_table
 from src.database.risk_history_db import init_risk_history_table
 init_db()
 init_risk_history_table()
+init_observation_history_table()
+init_prediction_ledger_table()

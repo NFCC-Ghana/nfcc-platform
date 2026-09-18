@@ -51,12 +51,24 @@ it, for a human to review in the dashboard's Alert Review Queue.
 Nothing gets sent to real people from this script; AlertEngine.process()
 is only ever called when a human clicks Approve.
 
-Also records a risk_history snapshot for every district on every run
-(POST /v1/districts/{district}/risk/history, src/api/v1/risk_history.py)
-- the orchestration that keeps GET /v1/districts/{district}/risk/history
-populated with a real, periodic time series, since this script (running
-outside the API container) has no direct database access. Uses the
-forecast value for this, unchanged from before.
+Also records, on every scheduled run:
+
+- A risk_history snapshot (POST /v1/districts/{district}/risk/history,
+  src/api/v1/risk_history.py) - a real, periodic score/tier time series.
+- A real observation_history row for every source actually fetched
+  this run (POST /v1/districts/{district}/observations,
+  src/database/observation_history_db.py) - the "Historical data"
+  foundation for training/backtesting/evaluation/model comparison/
+  event replay, which previously had no growing archive at all beyond
+  flood_polygons.py's fixed 8-event list.
+- One prediction_ledger entry per district (POST /v1/predictions/record,
+  src/database/prediction_ledger_db.py) - a full real /decision/card
+  snapshot (evidence, fused risk, confidence, reasoning), preserving
+  what happened/predicted/why so a real outcome can be attached later
+  and this platform can finally answer its own calibration question -
+  not just "what did CivicFlood predict for a past documented flood"
+  (src/models/rare_event_verification.py) but "was CivicFlood right",
+  for every real assessment, not only the 8 historical ones.
 
 Usage:
     python scripts/automated_risk_assessment.py
@@ -232,6 +244,56 @@ def _assess(
         return None
 
 
+def _record_observation(
+    api_url: str, district: str, source: str, value: Optional[float], unit: str
+) -> None:
+    """Best-effort: a real observation-history write failing must never
+    fail this district's overall assessment - the real-time assessment
+    already succeeded independently of whether its historical record
+    gets saved (same principle as the existing risk_history write)."""
+    quality_flag = "missing" if value is None else "not_evaluated"
+    try:
+        requests.post(
+            f"{api_url}/v1/districts/{district}/observations",
+            json={"source": source, "value": value, "unit": unit, "quality_flag": quality_flag},
+            timeout=20,
+        ).raise_for_status()
+    except Exception as e:
+        logger.warning(f"observation-history POST failed for {district}/{source}: {e}")
+
+
+def _record_prediction(api_url: str, district: str, precipitation: float) -> None:
+    """Logs one full real /decision/card snapshot (evidence, fused risk,
+    confidence, reasoning) into the prediction ledger
+    (src/database/prediction_ledger_db.py) - best-effort, same reason as
+    _record_observation above."""
+    try:
+        card_resp = requests.post(
+            f"{api_url}/decision/card",
+            json={"location": district, "precipitation": precipitation},
+            timeout=30,
+        )
+        card_resp.raise_for_status()
+        card = card_resp.json()
+        requests.post(
+            f"{api_url}/v1/predictions/record",
+            json={
+                "district": district,
+                "evidence_snapshot": card,
+                "risk_score": card.get("score"),
+                "risk_tier": card.get("risk_tier"),
+                "fused_risk_score": card.get("fused_risk_score"),
+                "fused_risk_tier": card.get("fused_risk_tier"),
+                "confidence": card.get("confidence", {}).get("value"),
+                "reason": card.get("reason"),
+                "risk_attribution": card.get("risk_attribution"),
+            },
+            timeout=20,
+        ).raise_for_status()
+    except Exception as e:
+        logger.warning(f"prediction-ledger record failed for {district}: {e}")
+
+
 def run(api_url: str) -> int:
     queued_count = 0
     failures = 0
@@ -345,6 +407,24 @@ def run(api_url: str) -> int:
                 ).raise_for_status()
             except Exception as e:
                 logger.warning(f"risk_history POST failed for {district}: {e}")
+
+        # Real observation-history archive (src/database/
+        # observation_history_db.py) - every source actually checked
+        # this run, real value or an honest miss, feeding the growing
+        # dataset training/backtesting/model-comparison/event-replay
+        # need. Best-effort, same reasoning as risk_history above.
+        _record_observation(api_url, district, "forecast_next_24h", forecast_precip, "mm")
+        _record_observation(api_url, district, antecedent_basis, antecedent_precip, "mm")
+        _record_observation(api_url, district, "dam_river_pathway", fluvial_risk, "risk_0_100")
+
+        # One full real /decision/card snapshot per district per run,
+        # into the prediction ledger (src/database/prediction_ledger_db.py)
+        # - preserves what happened/predicted/why so a real outcome can
+        # be attached later. Uses the forecast value (0.0 if unavailable)
+        # since /decision/card needs a precipitation input; the fluvial
+        # pathway is still captured inside the card's own evidence/
+        # fused_risk_score regardless of this choice.
+        _record_prediction(api_url, district, forecast_precip or 0.0)
 
     logger.info(
         f"Done. {queued_count} district(s) queued for human review, "

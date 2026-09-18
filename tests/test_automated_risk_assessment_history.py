@@ -250,6 +250,80 @@ def test_stale_chirps_falls_back_to_open_meteo_observed_past():
         assert all(c.kwargs["json"]["precipitation"] == 72.0 for c in fallback_calls)
 
 
+def test_observations_recorded_for_every_source():
+    with patch.object(
+        script, "get_forecast_precipitation", return_value=20.0
+    ), patch.object(
+        script, "get_antecedent_precipitation", return_value=15.0
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=60.0
+    ), patch("requests.post") as mock_post:
+        mock_post.return_value = _mock_response({"queued": False, "score": 50})
+        script.run("https://fake-api.example")
+
+        obs_calls = [
+            c for c in mock_post.call_args_list if "/observations" in c.args[0]
+        ]
+        # 3 sources (forecast, antecedent, dam_river_pathway) x 9 districts
+        assert len(obs_calls) == len(script.DISTRICT_COORDS) * 3
+        sources = {c.kwargs["json"]["source"] for c in obs_calls}
+        assert sources == {
+            "forecast_next_24h",
+            "antecedent_3d_accumulation",
+            "dam_river_pathway",
+        }
+
+
+def test_missing_fluvial_recorded_as_honest_missing_observation():
+    with patch.object(
+        script, "get_forecast_precipitation", return_value=20.0
+    ), patch.object(
+        script, "get_antecedent_precipitation", return_value=None
+    ), patch.object(
+        script, "get_observed_past_precipitation", return_value=None
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=None
+    ), patch("requests.post") as mock_post:
+        mock_post.return_value = _mock_response({"queued": False, "score": 50})
+        script.run("https://fake-api.example")
+
+        fluvial_obs = [
+            c
+            for c in mock_post.call_args_list
+            if "/observations" in c.args[0]
+            and c.kwargs["json"]["source"] == "dam_river_pathway"
+        ]
+        assert len(fluvial_obs) == len(script.DISTRICT_COORDS)
+        assert all(c.kwargs["json"]["value"] is None for c in fluvial_obs)
+        assert all(c.kwargs["json"]["quality_flag"] == "missing" for c in fluvial_obs)
+
+
+def test_prediction_recorded_once_per_district():
+    with patch.object(
+        script, "get_forecast_precipitation", return_value=20.0
+    ), patch.object(
+        script, "get_antecedent_precipitation", return_value=None
+    ), patch.object(
+        script, "get_observed_past_precipitation", return_value=None
+    ), patch.object(
+        script, "get_fluvial_risk", return_value=None
+    ), patch("requests.post") as mock_post:
+        mock_post.return_value = _mock_response(
+            {"queued": False, "score": 50, "risk_tier": "MODERATE", "confidence": {"value": 70}}
+        )
+        script.run("https://fake-api.example")
+
+        card_calls = [
+            c for c in mock_post.call_args_list if "/decision/card" in c.args[0]
+        ]
+        record_calls = [
+            c for c in mock_post.call_args_list if "/v1/predictions/record" in c.args[0]
+        ]
+        assert len(card_calls) == len(script.DISTRICT_COORDS)
+        assert len(record_calls) == len(script.DISTRICT_COORDS)
+        assert record_calls[0].kwargs["json"]["risk_score"] == 50
+
+
 def test_get_fluvial_risk_returns_real_value():
     with patch(
         "requests.get",
