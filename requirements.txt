@@ -27,6 +27,12 @@ plotly>=5.17.0
 twilio>=8.0.0
 python-dotenv>=1.0.0
 
+# API key auth (src/api/auth.py) - real dependency as of this commit,
+# not before: auth.py existed but was dead code (verify_api_key was
+# never wired into any route), so nothing ever actually imported it and
+# this missing pin went unnoticed until CI's clean install broke on it.
+slowapi==0.1.9
+
 # AI Copilot (src/copilot/) - Gemini API, automatic function calling.
 # Anthropic's own free tier has $0 usable credits; Gemini 2.5 Flash's
 # free tier (1,500 requests/day, no card required) is the realistic
