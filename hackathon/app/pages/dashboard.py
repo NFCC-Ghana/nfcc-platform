@@ -78,6 +78,14 @@ st.markdown(
 API_URL = os.getenv(
     "NFCC_API_URL", "https://nfcc-platform-355353600602.europe-west1.run.app"
 )
+# Sent as the X-API-Key header (src/api/auth.py's fixed header name -
+# settings.API_KEY_HEADER on the backend) on every request below. Set
+# via this app's Streamlit Cloud "Secrets" panel, matching the same
+# nfcc-api-key value already bound to Cloud Run as API_KEY. Harmless to
+# send even before the backend enforces it - verify_api_key() only
+# checks the header once settings.API_KEY is configured, and sending an
+# unrecognized header to an endpoint that ignores it is a no-op.
+API_KEY = os.getenv("NFCC_API_KEY", "")
 
 st.set_page_config(
     page_title="CivicFlood AI - National Emergency Operations Center",
@@ -92,6 +100,10 @@ st.set_page_config(
 # ============================================================
 
 
+def _auth_headers() -> dict:
+    return {"X-API-Key": API_KEY} if API_KEY else {}
+
+
 def call_api(
     endpoint: str, method: str = "GET", data: dict = None, timeout: int = 30
 ) -> dict:
@@ -99,9 +111,9 @@ def call_api(
     url = f"{API_URL}{endpoint}"
     try:
         if method == "GET":
-            response = requests.get(url, timeout=timeout)
+            response = requests.get(url, timeout=timeout, headers=_auth_headers())
         elif method == "POST":
-            response = requests.post(url, json=data, timeout=timeout)
+            response = requests.post(url, json=data, timeout=timeout, headers=_auth_headers())
         else:
             return {"error": f"Unsupported method: {method}"}
 
@@ -123,7 +135,7 @@ def fetch_cap_xml(alert_id: int) -> Optional[str]:
     None on any failure, so a broken export never crashes the queue view)."""
     try:
         response = requests.get(
-            f"{API_URL}/alerts/pending/{alert_id}/cap.xml", timeout=15
+            f"{API_URL}/alerts/pending/{alert_id}/cap.xml", timeout=15, headers=_auth_headers()
         )
         return response.text if response.status_code == 200 else None
     except requests.exceptions.RequestException:
