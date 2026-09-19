@@ -77,15 +77,45 @@ st.markdown(
         .stAlert, .stAlert * {
             color: inherit !important;
         }
-        /* Rounded, bold, Finelo-style buttons */
+        /* Rounded, bold, Finelo-style buttons. The default (secondary)
+           button variant is styled explicitly here, not left to
+           Streamlit's own theme defaults - on this Streamlit version
+           those can render as a light/white button, which combined with
+           our global light text color made the label invisible (the AI
+           Copilot's four suggested-question buttons). */
         .stButton > button, .stChatInput button {
             border-radius: 10px !important;
             font-weight: 600 !important;
+        }
+        .stButton > button {
+            background-color: #161616 !important;
+            color: #F5F5F5 !important;
+            border: 1px solid #2A2A2A !important;
+        }
+        .stButton > button:hover {
+            border-color: #8CD867 !important;
+            color: #8CD867 !important;
         }
         .stButton > button[kind="primary"] {
             background-color: #8CD867 !important;
             color: #0a0a0a !important;
             border: none !important;
+        }
+        .stButton > button[kind="primary"]:hover {
+            color: #0a0a0a !important;
+            opacity: 0.9;
+        }
+        /* Chat input and any other text inputs - same white-on-white
+           risk as the buttons above if left to native styling. */
+        .stChatInput textarea, .stChatInput input,
+        .stTextInput input, .stTextArea textarea,
+        .stNumberInput input {
+            background-color: #161616 !important;
+            color: #F5F5F5 !important;
+            border: 1px solid #2A2A2A !important;
+        }
+        .stChatInput, .stChatInput > div {
+            background-color: #161616 !important;
         }
         /* Sidebar and metric containers get the same dark card look as
            the custom HTML components in visual_components.py */
@@ -429,9 +459,26 @@ def render_header(state):
         st.caption(f"📊 {state.active_sources_count} Data Sources Active")
 
     with col3:
-        api_status = "✅" if state.api_connected else "⚠️"
-        st.markdown(f"{api_status} **API Connected**")
+        # Previously always said "API Connected" regardless of
+        # state.api_connected, just swapping the emoji - so a real
+        # failure (e.g. a missing/incorrect NFCC_API_KEY secret) still
+        # visually claimed to be connected next to a warning triangle.
+        if state.api_connected:
+            st.markdown("✅ **API Connected**")
+        else:
+            st.markdown("⚠️ **API Unavailable - showing fallback data**")
         st.code(API_URL, language="text")
+
+    if not state.api_connected:
+        st.error(
+            "The dashboard could not reach the live platform API for this "
+            "request, so the figures below are illustrative fallback "
+            "values, not real current data. If this persists, check that "
+            "NFCC_API_KEY is set correctly in this app's Streamlit Cloud "
+            "secrets (Settings → Secrets) and matches the platform's "
+            "nfcc-api-key.",
+            icon="\U0001F6A8",
+        )
 
     st.divider()
 
