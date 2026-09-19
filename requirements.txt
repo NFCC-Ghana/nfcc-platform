@@ -1,13 +1,11 @@
 # Core Framework
 fastapi==0.115.0
 uvicorn[standard]==0.24.0
-# Bumped from 2.5.0: anthropic's beta_tool/beta_async_tool decorators
-# (src/copilot/tools.py) crash on 2.5.0 - TypeAdapter over a
-# ValidateCallWrapper raises "unhashable type" - fixed by pydantic's own
-# later 2.x internals. Verified against the full existing test suite
-# (444 passed) before bumping; no other code in this repo depends on
-# anything specific to 2.5.0.
-pydantic==2.9.2
+# Bumped from 2.5.0: google-genai (src/copilot/) hard-requires
+# pydantic>=2.12.5. Verified against the full existing test suite
+# before bumping; no other code in this repo depends on anything
+# specific to 2.5.0.
+pydantic==2.12.5
 python-multipart==0.0.6
 email-validator>=2.0.0
 
@@ -29,8 +27,12 @@ plotly>=5.17.0
 twilio>=8.0.0
 python-dotenv>=1.0.0
 
-# AI Copilot (src/copilot/) - Claude API, tool-calling Tool Runner beta
-anthropic>=0.116.0
+# AI Copilot (src/copilot/) - Gemini API, automatic function calling.
+# Anthropic's own free tier has $0 usable credits; Gemini 2.5 Flash's
+# free tier (1,500 requests/day, no card required) is the realistic
+# option for a solo, low-budget maintainer - see src/copilot/engine.py's
+# module docstring.
+google-genai==2.24.0
 
 # Real OASIS CAP v1.2 XML export (src/api/routes/cap_export.py) - typed
 # dataclass bindings for the exact CAP schema (identifier/sender/status/
@@ -47,8 +49,14 @@ earthengine-api>=0.1.400
 pytest==7.4.3
 pytest-cov==4.1.0
 pytest-mock==3.12.0
+# Bumped from 0.25.1: google-genai hard-requires httpx>=0.28.1,<1.0.0.
+# starlette==0.38.6 (below) already works fine with httpx 0.28.1 - the
+# TestClient breakage this looked like it would cause turned out to be
+# stale packages in the local dev env, not a real incompatibility;
+# verified via a fresh install of the versions actually pinned here,
+# then the full test suite.
 pytest-asyncio==0.21.1
-httpx==0.25.1
+httpx==0.28.1
 
 # Utilities
 python-dateutil==2.8.2

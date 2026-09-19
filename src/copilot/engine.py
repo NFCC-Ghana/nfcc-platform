@@ -1,6 +1,19 @@
 """AI Copilot - a real, tool-calling operational assistant, not a chatbot
 with general knowledge about floods.
 
+Runs on Google's Gemini API (google-genai), not Anthropic's Claude:
+Anthropic's own free "Evaluation access" tier has $0 credits and no
+usable free quota, while Gemini's free tier is a genuinely ongoing,
+no-card-required allowance (confirmed against the currently installed
+google-genai==2.24.0 SDK's own source, not guessed) - the only realistic
+option for a solo, low-budget maintainer. Model is Gemini 2.5 Flash
+specifically, not a newer Gemini release, because its free-tier quota
+(1,500 requests/day at the time this was written) is far more usable for
+an operational tool than the newest Flash models' free tier (~20
+requests/day). If billing ever allows it, swapping back to Claude only
+requires rewriting this file - src/copilot/tools.py's plain async
+functions are provider-agnostic and were already used unmodified.
+
 Grounding architecture (why this is enforced structurally, not just by
 prompting - "only answer from retrieved data" in a system prompt is not
 by itself an enforcement mechanism; research on grounded/RAG assistants
@@ -19,11 +32,12 @@ refusal - when those tools return nothing):
    confident guess. This mirrors src/verification/outcome_verifier.py's
    existing "no_evidence_found" (not "no_flood_confirmed") pattern
    already used elsewhere in this platform for the same reason.
-3. tool_choice is left at "auto" rather than forced, because most
-   questions need 1-3 tool calls in sequence (e.g. "which districts are
-   highest risk" -> get_current_risk_overview, then possibly
-   get_district_decision on the top district for detail) - forcing a
-   single tool would prevent that.
+3. Gemini's automatic function calling (google.genai.types.
+   AutomaticFunctionCallingConfig) is left enabled with a bounded
+   maximum_remote_calls rather than forced single-tool calls, because
+   most questions need 1-3 tool calls in sequence (e.g. "which districts
+   are highest risk" -> get_current_risk_overview, then possibly
+   get_district_decision on the top district for detail).
 
 The Copilot never calls Earth Engine, DAHITI, Open-Meteo, or the
 database directly - it only calls the tool functions, which call this
@@ -36,7 +50,8 @@ import logging
 import os
 from typing import List, Optional
 
-from anthropic import AsyncAnthropic
+from google import genai
+from google.genai import types
 
 from src.copilot.tools import (
     get_current_risk_overview,
@@ -51,9 +66,8 @@ from src.copilot.tools import (
 
 logger = logging.getLogger("nfcc.copilot.engine")
 
-_MODEL = "claude-opus-5"
-_MAX_TOKENS = 4096
-_MAX_ITERATIONS = 8
+_MODEL = "gemini-2.5-flash"
+_MAX_TOOL_CALLS = 8
 
 _TOOLS = [
     list_tracked_districts,
@@ -106,6 +120,22 @@ class CopilotAnswer:
         return {"answer": self.answer, "tool_calls": self.tool_calls, "model": self.model}
 
 
+def _extract_tool_calls(response) -> List[dict]:
+    """Pulls {tool, input} pairs out of Gemini's automatic_function_calling_
+    history - the record of every tool call the SDK executed on this
+    platform's behalf, kept for the same transparency reason the dashboard
+    shows an "Evidence used" panel: a grounded answer must be able to show
+    its work, not just assert it."""
+    calls: List[dict] = []
+    for content in response.automatic_function_calling_history or []:
+        for part in content.parts or []:
+            if part.function_call is not None:
+                calls.append(
+                    {"tool": part.function_call.name, "input": dict(part.function_call.args or {})}
+                )
+    return calls
+
+
 async def ask_copilot(question: str, district: Optional[str] = None) -> CopilotAnswer:
     """Answer one operational question, grounded entirely in this
     platform's real, live data via the tools in src/copilot/tools.py.
@@ -117,11 +147,11 @@ async def ask_copilot(question: str, district: Optional[str] = None) -> CopilotA
             selected - passed to the model as context, not assumed by
             any tool.
     """
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return CopilotAnswer(
             answer=(
-                "The AI Copilot is not configured yet: ANTHROPIC_API_KEY is not "
+                "The AI Copilot is not configured yet: GEMINI_API_KEY is not "
                 "set on this deployment. This is a configuration gap, not a data "
                 "gap - ask your platform administrator to set it."
             ),
@@ -129,54 +159,41 @@ async def ask_copilot(question: str, district: Optional[str] = None) -> CopilotA
             model=_MODEL,
         )
 
-    client = AsyncAnthropic(api_key=api_key)
+    client = genai.Client(api_key=api_key)
 
     user_content = question
     if district:
         user_content = f"[Currently selected district in the dashboard: {district}]\n{question}"
 
-    messages = [{"role": "user", "content": user_content}]
-    tool_calls: List[dict] = []
-    final_text = ""
-
-    runner = client.beta.messages.tool_runner(
-        model=_MODEL,
-        max_tokens=_MAX_TOKENS,
-        system=_SYSTEM_PROMPT,
+    config = types.GenerateContentConfig(
+        system_instruction=_SYSTEM_PROMPT,
         tools=_TOOLS,
-        messages=messages,
-        thinking={"type": "adaptive"},
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+            maximum_remote_calls=_MAX_TOOL_CALLS
+        ),
     )
 
     try:
-        iterations = 0
-        async for message in runner:
-            iterations += 1
-            for block in message.content:
-                if block.type == "tool_use":
-                    tool_calls.append({"tool": block.name, "input": block.input})
-                elif block.type == "text":
-                    final_text = block.text
-            if iterations >= _MAX_ITERATIONS:
-                logger.warning("Copilot hit max_iterations (%d) for question: %s", _MAX_ITERATIONS, question)
-                break
+        response = await client.aio.models.generate_content(
+            model=_MODEL, contents=user_content, config=config
+        )
     except Exception as e:
-        logger.exception("Copilot tool-runner loop failed")
+        logger.exception("Copilot generate_content call failed")
         return CopilotAnswer(
             answer=(
                 "The Copilot hit an error retrieving live data and cannot answer "
                 f"reliably right now ({e}). Try again, or check "
                 "/v1/health/data-sources directly."
             ),
-            tool_calls=tool_calls,
+            tool_calls=[],
             model=_MODEL,
         )
 
-    if not final_text:
-        final_text = (
-            "I wasn't able to produce a grounded answer to that from the "
-            "platform's current data. Try rephrasing, or ask about a specific "
-            "tracked district."
-        )
+    tool_calls = _extract_tool_calls(response)
+    answer_text = response.text or (
+        "I wasn't able to produce a grounded answer to that from the "
+        "platform's current data. Try rephrasing, or ask about a specific "
+        "tracked district."
+    )
 
-    return CopilotAnswer(answer=final_text, tool_calls=tool_calls, model=_MODEL)
+    return CopilotAnswer(answer=answer_text, tool_calls=tool_calls, model=_MODEL)

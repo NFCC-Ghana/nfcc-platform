@@ -2,7 +2,7 @@
 
 The route itself is a thin pass-through to src/copilot/engine.py's
 ask_copilot() - these tests mock that function so they run without a
-real ANTHROPIC_API_KEY or network access, and only assert the route's
+real GEMINI_API_KEY or network access, and only assert the route's
 own contract (request/response shape). Grounding behavior itself is
 exercised by tests/test_copilot_tools.py (the real tool functions) and
 tests/test_copilot_engine.py (the no-API-key honesty path).
@@ -17,7 +17,7 @@ def test_copilot_ask_returns_answer_and_tool_calls(api_client):
     fake_answer = CopilotAnswer(
         answer="Tamale is at MODERATE risk per get_district_decision.",
         tool_calls=[{"tool": "get_district_decision", "input": {"district": "Tamale"}}],
-        model="claude-opus-5",
+        model="gemini-2.5-flash",
     )
     with patch(
         "src.api.v1.copilot.ask_copilot", new=AsyncMock(return_value=fake_answer)
@@ -30,7 +30,7 @@ def test_copilot_ask_returns_answer_and_tool_calls(api_client):
     data = resp.json()
     assert data["answer"] == fake_answer.answer
     assert data["tool_calls"][0]["tool"] == "get_district_decision"
-    assert data["model"] == "claude-opus-5"
+    assert data["model"] == "gemini-2.5-flash"
 
 
 def test_copilot_ask_requires_question_field(api_client):

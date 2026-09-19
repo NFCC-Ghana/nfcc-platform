@@ -1,13 +1,15 @@
 """Evidence/retrieval layer for the AI Copilot (src/copilot/engine.py).
 
-Each function here is a @beta_async_tool the Copilot can call. Every one
-wraps ONE existing, already-deployed /v1/* computation - the exact same
-service-layer function that route already calls - in-process (no HTTP
-round trip to this same service). This is the grounding mechanism: the
-Copilot has no tool that returns free-text "knowledge", only tools that
-return real, live, structured platform state. See engine.py's module
-docstring for why this is an architectural constraint, not a prompting
-choice.
+Each function here is a plain async tool the Copilot can call - passed
+directly to Gemini's automatic function calling (google-genai), which
+generates the tool schema from these signatures/docstrings and executes
+them itself, so no decorator is needed. Every one wraps ONE existing,
+already-deployed /v1/* computation - the exact same service-layer
+function that route already calls - in-process (no HTTP round trip to
+this same service). This is the grounding mechanism: the Copilot has no
+tool that returns free-text "knowledge", only tools that return real,
+live, structured platform state. See engine.py's module docstring for
+why this is an architectural constraint, not a prompting choice.
 
 Nothing here recomputes a number a route already computes. Where a tool
 needs "current precipitation" and the caller didn't supply one, it uses
@@ -20,8 +22,6 @@ used, never inventing a number.
 import dataclasses
 import logging
 from typing import Optional
-
-from anthropic import beta_async_tool
 
 from src.api.routes.decision_card import (
     DecisionCardRequest,
@@ -68,7 +68,6 @@ async def _live_precipitation_mm(district: str) -> tuple[float, str]:
     return forecast.get("24h", 0.0), "auto: Open-Meteo 24h forecast (no precipitation_mm supplied)"
 
 
-@beta_async_tool
 async def list_tracked_districts() -> dict:
     """List every district this platform actually tracks, with region,
     population, area, and the real named communities within it. Call
@@ -80,7 +79,6 @@ async def list_tracked_districts() -> dict:
     return {"count": len(districts), "districts": districts}
 
 
-@beta_async_tool
 async def get_current_risk_overview() -> dict:
     """Get the most recently recorded real risk snapshot for every
     tracked district, plus the snapshot before it, from the platform's
@@ -104,7 +102,6 @@ async def get_current_risk_overview() -> dict:
     return {"districts": overview}
 
 
-@beta_async_tool
 async def get_district_decision(district: str, precipitation_mm: Optional[float] = None) -> dict:
     """Get the full AI Decision Card for one district: risk_tier, score,
     fused_risk_score/tier (combining rainfall with river/dam/satellite
@@ -137,7 +134,6 @@ async def get_district_decision(district: str, precipitation_mm: Optional[float]
     return result
 
 
-@beta_async_tool
 async def get_district_evidence(district: str, precipitation_mm: Optional[float] = None) -> dict:
     """Get just the evidence array and confidence block behind a
     district's current risk tier, without the full decision card. Use
@@ -182,7 +178,6 @@ async def get_district_evidence(district: str, precipitation_mm: Optional[float]
     }
 
 
-@beta_async_tool
 async def get_district_forecast(district: str, current_precipitation_mm: Optional[float] = None) -> dict:
     """Get the real rainfall forecast (24h/48h/72h/daily) and the
     resulting risk projection at +6h/+12h/+18h/+24h for a district. Use
@@ -229,7 +224,6 @@ async def get_district_forecast(district: str, current_precipitation_mm: Optiona
     }
 
 
-@beta_async_tool
 async def get_district_resources(district: str, precipitation_mm: Optional[float] = None) -> dict:
     """Get real operational resources for a district: named public
     buildings that could serve as shelters, real dam disclosure
@@ -269,7 +263,6 @@ async def get_district_resources(district: str, precipitation_mm: Optional[float
     }
 
 
-@beta_async_tool
 async def get_data_source_health() -> dict:
     """Get real connectivity status for every data source this platform
     depends on (Earth Engine/Sentinel-1 SAR, DAHITI dam altimetry,
@@ -289,7 +282,6 @@ async def get_data_source_health() -> dict:
     return health.model_dump()
 
 
-@beta_async_tool
 async def get_data_quality_report() -> dict:
     """Get a deeper per-source quality report (freshness, plausible-range
     validity, completeness) than get_data_source_health provides - a
