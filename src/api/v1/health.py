@@ -143,6 +143,12 @@ def _check_community_reports_db() -> DataSourceStatus:
     check - confirms the database is genuinely queryable."""
     try:
         conn = sqlite3.connect(str(_COMMUNITY_DB_PATH), timeout=3)
+        # Matches the pragmas CommunityMemoryEngine._connect() applies
+        # (src/community/community_memory.py) - harmless for a read-only
+        # SELECT 1, but keeps every connection path to this Litestream-
+        # replicated file consistent rather than one silent exception.
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("SELECT 1")
         conn.close()
         return DataSourceStatus(
