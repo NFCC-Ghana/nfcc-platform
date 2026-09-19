@@ -49,22 +49,54 @@ from hackathon.app.modules.v4.visual_components import (
 from hackathon.app.modules.v4.state_fallback import get_fallback_data
 
 # ============================================================
-# FORCE BLACK TEXT - CSS OVERRIDE
+# DARK THEME - Finelo-inspired (near-black background, bright lime-green
+# accent, bold light text). Matches .streamlit/config.toml's theme
+# section (which handles native widgets - sliders, buttons, inputs) and
+# hackathon/app/modules/v4/visual_components.py's Theme class (which
+# handles the custom HTML cards) - all three should be edited together
+# if this palette ever changes.
 # ============================================================
 st.markdown(
     """
     <style>
-        /* Force ALL text to be black */
-        .stApp, .stApp p, .stApp div, .stApp span, .stApp label {
-            color: #000000 !important;
+        .stApp {
+            background-color: #0a0a0a;
+            color: #F5F5F5;
         }
-        /* Keep emojis visible */
+        .stApp p, .stApp span, .stApp label {
+            color: #F5F5F5;
+        }
+        .stMarkdown, .stMarkdown p, .stMarkdown div, .stMarkdown span {
+            color: #F5F5F5;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: #F5F5F5 !important;
+            font-weight: 700 !important;
+        }
+        /* Keep emojis and alert-box tinted text as Streamlit intends */
         .stAlert, .stAlert * {
             color: inherit !important;
         }
-        /* Force markdown text to black */
-        .stMarkdown, .stMarkdown p, .stMarkdown div, .stMarkdown span {
-            color: #000000 !important;
+        /* Rounded, bold, Finelo-style buttons */
+        .stButton > button, .stChatInput button {
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+        }
+        .stButton > button[kind="primary"] {
+            background-color: #8CD867 !important;
+            color: #0a0a0a !important;
+            border: none !important;
+        }
+        /* Sidebar and metric containers get the same dark card look as
+           the custom HTML components in visual_components.py */
+        section[data-testid="stSidebar"] {
+            background-color: #121212;
+        }
+        div[data-testid="stMetric"] {
+            background-color: #161616;
+            border: 1px solid #2A2A2A;
+            border-radius: 12px;
+            padding: 12px 16px;
         }
     </style>
     """,
@@ -537,7 +569,7 @@ def render_executive_summary(state):
         )
 
         st.markdown(
-            f"<div style='background-color:#f0f2f6;padding:15px;"
+            f"<div style='background-color:#161616;padding:15px;"
             f"border-radius:5px;border-left:5px solid {color};'>"
             f"<strong>{summary}</strong>"
             f"</div>",
@@ -1025,10 +1057,10 @@ def render_ai_decision_center(state):
         st.markdown(
             f"""
         <div style="
-            background: #ffffff;
+            background: #161616;
             padding: 16px 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
             border-left: 6px solid {urgency_color};
         ">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -1506,7 +1538,7 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
         st.caption(f"💡 {state.confidence_explanation}")
 
     st.markdown(
-        f"<div style='background:#f0f2f6;padding:16px 20px;"
+        f"<div style='background:#161616;padding:16px 20px;"
         f"border-radius:8px;border-left:6px solid {color};"
         f"margin-top:16px;font-size:16px;'>"
         f"<strong>{summary}</strong><br>"

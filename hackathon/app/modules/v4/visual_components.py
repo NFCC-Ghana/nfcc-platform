@@ -17,27 +17,43 @@ from hackathon.app.modules.v4.state import get_risk_tier_style
 
 
 class Theme:
-    """Centralized design tokens."""
+    """Centralized design tokens.
 
-    # Colors
-    SUCCESS = "#16A34A"
-    WARNING = "#F59E0B"
-    DANGER = "#DC2626"
-    INFO = "#2563EB"
+    Dark theme (Finelo-inspired: near-black background, bright lime-green
+    accent, bold light text on dark cards) - values were inverted from an
+    earlier light theme, but the NAMES were deliberately kept unchanged
+    (WHITE is still "the card background token", GRAY_900 is still "the
+    most-emphasized text token") so every one of the ~180 usage sites
+    across this file didn't need touching, only what each token resolves
+    to. See hackathon/app/pages/dashboard.py's global CSS block and
+    .streamlit/config.toml for the matching page-level dark theme.
+    """
 
-    # Neutrals
-    WHITE = "#FFFFFF"
-    BLACK = "#111827"
-    GRAY_50 = "#F9FAFB"
-    GRAY_100 = "#F3F4F6"
-    GRAY_200 = "#E5E7EB"
-    GRAY_300 = "#D1D5DB"
-    GRAY_400 = "#9CA3AF"
-    GRAY_500 = "#6B7280"
-    GRAY_600 = "#4B5563"
-    GRAY_700 = "#374151"
-    GRAY_800 = "#1F2937"
-    GRAY_900 = "#111827"
+    # Colors - kept fairly saturated/bright since muddy colors that read
+    # fine on white wash out against a near-black background.
+    SUCCESS = "#22C55E"
+    WARNING = "#FBBF24"
+    DANGER = "#EF4444"
+    INFO = "#60A5FA"
+    # Finelo-style primary accent (buttons, highlights, "most popular"-
+    # style emphasis) - matches .streamlit/config.toml's primaryColor.
+    ACCENT = "#8CD867"
+
+    # Neutrals - WHITE is the card background token (not literally white
+    # anymore); the GRAY_* scale still runs "more emphasis" at higher
+    # numbers, just inverted to mean "brighter" instead of "darker".
+    WHITE = "#161616"
+    BLACK = "#F5F5F5"
+    GRAY_50 = "#1E1E1E"
+    GRAY_100 = "#2A2A2A"
+    GRAY_200 = "#3A3A3A"
+    GRAY_300 = "#4A4A4A"
+    GRAY_400 = "#6E6E6E"
+    GRAY_500 = "#8A8A8A"
+    GRAY_600 = "#B0B0B0"
+    GRAY_700 = "#D0D0D0"
+    GRAY_800 = "#EDEDED"
+    GRAY_900 = "#F5F5F5"
 
     # Spacing
     SPACE_2 = 2
@@ -64,10 +80,12 @@ class Theme:
     RADIUS_XL = "16px"
     RADIUS_FULL = "9999px"
 
-    # Shadows
-    SHADOW_SM = "0 1px 2px rgba(0,0,0,0.05)"
-    SHADOW_MD = "0 2px 8px rgba(0,0,0,0.06)"
-    SHADOW_LG = "0 4px 16px rgba(0,0,0,0.08)"
+    # Shadows - a dark shadow is invisible against a near-black page
+    # background, so elevation here comes from a subtle light border-
+    # glow instead (the standard dark-UI substitute for a drop shadow).
+    SHADOW_SM = "0 0 0 1px rgba(255,255,255,0.06)"
+    SHADOW_MD = "0 0 0 1px rgba(255,255,255,0.08), 0 2px 12px rgba(0,0,0,0.4)"
+    SHADOW_LG = "0 0 0 1px rgba(255,255,255,0.10), 0 4px 20px rgba(0,0,0,0.5)"
 
     # Font sizes
     FONT_XS = "10px"
@@ -169,14 +187,14 @@ def render_risk_indicator(
 
     # Build HTML using simple concatenation - NO NESTED F-STRINGS
     html = (
-        '<div style="background:#FFFFFF; padding:16px 20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-left:6px solid '
+        '<div style="background:#161616; padding:16px 20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-left:6px solid '
         + color
         + '; margin-bottom:8px;">'
     )
     html += '<div style="display:flex; align-items:center; gap:16px;">'
     html += '<span style="font-size:48px; line-height:1;">' + emoji + "</span>"
     html += '<div style="flex:1;">'
-    html += '<div style="font-size:12px; color:#6B7280; font-weight:500;">Current Risk Level</div>'
+    html += '<div style="font-size:12px; color:#8A8A8A; font-weight:500;">Current Risk Level</div>'
     html += (
         '<div style="font-size:28px; font-weight:700; color:'
         + color
@@ -190,7 +208,7 @@ def render_risk_indicator(
 
     if show_progress:
         html += '<div style="margin-top:12px;">'
-        html += '<div style="width:100%; background:#F3F4F6; border-radius:9999px; height:8px; overflow:hidden;">'
+        html += '<div style="width:100%; background:#2A2A2A; border-radius:9999px; height:8px; overflow:hidden;">'
         html += (
             '<div style="width:'
             + f"{score:.0f}"
@@ -276,7 +294,7 @@ def render_visual_metric_card(
         display_value = str(value)
 
     # Build HTML using simple concatenation - NO NESTED F-STRINGS
-    html = '<div style="background:#FFFFFF; padding:16px 20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border:1px solid #E5E7EB; margin-bottom:10px;">'
+    html = '<div style="background:#161616; padding:16px 20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border:1px solid #3A3A3A; margin-bottom:10px;">'
 
     # Header with emoji, label, and value
     html += (
@@ -287,7 +305,7 @@ def render_visual_metric_card(
     )
     html += '<div style="flex:1;">'
     html += (
-        '<div style="font-size:14px; font-weight:600; color:#1F2937;">'
+        '<div style="font-size:14px; font-weight:600; color:#EDEDED;">'
         + safe_text(label)
         + "</div>"
     )
@@ -303,7 +321,7 @@ def render_visual_metric_card(
     # Progress bar
     if show_bar:
         html += '<div style="margin-top:4px;">'
-        html += '<div style="width:100%; background:#F3F4F6; border-radius:9999px; height:6px; overflow:hidden;">'
+        html += '<div style="width:100%; background:#2A2A2A; border-radius:9999px; height:6px; overflow:hidden;">'
         html += (
             '<div style="width:'
             + f"{pct:.1f}"
@@ -316,7 +334,7 @@ def render_visual_metric_card(
     # Subtitle
     if subtitle:
         html += (
-            '<div style="font-size:10px; color:#9CA3AF; margin-top:4px;">'
+            '<div style="font-size:10px; color:#8A8A8A; margin-top:4px;">'
             + safe_text(subtitle)
             + "</div>"
         )
@@ -355,16 +373,16 @@ def render_economic_impact(
 
     # Build HTML using string concatenation (NO indentation inside the string)
     html = "<div style='margin-bottom:16px; font-family: -apple-system, BlinkMacSystemFont, sans-serif;'>"
-    html += "<h3 style='font-size:18px; font-weight:600; color:#1F2937; margin-bottom:12px;'>💰 Estimated Economic Impact</h3>"
+    html += "<h3 style='font-size:18px; font-weight:600; color:#EDEDED; margin-bottom:12px;'>💰 Estimated Economic Impact</h3>"
     html += "<div style='display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;'>"
 
     # Residential
     html += (
-        "<div style='background:#FFFFFF; padding:12px 16px; border-radius:10px; border-left:4px solid "
+        "<div style='background:#161616; padding:12px 16px; border-radius:10px; border-left:4px solid "
         + colors["Residential"]
         + "; box-shadow:0 1px 2px rgba(0,0,0,0.05);'>"
     )
-    html += "<div style='font-size:12px; color:#6B7280;'>🏠 Residential</div>"
+    html += "<div style='font-size:12px; color:#8A8A8A;'>🏠 Residential</div>"
     html += (
         "<div style='font-size:18px; font-weight:700; color:"
         + colors["Residential"]
@@ -372,7 +390,7 @@ def render_economic_impact(
         + res_display
         + "</div>"
     )
-    html += "<div style='width:100%; background:#F3F4F6; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
+    html += "<div style='width:100%; background:#2A2A2A; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
     html += (
         "<div style='width:"
         + f"{res_pct:.0f}"
@@ -384,11 +402,11 @@ def render_economic_impact(
 
     # Infrastructure
     html += (
-        "<div style='background:#FFFFFF; padding:12px 16px; border-radius:10px; border-left:4px solid "
+        "<div style='background:#161616; padding:12px 16px; border-radius:10px; border-left:4px solid "
         + colors["Infrastructure"]
         + "; box-shadow:0 1px 2px rgba(0,0,0,0.05);'>"
     )
-    html += "<div style='font-size:12px; color:#6B7280;'>🏗️ Infrastructure</div>"
+    html += "<div style='font-size:12px; color:#8A8A8A;'>🏗️ Infrastructure</div>"
     html += (
         "<div style='font-size:18px; font-weight:700; color:"
         + colors["Infrastructure"]
@@ -396,7 +414,7 @@ def render_economic_impact(
         + inf_display
         + "</div>"
     )
-    html += "<div style='width:100%; background:#F3F4F6; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
+    html += "<div style='width:100%; background:#2A2A2A; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
     html += (
         "<div style='width:"
         + f"{inf_pct:.0f}"
@@ -408,11 +426,11 @@ def render_economic_impact(
 
     # Agriculture
     html += (
-        "<div style='background:#FFFFFF; padding:12px 16px; border-radius:10px; border-left:4px solid "
+        "<div style='background:#161616; padding:12px 16px; border-radius:10px; border-left:4px solid "
         + colors["Agriculture"]
         + "; box-shadow:0 1px 2px rgba(0,0,0,0.05);'>"
     )
-    html += "<div style='font-size:12px; color:#6B7280;'>🌾 Agriculture</div>"
+    html += "<div style='font-size:12px; color:#8A8A8A;'>🌾 Agriculture</div>"
     html += (
         "<div style='font-size:18px; font-weight:700; color:"
         + colors["Agriculture"]
@@ -420,7 +438,7 @@ def render_economic_impact(
         + ag_display
         + "</div>"
     )
-    html += "<div style='width:100%; background:#F3F4F6; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
+    html += "<div style='width:100%; background:#2A2A2A; border-radius:9999px; height:4px; margin-top:6px; overflow:hidden;'>"
     html += (
         "<div style='width:"
         + f"{ag_pct:.0f}"
@@ -433,8 +451,8 @@ def render_economic_impact(
     html += "</div>"  # Close grid
 
     # Total Impact - with WHITE text
-    html += "<div style='margin-top:12px; background:linear-gradient(135deg, #1a1a2e, #16213e); padding:20px 24px; border-radius:10px; text-align:center; border:1px solid #4B5563; box-shadow:0 4px 12px rgba(0,0,0,0.2);'>"
-    html += "<div style='font-size:13px; color:#9CA3AF; font-weight:500; letter-spacing:0.5px;'>Total Estimated Impact</div>"
+    html += "<div style='margin-top:12px; background:linear-gradient(135deg, #12261a, #0d1f14); padding:20px 24px; border-radius:10px; text-align:center; border:1px solid #2f5f3f; box-shadow:0 4px 12px rgba(0,0,0,0.4);'>"
+    html += "<div style='font-size:13px; color:#9CBBA5; font-weight:500; letter-spacing:0.5px;'>Total Estimated Impact</div>"
     # CRITICAL: White text on dark background
     html += "<div style='font-size:38px; font-weight:700; color:#FFFFFF; text-shadow:0 2px 8px rgba(0,0,0,0.5); padding:4px 0;'>"
     html += total_display
@@ -707,7 +725,7 @@ def render_risk_timeline_visual(
 
         # Hour label
         row += (
-            '<div style="min-width:40px; font-weight:bold; color:#111827; font-size:12px;">'
+            '<div style="min-width:40px; font-weight:bold; color:#F5F5F5; font-size:12px;">'
             + safe_text(hour)
             + "</div>"
         )
@@ -720,7 +738,7 @@ def render_risk_timeline_visual(
         row += '<span style="font-size:16px;">' + emoji + "</span>"
 
         # Progress bar
-        row += '<div style="flex:1; width:100%; background:#F3F4F6; border-radius:9999px; height:10px; overflow:hidden;">'
+        row += '<div style="flex:1; width:100%; background:#2A2A2A; border-radius:9999px; height:10px; overflow:hidden;">'
         row += (
             '<div style="width:'
             + f"{score:.0f}"

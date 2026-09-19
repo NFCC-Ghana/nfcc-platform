@@ -72,7 +72,11 @@ def render_situation_map(state):
         m = folium.Map(
             location=[center_lat, center_lon],
             zoom_start=12,
-            tiles="OpenStreetMap",
+            # Dark basemap (free, no API key) to match the dashboard's
+            # Finelo-inspired dark theme - the default light OpenStreetMap
+            # tile would otherwise be a bright rectangle on an otherwise
+            # near-black page.
+            tiles="CartoDB dark_matter",
             control_scale=True,
         )
 

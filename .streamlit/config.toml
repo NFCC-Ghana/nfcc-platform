@@ -1,9 +1,12 @@
 [theme]
+# Finelo-inspired dark theme: near-black page, bright lime-green accent.
+# Kept in sync with hackathon/app/pages/dashboard.py's global CSS block
+# and hackathon/app/modules/v4/visual_components.py's Theme class.
 base = "dark"
-primaryColor = "#00b4d8"
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#262730"
-textColor = "#fafafa"
+primaryColor = "#8CD867"
+backgroundColor = "#0a0a0a"
+secondaryBackgroundColor = "#161616"
+textColor = "#F5F5F5"
 font = "sans serif"
 
 [server]
