@@ -1,0 +1,20 @@
+# Litestream replication config - keeps the platform's two SQLite
+# databases (src/database/alert_db.py, src/community/community_memory.py)
+# durable across Cloud Run's ephemeral container storage. Without this,
+# every deploy or scale-to-zero restart silently wipes risk_history,
+# the prediction ledger, alerts, and verified community reports - real
+# scheduled writes were happening every 3 hours and being thrown away
+# with no error, since Cloud Run gives each container instance its own
+# throwaway local disk and this service runs with no persistent volume.
+#
+# Auth: Litestream auto-detects the Cloud Run service's own service
+# account credentials from the instance metadata server - no key file
+# or env var needed here, the same way this service already reaches
+# Secret Manager and Earth Engine.
+dbs:
+  - path: /app/data/alerts.db
+    replicas:
+      - url: gs://nfcc-earth-engine-2026-sqlite-backup/alerts-db
+  - path: /app/data/community_reports.db
+    replicas:
+      - url: gs://nfcc-earth-engine-2026-sqlite-backup/community-reports-db

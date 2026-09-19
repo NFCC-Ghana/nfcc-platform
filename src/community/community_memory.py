@@ -23,9 +23,18 @@ class CommunityMemoryEngine:
         self._init_db()
         logger.info("Community Memory Engine initialized")
 
+    def _connect(self) -> sqlite3.Connection:
+        """WAL mode is required for Litestream (litestream.yml) to
+        replicate this database to GCS - see the matching pragma helper
+        in src/database/alert_db.py for the full rationale."""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        return conn
+
     def _init_db(self):
         """Initialize database schema."""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect()
         cursor = conn.cursor()
 
         # Main reports table
@@ -66,7 +75,7 @@ class CommunityMemoryEngine:
 
     def submit_report(self, report_data: Dict) -> Dict:
         """Submit a community report."""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect()
         cursor = conn.cursor()
 
         report_id = f"RPT_{datetime.now().strftime('%Y%m%d%H%M%S')}_{report_data.get('community', 'UNK')[:5]}"
@@ -110,7 +119,7 @@ class CommunityMemoryEngine:
         limit: int = 50,
     ) -> List[Dict]:
         """Get community reports."""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
@@ -139,7 +148,7 @@ class CommunityMemoryEngine:
 
     def validate_report(self, report_id: str, confidence: float) -> Dict:
         """Validate a community report."""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect()
         cursor = conn.cursor()
 
         cursor.execute(
@@ -158,7 +167,7 @@ class CommunityMemoryEngine:
 
     def get_report_stats(self, district: Optional[str] = None) -> Dict:
         """Get report statistics."""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect()
         cursor = conn.cursor()
 
         query = "SELECT COUNT(*) as total FROM reports"
@@ -194,7 +203,7 @@ class CommunityMemoryEngine:
         automatically check whether real citizen reports corroborate a
         past prediction, without a human needing to look each one up
         manually."""
-        conn = sqlite3.connect(str(self.db_path))
+        conn = self._connect()
         cursor = conn.cursor()
         cursor.execute(
             """

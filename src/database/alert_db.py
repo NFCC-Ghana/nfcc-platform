@@ -14,6 +14,18 @@ logger = logging.getLogger(__name__)
 DB_PATH = Path(__file__).parent.parent.parent / "data" / "alerts.db"
 
 
+def _apply_pragmas(conn: sqlite3.Connection) -> None:
+    """WAL mode is required for Litestream (litestream.yml) to replicate
+    this database to GCS - it tails the WAL file for incremental
+    changes and cannot work against the default rollback-journal mode.
+    busy_timeout matters independently of Litestream: this file is
+    shared by 4 uvicorn worker processes (Dockerfile.prod), so without
+    it a write from one worker can hit "database is locked" instead of
+    briefly waiting for another worker's in-flight write."""
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+
+
 @contextmanager
 def get_db():
     """
@@ -24,6 +36,7 @@ def get_db():
     # check_same_thread=False allows connections across threads
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    _apply_pragmas(conn)
     try:
         yield conn
     finally:
@@ -38,6 +51,7 @@ def get_db_connection():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    _apply_pragmas(conn)
     return conn
 
 
