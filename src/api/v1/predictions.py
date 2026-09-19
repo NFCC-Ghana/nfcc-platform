@@ -20,9 +20,10 @@ auto-filled; a NULL outcome (the default) is an honest "not yet known".
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from src.api.auth import verify_api_key
 from src.database.prediction_ledger_db import (
     get_prediction,
     get_predictions,
@@ -80,7 +81,7 @@ class PredictionListResponse(BaseModel):
     predictions: List[PredictionRecord]
 
 
-@router.post("/record", response_model=PredictionRecord)
+@router.post("/record", response_model=PredictionRecord, dependencies=[Depends(verify_api_key)])
 async def record_prediction(request: RecordPredictionRequest) -> PredictionRecord:
     if get_district(request.district) is None:
         raise HTTPException(
@@ -129,7 +130,7 @@ async def get_one_prediction(prediction_id: int) -> PredictionRecord:
     return row
 
 
-@router.post("/{prediction_id}/outcome", response_model=PredictionRecord)
+@router.post("/{prediction_id}/outcome", response_model=PredictionRecord, dependencies=[Depends(verify_api_key)])
 async def record_prediction_outcome(
     prediction_id: int, request: RecordOutcomeRequest
 ) -> PredictionRecord:
@@ -139,7 +140,7 @@ async def record_prediction_outcome(
     return get_prediction(prediction_id)
 
 
-@router.post("/{prediction_id}/auto-verify")
+@router.post("/{prediction_id}/auto-verify", dependencies=[Depends(verify_api_key)])
 async def auto_verify_prediction(prediction_id: int) -> dict:
     """Runs the real automated outcome check (src/verification/
     outcome_verifier.py - ReliefWeb, GDELT, verified citizen reports,

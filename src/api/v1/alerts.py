@@ -22,9 +22,10 @@ unchanged and keep working exactly as before.
 
 from typing import List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from src.api.auth import verify_api_key
 from src.api.routes.alert_review import (
     AssessRequest,
     CancelDecision,
@@ -68,12 +69,12 @@ class PendingAlertListResponse(BaseModel):
     alerts: List[PendingAlertResponse]
 
 
-@router.post("/assess")
+@router.post("/assess", dependencies=[Depends(verify_api_key)])
 async def v1_assess(request: AssessRequest):
     return await assess_district(request)
 
 
-@router.post("/exercise")
+@router.post("/exercise", dependencies=[Depends(verify_api_key)])
 async def v1_exercise(request: ExerciseRequest):
     return await create_exercise_alert(request)
 
@@ -83,17 +84,17 @@ async def v1_list_pending(status: str = "pending"):
     return await list_pending_alerts(status=status)
 
 
-@router.post("/pending/{alert_id}/approve")
+@router.post("/pending/{alert_id}/approve", dependencies=[Depends(verify_api_key)])
 async def v1_approve(alert_id: int, decision: ReviewDecision):
     return await approve_pending_alert(alert_id, decision)
 
 
-@router.post("/pending/{alert_id}/cancel")
+@router.post("/pending/{alert_id}/cancel", dependencies=[Depends(verify_api_key)])
 async def v1_cancel(alert_id: int, decision: CancelDecision):
     return await cancel_pending_alert(alert_id, decision)
 
 
-@router.post("/pending/{alert_id}/dismiss")
+@router.post("/pending/{alert_id}/dismiss", dependencies=[Depends(verify_api_key)])
 async def v1_dismiss(alert_id: int, decision: ReviewDecision):
     return await dismiss_pending_alert(alert_id, decision)
 

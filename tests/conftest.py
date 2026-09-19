@@ -43,11 +43,20 @@ def initialize_database():
 def _new_api_test_client():
     from fastapi.testclient import TestClient
     from src.api.main import app
+    from src.api.auth import api_key_header
+    from src.config.settings import settings
 
     # Ensure database is initialized
     init_db()
 
     with TestClient(app) as client:
+        # Several routes now require X-API-Key (src/api/auth.py -
+        # verify_api_key, wired onto state-mutating routes). Set it once
+        # here rather than in every test that happens to hit one of
+        # them - matches whatever the running app actually expects
+        # (settings.API_KEY), so this is a no-op in the "development"/
+        # unset-API_KEY case verify_api_key() already special-cases.
+        client.headers.update({api_key_header.model.name: settings.API_KEY or ""})
         yield client
 
 

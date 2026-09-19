@@ -37,6 +37,11 @@ def test_client(test_db_path):
 
         # Create test client
         with TestClient(app) as client:
+            # subscriptions routes now require X-API-Key (src/api/auth.py)
+            from src.api.auth import api_key_header
+            from src.config.settings import settings
+
+            client.headers.update({api_key_header.model.name: settings.API_KEY or ""})
             yield client
 
 

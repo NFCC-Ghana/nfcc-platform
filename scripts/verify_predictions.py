@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -47,6 +48,15 @@ logging.basicConfig(
 logger = logging.getLogger("verify-predictions")
 
 DEFAULT_API_URL = "https://nfcc-platform-355353600602.europe-west1.run.app"
+
+# POST /v1/predictions/{id}/auto-verify requires X-API-Key now - see
+# src/api/auth.py. Sourced from the NFCC_API_KEY GitHub Actions secret
+# (.github/workflows/verify_predictions.yml).
+_API_KEY = os.getenv("NFCC_API_KEY", "")
+
+
+def _auth_headers() -> dict:
+    return {"X-API-Key": _API_KEY} if _API_KEY else {}
 
 _MIN_AGE_DAYS = 3
 _MAX_AGE_DAYS = 30
@@ -88,7 +98,9 @@ def run(api_url: str) -> int:
         district = prediction["district"]
         try:
             resp = requests.post(
-                f"{api_url}/v1/predictions/{pred_id}/auto-verify", timeout=60
+                f"{api_url}/v1/predictions/{pred_id}/auto-verify",
+                timeout=60,
+                headers=_auth_headers(),
             )
             resp.raise_for_status()
             result = resp.json()

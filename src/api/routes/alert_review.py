@@ -28,9 +28,10 @@ persistent store (Firestore/Cloud SQL) later.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from src.api.auth import verify_api_key
 from src.alerts.engine import AlertEngine
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.exposure.community_names import get_affected_communities
@@ -185,7 +186,7 @@ class ReviewDecision(BaseModel):
     )
 
 
-@router.post("/assess")
+@router.post("/assess", dependencies=[Depends(verify_api_key)])
 async def assess_district(request: AssessRequest):
     """Run a real risk assessment and, if it's at least MODERATE, queue it
     for human review - never sends anything itself."""
@@ -288,7 +289,7 @@ class ExerciseRequest(BaseModel):
     )
 
 
-@router.post("/exercise")
+@router.post("/exercise", dependencies=[Depends(verify_api_key)])
 async def create_exercise_alert(request: ExerciseRequest):
     """Manually queue a training drill for any district/tier on demand -
     unlike /assess, this doesn't wait for real rainfall to cross the
@@ -358,7 +359,7 @@ async def list_pending_alerts(status: str = "pending"):
     return {"count": len(alerts), "alerts": alerts}
 
 
-@router.post("/pending/{alert_id}/approve")
+@router.post("/pending/{alert_id}/approve", dependencies=[Depends(verify_api_key)])
 async def approve_pending_alert(alert_id: int, decision: ReviewDecision):
     """Human approves a queued assessment - this is the one place a real
     alert actually gets sent as a result of automated assessment."""
@@ -419,7 +420,7 @@ class CancelDecision(BaseModel):
     )
 
 
-@router.post("/pending/{alert_id}/cancel")
+@router.post("/pending/{alert_id}/cancel", dependencies=[Depends(verify_api_key)])
 async def cancel_pending_alert(alert_id: int, decision: CancelDecision):
     """Retract an already-sent alert (CAP msgType=Cancel - the OASIS
     Common Alerting Protocol standard behind FEMA IPAWS/EU/Japan/Canada
@@ -494,7 +495,7 @@ async def cancel_pending_alert(alert_id: int, decision: CancelDecision):
     }
 
 
-@router.post("/pending/{alert_id}/dismiss")
+@router.post("/pending/{alert_id}/dismiss", dependencies=[Depends(verify_api_key)])
 async def dismiss_pending_alert(alert_id: int, decision: ReviewDecision):
     """Human dismisses a queued assessment - nothing gets sent."""
     pending = get_pending_alert(alert_id)

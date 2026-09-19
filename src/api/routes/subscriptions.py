@@ -4,9 +4,10 @@ import logging
 import sqlite3
 from typing import List, Optional, Dict, Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field, validator
 
+from src.api.auth import verify_api_key
 from src.database.alert_db import (
     subscribe,
     unsubscribe,
@@ -86,7 +87,12 @@ class UnsubscribeResponse(BaseModel):
     unsubscribed: bool
 
 
-@router.post("/", response_model=SubscriptionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=SubscriptionResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verify_api_key)],
+)
 async def create_subscription(payload: SubscriptionRequest) -> SubscriptionResponse:
     """Create a new alert subscription."""
     try:
@@ -115,7 +121,11 @@ async def create_subscription(payload: SubscriptionRequest) -> SubscriptionRespo
         )
 
 
-@router.delete("/{email}", response_model=UnsubscribeResponse)
+@router.delete(
+    "/{email}",
+    response_model=UnsubscribeResponse,
+    dependencies=[Depends(verify_api_key)],
+)
 async def unsubscribe_endpoint(email: EmailStr) -> UnsubscribeResponse:
     """Unsubscribe the target email address."""
     try:
@@ -136,8 +146,17 @@ async def unsubscribe_endpoint(email: EmailStr) -> UnsubscribeResponse:
         )
 
 
-@router.get("/", response_model=List[SubscriptionResponse])
+@router.get(
+    "/",
+    response_model=List[SubscriptionResponse],
+    dependencies=[Depends(verify_api_key)],
+)
 async def list_subscriptions(active_only: bool = True) -> List[SubscriptionResponse]:
-    """List current subscriptions."""
+    """List current subscriptions.
+
+    Protected despite being a GET: unlike this platform's other reads,
+    this one returns every subscriber's raw email, phone number, and
+    unsubscribe_token (a secret capability token, not just data) - real
+    PII plus a real actionable secret, not just risk-assessment output."""
     subscriptions = get_all_subscriptions(active_only=active_only)
     return [SubscriptionResponse(**sub) for sub in subscriptions]

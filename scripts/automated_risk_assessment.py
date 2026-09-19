@@ -79,6 +79,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from typing import Optional
 
@@ -90,6 +91,18 @@ logging.basicConfig(
 logger = logging.getLogger("automated-risk-assessment")
 
 DEFAULT_API_URL = "https://nfcc-platform-355353600602.europe-west1.run.app"
+
+# The write endpoints this script POSTs to (assess/observations/
+# decision-card/predictions/risk-history) require X-API-Key now - see
+# src/api/auth.py. Sourced from the NFCC_API_KEY GitHub Actions secret
+# (.github/workflows/automated_risk_assessment.yml), the same value as
+# the nfcc-api-key Cloud Run secret this script has always talked to.
+_API_KEY = os.getenv("NFCC_API_KEY", "")
+
+
+def _auth_headers() -> dict:
+    return {"X-API-Key": _API_KEY} if _API_KEY else {}
+
 
 # Matches hackathon/app/pages/dashboard.py's get_district_data and
 # src/hydrology/weather_forecast.py's district_coords - the 9 districts
@@ -236,6 +249,7 @@ def _assess(
             f"{api_url}/alerts/assess",
             json=payload,
             timeout=20,
+            headers=_auth_headers(),
         )
         resp.raise_for_status()
         return resp.json()
@@ -257,6 +271,7 @@ def _record_observation(
             f"{api_url}/v1/districts/{district}/observations",
             json={"source": source, "value": value, "unit": unit, "quality_flag": quality_flag},
             timeout=20,
+            headers=_auth_headers(),
         ).raise_for_status()
     except Exception as e:
         logger.warning(f"observation-history POST failed for {district}/{source}: {e}")
@@ -272,6 +287,7 @@ def _record_prediction(api_url: str, district: str, precipitation: float) -> Non
             f"{api_url}/decision/card",
             json={"location": district, "precipitation": precipitation},
             timeout=30,
+            headers=_auth_headers(),
         )
         card_resp.raise_for_status()
         card = card_resp.json()
@@ -289,6 +305,7 @@ def _record_prediction(api_url: str, district: str, precipitation: float) -> Non
                 "risk_attribution": card.get("risk_attribution"),
             },
             timeout=20,
+            headers=_auth_headers(),
         ).raise_for_status()
     except Exception as e:
         logger.warning(f"prediction-ledger record failed for {district}: {e}")
@@ -404,6 +421,7 @@ def run(api_url: str) -> int:
                     f"{api_url}/v1/districts/{district}/risk/history",
                     json={"precipitation_mm": forecast_precip, "source": "scheduled"},
                     timeout=20,
+                    headers=_auth_headers(),
                 ).raise_for_status()
             except Exception as e:
                 logger.warning(f"risk_history POST failed for {district}: {e}")

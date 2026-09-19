@@ -16,9 +16,10 @@ import logging
 from typing import Optional
 
 import requests
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from src.api.auth import verify_api_key
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.community.community_memory import community_memory
 from src.exposure.impact_estimator import impact_estimator
@@ -153,7 +154,7 @@ def _estimate_economic_loss(
     }
 
 
-@router.post("/situation")
+@router.post("/situation", dependencies=[Depends(verify_api_key)])
 async def get_situation(request: SituationRequest):
     """Full situation assessment for a district: risk score, hydrology
     evidence (rainfall/river/soil/dam), population and infrastructure

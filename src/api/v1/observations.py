@@ -17,9 +17,10 @@ every real run after that.
 
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from src.api.auth import verify_api_key
 from src.database.observation_history_db import get_observations, save_observation
 from src.exposure.districts import get_district
 
@@ -78,7 +79,11 @@ async def get_district_observations(
     return ObservationListResponse(district=district, count=len(rows), observations=rows)
 
 
-@router.post("/{district}/observations", response_model=ObservationPoint)
+@router.post(
+    "/{district}/observations",
+    response_model=ObservationPoint,
+    dependencies=[Depends(verify_api_key)],
+)
 async def record_district_observation(
     district: str, request: RecordObservationRequest
 ) -> ObservationPoint:

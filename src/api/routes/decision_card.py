@@ -30,9 +30,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from src.api.auth import verify_api_key
 from src.alerts.formatter import get_risk_tier
 from src.api.routes.situation import SituationRequest, get_situation
 from src.exposure.community_names import get_affected_communities
@@ -474,7 +475,7 @@ def basis_from_fusion(result: OverallFusionResult) -> List[str]:
     return basis or ["No real evidence sources available"]
 
 
-@router.post("/card", response_model=DecisionCard)
+@router.post("/card", response_model=DecisionCard, dependencies=[Depends(verify_api_key)])
 async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
     """Grounded decision output for one district - see module docstring."""
     situation = await get_situation(

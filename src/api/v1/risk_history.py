@@ -20,9 +20,10 @@ at least once after this endpoint was deployed.
 
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from src.api.auth import verify_api_key
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.database.risk_history_db import get_risk_history, save_risk_snapshot
 from src.exposure.districts import get_district
@@ -74,7 +75,11 @@ async def get_district_risk_history(
     return RiskHistoryResponse(district=district, count=len(history), history=history)
 
 
-@router.post("/{district}/risk/history", response_model=RiskHistoryPoint)
+@router.post(
+    "/{district}/risk/history",
+    response_model=RiskHistoryPoint,
+    dependencies=[Depends(verify_api_key)],
+)
 async def record_district_risk_snapshot(
     district: str, request: RecordRiskSnapshotRequest
 ) -> RiskHistoryPoint:

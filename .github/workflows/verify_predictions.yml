@@ -26,4 +26,6 @@ jobs:
         run: pip install requests
 
       - name: Run automated outcome verification
+        env:
+          NFCC_API_KEY: ${{ secrets.NFCC_API_KEY }}
         run: python scripts/verify_predictions.py

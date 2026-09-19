@@ -8,9 +8,10 @@ the answer - never a black-box response.
 
 from typing import List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from src.api.auth import verify_api_key
 from src.copilot.engine import ask_copilot
 
 router = APIRouter(prefix="/copilot", tags=["v1"])
@@ -32,7 +33,7 @@ class CopilotAskResponse(BaseModel):
     model: str
 
 
-@router.post("/ask", response_model=CopilotAskResponse)
+@router.post("/ask", response_model=CopilotAskResponse, dependencies=[Depends(verify_api_key)])
 async def copilot_ask(request: CopilotAskRequest) -> CopilotAskResponse:
     result = await ask_copilot(request.question, district=request.district)
     return CopilotAskResponse(**result.to_dict())
