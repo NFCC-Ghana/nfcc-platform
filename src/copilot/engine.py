@@ -6,13 +6,19 @@ Anthropic's own free "Evaluation access" tier has $0 credits and no
 usable free quota, while Gemini's free tier is a genuinely ongoing,
 no-card-required allowance (confirmed against the currently installed
 google-genai==2.24.0 SDK's own source, not guessed) - the only realistic
-option for a solo, low-budget maintainer. Model is Gemini 2.5 Flash
-specifically, not a newer Gemini release, because its free-tier quota
-(1,500 requests/day at the time this was written) is far more usable for
-an operational tool than the newest Flash models' free tier (~20
-requests/day). If billing ever allows it, swapping back to Claude only
-requires rewriting this file - src/copilot/tools.py's plain async
-functions are provider-agnostic and were already used unmodified.
+option for a solo, low-budget maintainer.
+
+Model is "gemini-flash-lite-latest", a Google-maintained alias, not a
+pinned dated model name: gemini-2.5-flash and gemini-2.5-flash-lite were
+both tried first and both returned a live 404 ("no longer available to
+new users") against this project's real key - Google had already
+deprecated them for newly created API keys/projects by the time this was
+written, despite still listing them in models.list. An alias that
+Google itself keeps pointed at a current model avoids repeating that
+exact failure the next time a dated model name is retired. If billing
+ever allows it, swapping back to Claude only requires rewriting this
+file - src/copilot/tools.py's plain async functions are provider-
+agnostic and were already used unmodified.
 
 Grounding architecture (why this is enforced structurally, not just by
 prompting - "only answer from retrieved data" in a system prompt is not
@@ -66,7 +72,7 @@ from src.copilot.tools import (
 
 logger = logging.getLogger("nfcc.copilot.engine")
 
-_MODEL = "gemini-2.5-flash"
+_MODEL = "gemini-flash-lite-latest"
 _MAX_TOOL_CALLS = 8
 
 _TOOLS = [
