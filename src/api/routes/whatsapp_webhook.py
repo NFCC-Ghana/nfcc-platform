@@ -18,13 +18,28 @@ signature verification only - no new secret needed.
 
 Message format is deliberately forgiving, not a rigid schema: citizens
 were never told an exact format, so free text is parsed best-effort for a
-known district/community name, a report type, and an optional depth
-("Alajo - water rising on the main road, knee-deep, about 40cm"). A
-message with no recognizable place name is still saved (never silently
-dropped) under a district of "Unclassified - needs triage" so a human can
-reclassify it via PATCH src/api/v1/community_reports.py - deliberately NOT
-guessed or fuzzy-matched to a nearby district, since misfiling a real
-report to the wrong district is worse than leaving it for a human to fix.
+known district/community name, a report type, an optional depth
+("Alajo - water rising on the main road, knee-deep, about 40cm"), and an
+urgency level. A message with no recognizable place name is still saved
+(never silently dropped) under a district of "Unclassified - needs
+triage" so a human can reclassify it via GET/POST
+src/api/v1/community_reports.py - deliberately NOT guessed or fuzzy-
+matched to a nearby district, since misfiling a real report to the wrong
+district is worse than leaving it for a human to fix. Latitude/longitude
+are captured directly from Twilio's own fields when a citizen shares
+their live WhatsApp location, which is a far more reliable signal than
+text matching when present.
+
+This replaces an earlier prototype (src/chatbot/whatsapp_bot.py +
+scripts/civisenti_handler.py + .github/workflows/civisenti.yml, removed)
+that was never actually wired to a live endpoint - only ever invoked
+manually or by a daily cron summarizing an always-empty JSONL file with
+no real intake path of its own. Its two genuinely useful ideas - GPS
+capture and urgency-keyword detection ("trapped"/"rescue" language) -
+are folded in here; its separate, non-Litestream-replicated JSONL
+storage was not, since community_memory.py's SQLite table is the one
+every other real consumer (situation.py's report stats, the outcome
+verifier) already reads.
 """
 
 import logging
@@ -61,6 +76,17 @@ _TYPE_KEYWORDS = [
     (("yesterday", "last night", "this morning", "earlier"), "Recent Flood"),
 ]
 
+# Urgency keywords - folded in from an earlier, never-wired-live
+# prototype (src/chatbot/whatsapp_bot.py, removed in favor of this real
+# integration) whose one genuinely good idea was flagging "trapped" /
+# "rescue" language as a distinct, more urgent signal than ordinary
+# flooding language - worth a human reviewer seeing immediately.
+_URGENCY_KEYWORDS = [
+    (("trapped", "rescue", "emergency", "life", "dying", "help us"), "CRITICAL"),
+    (("waist", "danger", "severe", "cannot leave", "stranded"), "HIGH"),
+    (("ankle", "minor", "small", "low"), "LOW"),
+]
+
 _DEPTH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(cm|centimet\w*|m\b|met(?:er|re)s?)", re.IGNORECASE)
 
 
@@ -86,6 +112,23 @@ def _extract_report_type(text: str) -> str:
         if any(k in lowered for k in keywords):
             return label
     return "Active Flooding"
+
+
+def _extract_urgency(text: str) -> str:
+    lowered = text.lower()
+    for keywords, label in _URGENCY_KEYWORDS:
+        if any(k in lowered for k in keywords):
+            return label
+    return "MODERATE"
+
+
+def _to_float(value) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _extract_depth_m(text: str) -> Optional[float]:
@@ -132,6 +175,11 @@ async def whatsapp_inbound(request: Request) -> Response:
     profile_name = form_dict.get("ProfileName") or None
     num_media = int(form_dict.get("NumMedia", 0) or 0)
     photo_url = form_dict.get("MediaUrl0") if num_media > 0 else None
+    # Twilio's real field names when a WhatsApp user shares their live
+    # location (not just typed text) - a far more reliable signal than
+    # text district-matching when present.
+    latitude = _to_float(form_dict.get("Latitude"))
+    longitude = _to_float(form_dict.get("Longitude"))
 
     if not body:
         return _twiml(
@@ -148,6 +196,7 @@ async def whatsapp_inbound(request: Request) -> Response:
         )
 
     district, community = _extract_location(body)
+    urgency = _extract_urgency(body)
 
     report_data = {
         "district": district or "Unclassified - needs triage",
@@ -158,6 +207,9 @@ async def whatsapp_inbound(request: Request) -> Response:
         "photo_url": photo_url,
         "reporter_name": profile_name,
         "reporter_phone": from_number,
+        "latitude": latitude,
+        "longitude": longitude,
+        "urgency": urgency,
     }
 
     try:
@@ -166,9 +218,11 @@ async def whatsapp_inbound(request: Request) -> Response:
         logger.exception("Failed to save WhatsApp community report")
         return _twiml("Sorry, we couldn't save your report right now. Please try again shortly.")
 
-    logger.info(
-        "WhatsApp report saved: id=%s district=%s community=%s from=%s",
-        result.get("report_id"), report_data["district"], report_data["community"], from_number,
+    log_level = logger.warning if urgency == "CRITICAL" else logger.info
+    log_level(
+        "WhatsApp report saved: id=%s district=%s community=%s urgency=%s gps=%s from=%s",
+        result.get("report_id"), report_data["district"], report_data["community"],
+        urgency, bool(latitude and longitude), from_number,
     )
 
     if district:
@@ -182,6 +236,12 @@ async def whatsapp_inbound(request: Request) -> Response:
             "Report received and flagged for review - we couldn't "
             "automatically detect your district. A team member may "
             f"follow up. Ref: {result.get('report_id')}"
+        )
+
+    if urgency == "CRITICAL":
+        confirmation = (
+            "This sounds urgent - if anyone is in immediate danger, please "
+            "also call your local emergency services now. " + confirmation
         )
 
     return _twiml(confirmation)

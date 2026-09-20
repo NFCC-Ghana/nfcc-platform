@@ -35,6 +35,9 @@ class CommunityReport(BaseModel):
     reporter_phone: Optional[str] = None
     reporter_email: Optional[str] = None
     report_time: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    urgency: str = "MODERATE"
     validated: bool
     validation_confidence: float
     trusted_score: float

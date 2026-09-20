@@ -107,6 +107,35 @@ def test_help_keyword_returns_instructions(api_client):
     assert "NFCC Flood Reporting" in resp.text
 
 
+def test_gps_location_share_is_captured(api_client):
+    resp = _post_whatsapp(
+        api_client,
+        "Flooding near me",
+        Latitude="5.5663",
+        Longitude="-0.2374",
+    )
+    assert resp.status_code == 200
+    reports = api_client.get("/v1/community-reports?limit=1").json()["reports"]
+    assert reports[0]["latitude"] == pytest.approx(5.5663)
+    assert reports[0]["longitude"] == pytest.approx(-0.2374)
+
+
+def test_critical_urgency_keywords_escalate_reply(api_client):
+    resp = _post_whatsapp(api_client, "Help, we are trapped on the roof, water still rising in Circle")
+    assert resp.status_code == 200
+    assert "immediate danger" in resp.text
+
+    reports = api_client.get("/v1/community-reports?limit=1").json()["reports"]
+    assert reports[0]["urgency"] == "CRITICAL"
+
+
+def test_ordinary_report_defaults_to_moderate_urgency(api_client):
+    resp = _post_whatsapp(api_client, "Kaneshie flooding, cars can't pass")
+    assert resp.status_code == 200
+    reports = api_client.get("/v1/community-reports?limit=1").json()["reports"]
+    assert reports[0]["urgency"] == "MODERATE"
+
+
 def test_photo_attachment_is_stored(api_client):
     resp = _post_whatsapp(
         api_client,

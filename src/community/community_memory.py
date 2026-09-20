@@ -60,6 +60,27 @@ class CommunityMemoryEngine:
             )
         """)
 
+        # Migration for tables created before GPS/urgency existed - a
+        # WhatsApp location share (real Twilio Latitude/Longitude webhook
+        # fields) is a far more reliable signal than text district
+        # matching, and "trapped"/"rescue"/"emergency" language in a
+        # report is a genuine life-safety signal worth a human seeing
+        # immediately rather than buried in free-text description.
+        # SQLite has no "ADD COLUMN IF NOT EXISTS" - catching the
+        # duplicate-column error is the standard idempotent pattern (see
+        # src/database/alert_db.py's matching migration for pending_alerts).
+        for column, coltype in (("latitude", "REAL"), ("longitude", "REAL")):
+            try:
+                cursor.execute(f"ALTER TABLE reports ADD COLUMN {column} {coltype}")
+            except Exception:
+                pass  # column already exists
+        try:
+            cursor.execute(
+                "ALTER TABLE reports ADD COLUMN urgency TEXT NOT NULL DEFAULT 'MODERATE'"
+            )
+        except Exception:
+            pass
+
         # Add indexes
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_reports_district ON reports(district)"
@@ -100,8 +121,8 @@ class CommunityMemoryEngine:
                 INSERT INTO reports (
                     report_id, district, community, report_type, description,
                     flood_depth_m, photo_url, reporter_name, reporter_phone,
-                    reporter_email, report_time
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reporter_email, report_time, latitude, longitude, urgency
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     report_id,
@@ -115,6 +136,9 @@ class CommunityMemoryEngine:
                     report_data.get("reporter_phone"),
                     report_data.get("reporter_email"),
                     datetime.now().isoformat(),
+                    report_data.get("latitude"),
+                    report_data.get("longitude"),
+                    report_data.get("urgency", "MODERATE"),
                 ),
             )
 
