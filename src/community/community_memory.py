@@ -3,6 +3,7 @@
 import json
 import logging
 import sqlite3
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -74,43 +75,61 @@ class CommunityMemoryEngine:
         conn.close()
 
     def submit_report(self, report_data: Dict) -> Dict:
-        """Submit a community report."""
+        """Submit a community report.
+
+        report_id includes a uuid4 suffix, not just a second-precision
+        timestamp: two reports landing in the same second (real under
+        WhatsApp inbound traffic, e.g. two "Unspecified"-community
+        unclassified reports within a second of each other) used to
+        collide on the UNIQUE constraint below - caught when the new
+        WhatsApp webhook (src/api/routes/whatsapp_webhook.py) hit exactly
+        this in testing.
+        """
         conn = self._connect()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        report_id = f"RPT_{datetime.now().strftime('%Y%m%d%H%M%S')}_{report_data.get('community', 'UNK')[:5]}"
+            community_slug = (report_data.get("community") or "UNK")[:5]
+            report_id = (
+                f"RPT_{datetime.now().strftime('%Y%m%d%H%M%S')}_"
+                f"{community_slug}_{uuid.uuid4().hex[:6]}"
+            )
 
-        cursor.execute(
-            """
-            INSERT INTO reports (
-                report_id, district, community, report_type, description,
-                flood_depth_m, photo_url, reporter_name, reporter_phone, 
-                reporter_email, report_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                report_id,
-                report_data.get("district"),
-                report_data.get("community"),
-                report_data.get("report_type", "flood"),
-                report_data.get("description"),
-                report_data.get("flood_depth_m", 0),
-                report_data.get("photo_url"),
-                report_data.get("reporter_name"),
-                report_data.get("reporter_phone"),
-                report_data.get("reporter_email"),
-                datetime.now().isoformat(),
-            ),
-        )
+            cursor.execute(
+                """
+                INSERT INTO reports (
+                    report_id, district, community, report_type, description,
+                    flood_depth_m, photo_url, reporter_name, reporter_phone,
+                    reporter_email, report_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    report_id,
+                    report_data.get("district"),
+                    report_data.get("community"),
+                    report_data.get("report_type", "flood"),
+                    report_data.get("description"),
+                    report_data.get("flood_depth_m", 0),
+                    report_data.get("photo_url"),
+                    report_data.get("reporter_name"),
+                    report_data.get("reporter_phone"),
+                    report_data.get("reporter_email"),
+                    datetime.now().isoformat(),
+                ),
+            )
 
-        conn.commit()
-        conn.close()
+            conn.commit()
 
-        return {
-            "status": "submitted",
-            "report_id": report_id,
-            "timestamp": datetime.now().isoformat(),
-        }
+            return {
+                "status": "submitted",
+                "report_id": report_id,
+                "timestamp": datetime.now().isoformat(),
+            }
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def get_reports(
         self,
@@ -120,80 +139,88 @@ class CommunityMemoryEngine:
     ) -> List[Dict]:
         """Get community reports."""
         conn = self._connect()
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        query = "SELECT * FROM reports"
-        params = []
-        conditions = []
+            query = "SELECT * FROM reports"
+            params = []
+            conditions = []
 
-        if district:
-            conditions.append("district = ?")
-            params.append(district)
+            if district:
+                conditions.append("district = ?")
+                params.append(district)
 
-        if validated_only:
-            conditions.append("validated = 1")
+            if validated_only:
+                conditions.append("validated = 1")
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
 
-        query += " ORDER BY report_time DESC LIMIT ?"
-        params.append(limit)
+            query += " ORDER BY report_time DESC LIMIT ?"
+            params.append(limit)
 
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
 
-        return [dict(row) for row in rows]
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
 
     def validate_report(self, report_id: str, confidence: float) -> Dict:
         """Validate a community report."""
         conn = self._connect()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        cursor.execute(
-            """
-            UPDATE reports 
-            SET validated = 1, validation_confidence = ?
-            WHERE report_id = ?
-        """,
-            (confidence, report_id),
-        )
+            cursor.execute(
+                """
+                UPDATE reports
+                SET validated = 1, validation_confidence = ?
+                WHERE report_id = ?
+            """,
+                (confidence, report_id),
+            )
 
-        conn.commit()
-        conn.close()
+            conn.commit()
 
-        return {"status": "validated", "report_id": report_id, "confidence": confidence}
+            return {"status": "validated", "report_id": report_id, "confidence": confidence}
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def get_report_stats(self, district: Optional[str] = None) -> Dict:
         """Get report statistics."""
         conn = self._connect()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        query = "SELECT COUNT(*) as total FROM reports"
-        params = []
-        if district:
-            query += " WHERE district = ?"
-            params.append(district)
+            query = "SELECT COUNT(*) as total FROM reports"
+            params = []
+            if district:
+                query += " WHERE district = ?"
+                params.append(district)
 
-        cursor.execute(query, params)
-        total = cursor.fetchone()[0]
+            cursor.execute(query, params)
+            total = cursor.fetchone()[0]
 
-        query = "SELECT COUNT(*) as validated FROM reports WHERE validated = 1"
-        if district:
-            query += " AND district = ?"
-            cursor.execute(query, (district,))
-        else:
-            cursor.execute(query)
-        validated = cursor.fetchone()[0]
+            query = "SELECT COUNT(*) as validated FROM reports WHERE validated = 1"
+            if district:
+                query += " AND district = ?"
+                cursor.execute(query, (district,))
+            else:
+                cursor.execute(query)
+            validated = cursor.fetchone()[0]
 
-        conn.close()
-
-        return {
-            "total_reports": total,
-            "validated_reports": validated,
-            "validation_rate": validated / total if total > 0 else 0,
-        }
+            return {
+                "total_reports": total,
+                "validated_reports": validated,
+                "validation_rate": validated / total if total > 0 else 0,
+            }
+        finally:
+            conn.close()
 
     def get_validated_report_count_in_window(
         self, district: str, start_iso: str, end_iso: str
@@ -204,18 +231,19 @@ class CommunityMemoryEngine:
         past prediction, without a human needing to look each one up
         manually."""
         conn = self._connect()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT COUNT(*) FROM reports
-            WHERE district = ? AND validated = 1
-            AND report_time >= ? AND report_time <= ?
-            """,
-            (district, start_iso, end_iso),
-        )
-        count = cursor.fetchone()[0]
-        conn.close()
-        return count
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM reports
+                WHERE district = ? AND validated = 1
+                AND report_time >= ? AND report_time <= ?
+                """,
+                (district, start_iso, end_iso),
+            )
+            return cursor.fetchone()[0]
+        finally:
+            conn.close()
 
 
 # Singleton instance

@@ -79,6 +79,8 @@ PROTECTED_ROUTES = [
     ("GET", "/subscriptions/", None),
     # AI Copilot
     ("POST", "/v1/copilot/ask", {"question": "ping"}),
+    # Community report triage
+    ("POST", "/v1/community-reports/RPT_does_not_exist/validate", {"confidence": 0.9}),
 ]
 
 
@@ -161,6 +163,9 @@ class TestOpenAPISpec:
             "/v1/copilot/ask",
             "/v1/alerts/assess",
             "/v1/alerts/pending",
+            "/v1/community-reports",
+            "/v1/community-reports/{report_id}/validate",
+            "/webhooks/whatsapp",
         ],
     )
     def test_route_registered_in_spec(self, api_client: TestClient, path_template):
