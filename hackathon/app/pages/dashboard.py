@@ -479,6 +479,26 @@ def render_header(state):
             "nfcc-api-key.",
             icon="\U0001F6A8",
         )
+        # Diagnostic for exactly this failure mode: two independent
+        # careful re-copies of the secret still failed with "Invalid API
+        # key" (not "Missing header"), meaning Streamlit IS sending a
+        # key - it just doesn't match. A plain character count in a text
+        # editor won't reveal a stray invisible character (trailing
+        # newline, non-breaking space, etc.), so this shows the raw
+        # repr() of the first/last 2 characters plus the length - repr()
+        # prints hidden whitespace as visible escape sequences (\n, \xa0,
+        # ...) instead of silently rendering it as blank space. Never
+        # logs the full key. Remove once the mismatch is resolved.
+        with st.expander("🔧 Debug: what key is this app actually sending?"):
+            st.write(f"Length: {len(API_KEY)} (should be 24)")
+            if API_KEY:
+                st.code(
+                    f"starts: {API_KEY[:2]!r}  ends: {API_KEY[-2:]!r}  "
+                    f"has_whitespace: {API_KEY != API_KEY.strip()}",
+                    language="text",
+                )
+            else:
+                st.write("NFCC_API_KEY is empty or not set at all in this app's environment.")
 
     st.divider()
 
