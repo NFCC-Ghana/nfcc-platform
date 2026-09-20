@@ -664,6 +664,9 @@ def render_national_map(state):
             self.district = "Accra Central"
             self.risk_score = 50
             self.risk_category = "MODERATE"
+            self.risk_color = "#ffaa00"
+            self.affected_communities = []
+            self.shelter_names = []
             self.shelters_available = 3
             self.verified_reports = 0
             self.district_count = TRACKED_DISTRICT_COUNT
@@ -675,6 +678,14 @@ def render_national_map(state):
     map_state.district = getattr(state, "district", "Accra Central")
     map_state.risk_score = getattr(state, "risk_score", 50)
     map_state.risk_category = getattr(state, "risk_category", "MODERATE")
+    map_state.risk_color = getattr(state, "risk_color", "#ffaa00")
+    # Real per-district data (see fetch_situation_state) - the map used to
+    # plot a fixed Alajo/Kaneshie/Circle/Nima/Mamobi list and 3 fixed
+    # Accra shelter names no matter which district was selected, which
+    # broke (showed the wrong city's places) the moment anyone changed
+    # the district dropdown - one of the first things a reviewer tries.
+    map_state.affected_communities = getattr(state, "affected_communities", [])
+    map_state.shelter_names = getattr(state, "shelter_names", [])
     # These two were missing entirely until now - situation_map.py's own
     # stat cards read state.shelters_available/verified_reports directly
     # (no getattr fallback there), so passing this stripped-down MapState
@@ -996,6 +1007,20 @@ def render_operations_panel(state, district_data):
     """QUESTION 5: What are we doing? - VISUAL VERSION"""
     st.markdown("## 🚗 Operations")
     st.caption("*What resources are deployed and available?*")
+    # This whole panel's honesty gap was already documented in code
+    # comments below (shelter/resource/drive-time fields) but never
+    # surfaced to anyone actually looking at the dashboard - a stakeholder
+    # had no way to tell "Rescue Boats: 3" apart from a real live count.
+    # Shelter and community NAMES are real (src/exposure/
+    # shelter_candidates.py, src/exposure/community_names.py); resource
+    # counts, shelter capacity/occupancy, and drive times are illustrative
+    # placeholders because no live inventory or routing system exists yet.
+    st.caption(
+        "ℹ️ Shelter and community names are real. Resource counts, "
+        "capacity/occupancy figures, and drive times below are "
+        "illustrative placeholders - no live inventory or routing system "
+        "exists yet."
+    )
 
     # No officially-designated shelter registry exists publicly for Ghana
     # (NADMO designates schools/community buildings ad-hoc during an
@@ -1445,6 +1470,14 @@ def fetch_situation_state(district: str, rainfall_mm: float):
     state.elevation_m = district_data.get("elevation", 10)
     state.area_km2 = district_data.get("area_km2", 45.5)
     state.api_connected = "error" not in api_data
+    # Real per-district community names (src/exposure/community_names.py,
+    # mirrored client-side in get_district_data) - this field existed on
+    # DashboardState already but nothing ever assigned it, so every
+    # consumer either fell back to state.district alone or (the National
+    # Flood Map) used a hardcoded Accra-only list regardless of the
+    # selected district. See render_situation_map's own fix for why this
+    # matters.
+    state.affected_communities = district_data.get("affected_communities", [])
 
     # Real multi-source fusion confidence (src/models/multi_source_
     # confidence.py) - replaces the fixed 0.80 DashboardState default,

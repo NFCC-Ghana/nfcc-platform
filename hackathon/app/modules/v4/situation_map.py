@@ -16,7 +16,9 @@ def render_situation_map(state):
 
     st.markdown("## 🗺️ National Flood Situation Map")
     st.caption(
-        "Interactive map showing flood risk, affected areas, shelters, and infrastructure"
+        "Real community and shelter names for the selected district, at "
+        "approximate positions (no per-community geocoding or risk data "
+        "exists yet - all markers share the district's one real risk tier)."
     )
 
     # Color legend
@@ -37,29 +39,9 @@ def render_situation_map(state):
         st.markdown("🏛️ **Shelter**")
         st.caption("Safe location")
 
-    # Define risk_data BEFORE try block
-    risk_data = [
-        {"name": "Alajo", "lat": 5.565, "lon": -0.218, "risk": "EXTREME", "pop": 18750},
-        {
-            "name": "Kaneshie",
-            "lat": 5.555,
-            "lon": -0.228,
-            "risk": "EXTREME",
-            "pop": 22340,
-        },
-        {"name": "Circle", "lat": 5.575, "lon": -0.225, "risk": "HIGH", "pop": 15620},
-        {"name": "Nima", "lat": 5.555, "lon": -0.215, "risk": "HIGH", "pop": 48230},
-        {
-            "name": "Mamobi",
-            "lat": 5.545,
-            "lon": -0.212,
-            "risk": "MODERATE",
-            "pop": 34320,
-        },
-    ]
-
     risk_colors = {
         "EXTREME": "#ff0000",
+        "CRITICAL": "#cc0000",
         "HIGH": "#ff6600",
         "MODERATE": "#ffaa00",
         "LOW": "#00cc00",
@@ -68,6 +50,27 @@ def render_situation_map(state):
     try:
         center_lat = getattr(state, "lat", 5.560)
         center_lon = getattr(state, "lon", -0.210)
+        district_risk = getattr(state, "risk_category", "MODERATE")
+        marker_color = risk_colors.get(
+            district_risk, getattr(state, "risk_color", "#ffaa00")
+        )
+
+        # Real per-district community/shelter NAMES (see
+        # fetch_situation_state in dashboard.py: state.affected_communities
+        # from src/exposure/community_names.py, state.shelter_names from
+        # src/exposure/shelter_candidates.py via /situation) - this used to
+        # be a fixed Alajo/Kaneshie/Circle/Nima/Mamobi list and 3 fixed
+        # Accra shelter names regardless of the selected district. No real
+        # per-community lat/lon or per-community risk level exists anywhere
+        # in the codebase (only a district-level risk score), so markers
+        # are positioned at small illustrative offsets around the real
+        # district center and all colored by the district's one real risk
+        # tier - deliberately uniform rather than inventing distinct
+        # per-community risk levels that don't exist.
+        communities = getattr(state, "affected_communities", None) or [
+            getattr(state, "district", "This district")
+        ]
+        shelter_names = getattr(state, "shelter_names", None) or []
 
         m = folium.Map(
             location=[center_lat, center_lon],
@@ -81,62 +84,36 @@ def render_situation_map(state):
             control_scale=True,
         )
 
-        for area in risk_data:
-            color = risk_colors.get(area["risk"], "#808080")
-            radius = max(8, min(45, int(area["pop"] / 1000)))
-
-            # PLAIN TEXT - NO HTML
+        # Small deterministic ring offsets (~0.6-1km) around the real
+        # district center - illustrative positions, not surveyed
+        # coordinates, since no real per-community geocoding exists.
+        _offsets = [(0.006, 0.0), (0.002, 0.007), (-0.005, 0.004), (-0.005, -0.004), (0.002, -0.007)]
+        for i, name in enumerate(communities[:5]):
+            d_lat, d_lon = _offsets[i % len(_offsets)]
             popup_text = (
-                f"{area['name']} | Risk: {area['risk']} | Population: {area['pop']:,}"
+                f"{name} | District risk: {district_risk} "
+                "(approximate location)"
             )
-
             folium.CircleMarker(
-                location=[area["lat"], area["lon"]],
-                radius=radius,
-                color=color,
+                location=[center_lat + d_lat, center_lon + d_lon],
+                radius=14,
+                color=marker_color,
                 fill=True,
-                fill_color=color,
+                fill_color=marker_color,
                 fill_opacity=0.7,
                 weight=2,
                 popup=popup_text,
             ).add_to(m)
 
-        shelters = [
-            {
-                "name": "Accra High School",
-                "lat": 5.578,
-                "lon": -0.222,
-                "capacity": 1200,
-            },
-            {"name": "Community Center", "lat": 5.562, "lon": -0.218, "capacity": 500},
-            {
-                "name": "Trade Fair Centre",
-                "lat": 5.565,
-                "lon": -0.185,
-                "capacity": 2000,
-            },
-        ]
-
-        for shelter in shelters:
-            popup_text = f"{shelter['name']} | Capacity: {shelter['capacity']:,} | OPEN"
-
+        _shelter_offsets = [(0.010, 0.005), (-0.009, 0.008), (0.004, -0.011)]
+        for i, name in enumerate(shelter_names[:3]):
+            d_lat, d_lon = _shelter_offsets[i % len(_shelter_offsets)]
+            popup_text = f"{name} (approximate location - exact coordinates not available)"
             folium.Marker(
-                location=[shelter["lat"], shelter["lon"]],
+                location=[center_lat + d_lat, center_lon + d_lon],
                 popup=popup_text,
                 icon=folium.Icon(color="green", icon="home", prefix="fa"),
             ).add_to(m)
-
-        river_points = [
-            [5.560, -0.205],
-            [5.555, -0.210],
-            [5.550, -0.215],
-            [5.545, -0.220],
-            [5.540, -0.225],
-        ]
-
-        folium.PolyLine(
-            river_points, color="blue", weight=3, opacity=0.7, popup="Odaw River"
-        ).add_to(m)
 
         st_folium(m, width=800, height=500)
 
@@ -164,20 +141,28 @@ def render_situation_map(state):
         with col4:
             st.metric("Verified Reports", getattr(state, "verified_reports", 0))
 
-        st.caption("🗺️ Click on markers for details • Updated in real-time")
+        st.caption("🗺️ Click a marker for its name and district risk tier")
 
     except Exception as e:
-        st.warning(f"⚠️ Map temporarily unavailable")
+        # Re-reads from `state` directly rather than the try block's local
+        # variables (communities/district_risk) - those may not have been
+        # assigned yet if the exception happened before they were set, and
+        # this used to reference risk_data, a name that no longer exists
+        # in this function at all since the fixed Accra-only list was
+        # replaced with real per-district data.
+        st.warning("⚠️ Map temporarily unavailable")
         st.markdown("### 📍 Affected Areas")
 
+        fallback_communities = getattr(state, "affected_communities", None) or [
+            getattr(state, "district", "This district")
+        ]
         risk_df = pd.DataFrame(
             [
                 {
-                    "Community": r["name"],
-                    "Risk": r["risk"],
-                    "Population": f"{r['pop']:,}",
+                    "Community": name,
+                    "District Risk": getattr(state, "risk_category", "MODERATE"),
                 }
-                for r in risk_data
+                for name in fallback_communities[:5]
             ]
         )
         st.dataframe(risk_df, use_container_width=True)
