@@ -21,7 +21,18 @@ def check_twilio_health() -> Dict[str, Any]:
 
 
 def check_model_health() -> Dict[str, Any]:
-    """Check model health (no network calls)."""
+    """Check model health (no network calls).
+
+    Honesty note for anyone reading this endpoint's output: a "healthy"
+    XGBoost model here does NOT mean flood risk scoring is ML-driven.
+    grep confirms .predict() is never called anywhere in the live
+    request path (src/models/historical_backtest.py's own module
+    docstring documents this) - every real score comes from
+    calculate_score()'s hand-authored precipitation curve
+    (src/alerts/formatter.py). This model is loaded and reported on here
+    only so a genuine load failure is visible; it is not part of any
+    real prediction today.
+    """
     from src.config.settings import settings
 
     try:
@@ -29,7 +40,11 @@ def check_model_health() -> Dict[str, Any]:
         model = settings.model
         return {
             "status": "healthy",
-            "message": f"Model loaded from {settings.MODEL_PATH}",
+            "message": (
+                f"Model file loads correctly from {settings.MODEL_PATH}. "
+                "Not used in live risk scoring - see calculate_score() "
+                "(src/alerts/formatter.py) for the real scoring logic."
+            ),
         }
     except Exception as e:
         return {"status": "unhealthy", "message": str(e)}
@@ -49,12 +64,28 @@ async def health_check() -> Dict[str, Any]:
         "environment": settings.ENVIRONMENT,
         "version": settings.API_VERSION,
         "dry_run": is_dry_run,
+        # Previously only ever reported "whatsapp" - sms/email silently
+        # never appeared here at all, so a real gap (all three currently
+        # disabled, alert dispatch falls back to MockAlertProvider -
+        # src/alerts/provider_factory.py) had no visible signal anywhere
+        # in this endpoint.
         "providers": {
             "whatsapp": (
                 {"status": "configured"}
                 if provider_status["whatsapp"]
                 else {"status": "disabled"}
             ),
+            "sms": (
+                {"status": "configured"}
+                if provider_status["sms"]
+                else {"status": "disabled"}
+            ),
+            "email": (
+                {"status": "configured"}
+                if provider_status["email"]
+                else {"status": "disabled"}
+            ),
+            "using_mock_provider": not any(provider_status.values()),
         },
         "redis": {
             "available": is_redis_available(),

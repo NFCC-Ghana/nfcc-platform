@@ -1586,7 +1586,7 @@ def render_situation(
     st.caption(f"🔄 Last updated: {state.timestamp[:19]}")
 
 
-def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
+def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -> str:
     """Compact, single-screen 'TV broadcast' view for demo mode - one
     dominant risk indicator, a handful of key numbers, no scrolling.
 
@@ -1595,7 +1595,11 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
     the demo as normal manual mode - the opposite of a quick, glanceable
     presentation for a 5-minute stakeholder briefing. This shows the same
     real fetch_situation_state() data, just as one condensed screen
-    instead of the full operational console."""
+    instead of the full operational console.
+
+    Returns "advance" (safe for the caller's auto-advance timer to keep
+    running) or "paused" (an exercise alert was just queued and is
+    awaiting an operator's Approve/Dismiss click - see the block below)."""
     state, _ = fetch_situation_state(district, rainfall_mm)
     summary, color, recommendation = SITUATION_BY_TIER.get(
         state.risk_category, SITUATION_BY_TIER["MODERATE"]
@@ -1700,6 +1704,93 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str):
         f"{soil_note}  •  "
         f"{sat_note} ({state.satellite_source})"
     )
+
+    # Stitches the auto-play narrative into the real human-review
+    # workflow instead of stopping at "here's a recommendation" - the
+    # auto-play demo and the Alert Review Queue used to be two
+    # disconnected sidebar toggles (turning Review Queue mode on killed
+    # any in-progress demo), so a presenter had to break the narrative
+    # and switch modes to show operator review -> alert issuance at all.
+    #
+    # Uses exercise=True so the queued alert's cap_status is "Exercise" -
+    # approve_pending_alert() has a completely separate code path for
+    # exercise alerts that never touches AlertEngine.process() at all
+    # (src/api/routes/alert_review.py), which is the actual safety
+    # guarantee here: a stakeholder demo must never be able to send a
+    # real message, regardless of what alert-provider credentials exist
+    # in whatever environment it's run from.
+    _tier_rank = {"VERY_LOW": 0, "LOW": 0, "MODERATE": 1, "HIGH": 2, "CRITICAL": 3, "EXTREME": 4}
+    if _tier_rank.get(state.risk_category, 0) < 1:
+        return "advance"
+
+    pending_key = "demo_pending_alert"
+    assessed_key = "demo_alert_assessed_for_stage"
+
+    if st.session_state.get(pending_key) is None and st.session_state.get(assessed_key) != stage_label:
+        result = call_api(
+            "/alerts/assess",
+            "POST",
+            {"location": district, "precipitation": rainfall_mm, "exercise": True},
+        )
+        st.session_state[assessed_key] = stage_label
+        if result.get("queued"):
+            st.session_state[pending_key] = result
+
+    pending = st.session_state.get(pending_key)
+    last_outcome = st.session_state.pop("demo_last_outcome", None)
+    if last_outcome:
+        st.success(
+            f"🚨 Alert #{last_outcome['id']} issued and recorded - "
+            f"{last_outcome['send_result']['note']}"
+        )
+
+    if pending is None:
+        return "advance"
+
+    st.divider()
+    st.markdown("### 🔔 Decision Engine Recommendation — Awaiting Operator Action")
+    st.caption(
+        "🎓 Exercise mode: queued through the exact same review workflow "
+        "a real automated assessment uses - approving this cannot send a "
+        "real message to anyone, by a separate code path, not just a "
+        "flag this UI happens to respect."
+    )
+    with st.container(border=True):
+        st.markdown(f"**{pending['message']}**")
+        if pending.get("response_guidance"):
+            st.caption(f"🎯 {pending['response_guidance']}")
+        if pending.get("affected_communities"):
+            st.caption(f"📍 Targets: {', '.join(pending['affected_communities'])}")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button(
+                "✅ Approve & Issue Alert",
+                key=f"demo_approve_{pending['id']}",
+                use_container_width=True,
+            ):
+                send_result = call_api(
+                    f"/alerts/pending/{pending['id']}/approve",
+                    "POST",
+                    {"reviewed_by": "stakeholder-demo"},
+                )
+                st.session_state["demo_last_outcome"] = send_result
+                st.session_state[pending_key] = None
+                st.rerun()
+        with c2:
+            if st.button(
+                "❌ Dismiss",
+                key=f"demo_dismiss_{pending['id']}",
+                use_container_width=True,
+            ):
+                call_api(
+                    f"/alerts/pending/{pending['id']}/dismiss",
+                    "POST",
+                    {"reviewed_by": "stakeholder-demo"},
+                )
+                st.session_state[pending_key] = None
+                st.rerun()
+
+    return "paused"
 
 
 # All districts this platform has real hydrology/impact data for - used
@@ -1959,6 +2050,47 @@ def render_alert_review_queue():
                             use_container_width=True,
                         )
 
+    # Outcome feedback (scripts/verify_predictions.py, daily cron) - real
+    # verified data (ReliefWeb/GDELT/verified citizen reports/Sentinel-1
+    # SAR via src/verification/outcome_verifier.py) written back onto the
+    # prediction ledger, but previously with no dashboard surface at all -
+    # it only ever existed as rows in a database a presenter had no way
+    # to show. GET /v1/predictions has no "outcome is not null" filter
+    # (only an exact-match or the __pending__ NULL check - src/database/
+    # prediction_ledger_db.py), so this fetches a recent batch and filters
+    # client-side rather than adding new backend query logic for one
+    # dashboard panel.
+    st.divider()
+    st.markdown("### 🔁 Recent Verified Outcomes")
+    st.caption(
+        "What actually happened, for past predictions - checked daily "
+        "against real news/citizen-report/satellite sources, not "
+        "self-reported by this platform."
+    )
+    recent_predictions = call_api("/v1/predictions?limit=25", "GET")
+    if "error" in recent_predictions:
+        st.caption(f"Could not reach the prediction ledger: {recent_predictions['error']}")
+    else:
+        verified = [
+            p for p in recent_predictions.get("predictions", []) if p.get("outcome")
+        ]
+        if not verified:
+            st.caption(
+                "No predictions have a verified outcome yet - "
+                "scripts/verify_predictions.py runs daily and needs a "
+                "prediction to be a few days old before checking it."
+            )
+        else:
+            for pred in verified[:10]:
+                outcome_emoji = "✅" if pred["outcome"] == "flood_confirmed" else "➖"
+                st.caption(
+                    f"{outcome_emoji} **{pred['district']}** predicted "
+                    f"{pred.get('risk_tier', '?')} on {pred['predicted_at'][:10]} "
+                    f"→ outcome: **{pred['outcome']}** "
+                    f"(source: {pred.get('outcome_source', 'unknown')}, "
+                    f"checked {pred.get('outcome_recorded_at', '?')[:10]})"
+                )
+
 
 def weather_forecast_24h(district: str) -> float:
     """Real next-24h forecasted rainfall for a district, via the same
@@ -2011,6 +2143,14 @@ def main():
     control_data = render_control_panel()
     district = control_data["district"]
 
+    def _clear_demo_alert_state():
+        """Clears the exercise-alert stitching state (see
+        render_broadcast_view) alongside demo_stage_idx, so a fresh demo
+        run or a switch to Review Queue mode never resumes showing a
+        decision prompt left over from a previous run."""
+        for key in ("demo_pending_alert", "demo_alert_assessed_for_stage", "demo_last_outcome"):
+            st.session_state.pop(key, None)
+
     if control_data["review_mode"]:
         # Cleanly stop any in-progress demo rather than leaving
         # demo_stage_idx frozen mid-sequence - without this, switching
@@ -2019,17 +2159,20 @@ def main():
         # "click Start Demo" state.
         if st.session_state.get("demo_stage_idx") is not None:
             st.session_state["demo_stage_idx"] = None
+            _clear_demo_alert_state()
             st.info("🎬 Demo stopped because Review Queue mode was opened.")
         render_alert_review_queue()
         return
 
     if not control_data["demo_mode"]:
         st.session_state["demo_stage_idx"] = None
+        _clear_demo_alert_state()
         render_situation(district, control_data["rainfall_mm"])
         return
 
     if control_data["start_demo"]:
         st.session_state["demo_stage_idx"] = 0
+        _clear_demo_alert_state()
 
     idx = st.session_state.get("demo_stage_idx")
 
@@ -2047,8 +2190,14 @@ def main():
     else:
         label, rainfall_mm = DEMO_STAGES[idx]
         # Compact broadcast view, not the full scrolling dashboard - see
-        # render_broadcast_view's docstring for why.
-        render_broadcast_view(district, rainfall_mm, stage_label=label)
+        # render_broadcast_view's docstring for why. Returns "paused"
+        # when a real exercise alert was just queued and is awaiting an
+        # Approve/Dismiss click - the auto-advance timer below is
+        # deliberately skipped in that case so the demo doesn't sweep
+        # past the one moment meant to show a human actually deciding.
+        flow_state = render_broadcast_view(district, rainfall_mm, stage_label=label)
+        if flow_state == "paused":
+            return
         time.sleep(DEMO_SECONDS_PER_STAGE)
         st.session_state["demo_stage_idx"] = idx + 1
         st.rerun()
