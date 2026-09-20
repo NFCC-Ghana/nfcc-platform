@@ -590,20 +590,29 @@ def render_evacuation_routes(routes: List[Dict[str, str]]) -> None:
     st.markdown("".join(html_parts), unsafe_allow_html=True)
 
 
-def render_affected_communities(communities: List[str], max_display: int = 5) -> None:
-    """Render complete affected communities list."""
+def render_affected_communities(
+    communities: List[str], max_display: int = 5, risk_color: str = None, risk_emoji: str = "📍"
+) -> None:
+    """Render complete affected communities list.
+
+    Previously cycled through a fixed 5-color/5-emoji sequence by list
+    position (red/orange/yellow/orange/green) regardless of content -
+    implying a per-community severity ranking that doesn't exist
+    anywhere in this codebase (only a district-level risk score is
+    real). Now uses one color for every community, tied to the real
+    district risk tier when the caller has one (falls back to a neutral
+    gray + a plain pin emoji when it doesn't), which is honest about
+    there being exactly one real risk number behind all of them.
+    """
     if not communities:
         st.info("No affected communities reported.")
         return
 
-    severity_colors = [THEME.DANGER, "#EA580C", THEME.WARNING, "#EA580C", THEME.SUCCESS]
-    severity_emojis = ["🔴", "🟠", "🟡", "🟠", "🟢"]
+    color = risk_color or THEME.GRAY_400
+    emoji = risk_emoji
 
     html_parts = []
-    for i, community in enumerate(communities[:max_display]):
-        color = severity_colors[i % len(severity_colors)]
-        emoji = severity_emojis[i % len(severity_emojis)]
-
+    for community in communities[:max_display]:
         html_parts.append(f"""
         <div style="
             display: flex;

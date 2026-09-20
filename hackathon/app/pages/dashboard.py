@@ -601,7 +601,14 @@ def render_executive_summary(state):
             st.caption(f"💡 {state.confidence_explanation}")
 
     with col2:
-        st.markdown("🤖 **AI Situation Summary**")
+        # Was labeled "AI Situation Summary" - misleading, since
+        # SITUATION_BY_TIER (below) is a static 5-row lookup table with no
+        # computation or model call behind it at all, unlike the real
+        # backend-fused "AI Decision Center" panel further down the page.
+        # Relabeled to not imply AI/LLM involvement that isn't there -
+        # matches this platform's stated principle elsewhere (src/copilot,
+        # src/verification) of never letting scripted content pass as AI.
+        st.markdown("📋 **Risk Tier Guidance**")
 
         # Keyed off state.risk_category (sourced from the backend's own
         # risk_tier in create_state_from_api) instead of re-deriving from
@@ -977,7 +984,11 @@ def render_impact_panel(state, district_data):
     affected = district_data.get("affected_communities", [])
     if affected:
         st.markdown("### 🏘️ Affected Communities")
-        render_affected_communities(affected[:5])
+        render_affected_communities(
+            affected[:5],
+            risk_color=getattr(state, "risk_color", None),
+            risk_emoji=getattr(state, "risk_emoji", "📍"),
+        )
 
     st.divider()
 
@@ -1249,6 +1260,16 @@ def render_risk_timeline(state):
             min(100, current_risk + 5),
             min(100, current_risk),
         ]
+        # This shape is a fixed +15/+10/+5/+0 offset off whatever
+        # current_risk happens to be - not a forecast, and identical for
+        # any two districts that happen to share a current score. Nothing
+        # previously told the viewer this differs from the real
+        # forecast-driven timeline above, which most requests actually
+        # get from /situation.
+        st.caption(
+            "⚠️ Showing an illustrative estimate, not a real forecast - "
+            "the live forecast data wasn't available for this request."
+        )
 
     render_risk_timeline_visual(hours, risks, current_risk)
 
@@ -1378,7 +1399,25 @@ def render_ai_copilot(state):
             )
 
         if "error" in result:
-            st.error(f"Copilot could not reach the platform's live data: {result['error']}")
+            # Previously dumped the raw backend response text verbatim
+            # (e.g. a literal {"detail":"Invalid API key"} JSON blob) into
+            # the visible error message - not a great stakeholder-facing
+            # failure mode. Give a clean, specific message for the auth
+            # case (the one most likely to actually occur, given POST
+            # /v1/copilot/ask requires the same NFCC_API_KEY as the rest
+            # of the platform) and a generic one otherwise.
+            status_code = result.get("status_code")
+            if status_code in (401, 403):
+                st.error(
+                    "The AI Copilot couldn't authenticate with the platform "
+                    "(the API key isn't set correctly for this app). This "
+                    "is a configuration issue, not a data issue."
+                )
+            else:
+                st.error(
+                    "The AI Copilot couldn't reach the platform's live data "
+                    "right now. Try again in a moment."
+                )
         else:
             st.info(result.get("answer", "No answer returned."))
             tool_calls = result.get("tool_calls", [])
@@ -1463,10 +1502,22 @@ def fetch_situation_state(district: str, rainfall_mm: float):
     # which no code path ever overwrote before this. /situation doesn't
     # carry a confidence field, so this is a second, real call rather
     # than something derivable from api_data above.
-    confidence_data = call_api(
-        f"/v1/districts/{district}/evidence?precipitation_mm={rainfall_mm}", "GET"
-    )
-    apply_confidence_to_state(state, confidence_data)
+    #
+    # Only applied when /situation itself succeeded: GET .../evidence
+    # requires no API key (an intentionally-open read), while POST
+    # /situation does - so during an auth misconfiguration or partial
+    # outage, this call can succeed independently and produce a real
+    # confidence figure describing evidence for a risk_score that is
+    # actually the DashboardState fallback default, not real data. That
+    # combination (a genuine "Confidence: 74%" next to a fake "50%
+    # MODERATE") is more actively misleading than either failing
+    # visibly together, so confidence is left at its own honest fallback
+    # whenever the primary situation call didn't succeed.
+    if state.api_connected:
+        confidence_data = call_api(
+            f"/v1/districts/{district}/evidence?precipitation_mm={rainfall_mm}", "GET"
+        )
+        apply_confidence_to_state(state, confidence_data)
 
     if state.lead_time_hours == 0:
         tier = tier_from_score(state.risk_score)
