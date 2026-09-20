@@ -12,23 +12,20 @@ No new billing required: Twilio's WhatsApp Sandbox (and a production
 WhatsApp sender once approved) charges for messages the platform SENDS,
 not for inbound messages received or the same-request TwiML reply sent
 back in response to them - both are free regardless of account funding
-status. TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN already exist as Cloud Run
-secrets (added for outbound alerting) and are reused here for inbound
-signature verification only - no new secret needed.
+status. This was confirmed against a real account: a first Twilio
+account showed 0 free units for everything (Ghana isn't eligible for
+Twilio trials at all), but a second account's WhatsApp Sandbox - a
+shared Twilio developer testing number every account can join via a
+join-code text, requiring no payment or WhatsApp Business approval -
+worked normally. TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN are reused here
+(from whichever account is actually wired up) for inbound signature
+verification only - no new secret needed.
 
-Message format is deliberately forgiving, not a rigid schema: citizens
-were never told an exact format, so free text is parsed best-effort for a
-known district/community name, a report type, an optional depth
-("Alajo - water rising on the main road, knee-deep, about 40cm"), and an
-urgency level. A message with no recognizable place name is still saved
-(never silently dropped) under a district of "Unclassified - needs
-triage" so a human can reclassify it via GET/POST
-src/api/v1/community_reports.py - deliberately NOT guessed or fuzzy-
-matched to a nearby district, since misfiling a real report to the wrong
-district is worse than leaving it for a human to fix. Latitude/longitude
-are captured directly from Twilio's own fields when a citizen shares
-their live WhatsApp location, which is a far more reliable signal than
-text matching when present.
+Message parsing (district/community/report-type/depth/urgency) lives in
+src/community/report_parsing.py, shared with
+src/api/routes/telegram_webhook.py - a second, always-free intake
+channel added alongside this one so citizen reporting doesn't depend on
+Twilio's billing status at all.
 
 This replaces an earlier prototype (src/chatbot/whatsapp_bot.py +
 scripts/civisenti_handler.py + .github/workflows/civisenti.yml, removed)
@@ -36,15 +33,13 @@ that was never actually wired to a live endpoint - only ever invoked
 manually or by a daily cron summarizing an always-empty JSONL file with
 no real intake path of its own. Its two genuinely useful ideas - GPS
 capture and urgency-keyword detection ("trapped"/"rescue" language) -
-are folded in here; its separate, non-Litestream-replicated JSONL
-storage was not, since community_memory.py's SQLite table is the one
-every other real consumer (situation.py's report stats, the outcome
-verifier) already reads.
+were folded into report_parsing.py; its separate, non-Litestream-
+replicated JSONL storage was not, since community_memory.py's SQLite
+table is the one every other real consumer (situation.py's report
+stats, the outcome verifier) already reads.
 """
 
 import logging
-import re
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
@@ -52,94 +47,12 @@ from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 
 from src.community.community_memory import community_memory
+from src.community.report_parsing import build_report_data, to_float
 from src.config.settings import settings
-from src.exposure.community_names import DISTRICT_COMMUNITIES
 
 logger = logging.getLogger("nfcc-api.whatsapp-webhook")
 
 router = APIRouter(prefix="/webhooks", tags=["whatsapp"])
-
-# lowercase name -> canonical district, for the district names themselves
-# AND every community under them (e.g. "kaneshie" -> "Accra Central").
-_LOCATION_LOOKUP: dict = {}
-for _district, _communities in DISTRICT_COMMUNITIES.items():
-    _LOCATION_LOOKUP[_district.lower()] = _district
-    for _c in _communities:
-        _LOCATION_LOOKUP[_c.lower()] = _district
-# Longest terms first so "tema community 1" matches before a bare "tema".
-_LOCATION_TERMS = sorted(_LOCATION_LOOKUP.keys(), key=len, reverse=True)
-
-_TYPE_KEYWORDS = [
-    (("drain", "gutter", "culvert"), "Drainage Blocked"),
-    (("rising", "rise", "increasing"), "Water Level Rising"),
-    (("warn", "expect", "forecast"), "Weather Warning"),
-    (("yesterday", "last night", "this morning", "earlier"), "Recent Flood"),
-]
-
-# Urgency keywords - folded in from an earlier, never-wired-live
-# prototype (src/chatbot/whatsapp_bot.py, removed in favor of this real
-# integration) whose one genuinely good idea was flagging "trapped" /
-# "rescue" language as a distinct, more urgent signal than ordinary
-# flooding language - worth a human reviewer seeing immediately.
-_URGENCY_KEYWORDS = [
-    (("trapped", "rescue", "emergency", "life", "dying", "help us"), "CRITICAL"),
-    (("waist", "danger", "severe", "cannot leave", "stranded"), "HIGH"),
-    (("ankle", "minor", "small", "low"), "LOW"),
-]
-
-_DEPTH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(cm|centimet\w*|m\b|met(?:er|re)s?)", re.IGNORECASE)
-
-
-def _extract_location(text: str) -> tuple:
-    """Exact (case-insensitive) match only - no fuzzy guessing. Word-
-    boundary matching, not substring: a raw substring check would let
-    the district "Ho" match inside "house", or "Dome" (a Ho community)
-    match inside "domestic" - both real false positives caught in
-    testing. Returns (district, community); community is None if only a
-    district matched."""
-    lowered = text.lower()
-    for term in _LOCATION_TERMS:
-        if re.search(rf"\b{re.escape(term)}\b", lowered):
-            district = _LOCATION_LOOKUP[term]
-            community = None if term == district.lower() else term.title()
-            return district, community
-    return None, None
-
-
-def _extract_report_type(text: str) -> str:
-    lowered = text.lower()
-    for keywords, label in _TYPE_KEYWORDS:
-        if any(k in lowered for k in keywords):
-            return label
-    return "Active Flooding"
-
-
-def _extract_urgency(text: str) -> str:
-    lowered = text.lower()
-    for keywords, label in _URGENCY_KEYWORDS:
-        if any(k in lowered for k in keywords):
-            return label
-    return "MODERATE"
-
-
-def _to_float(value) -> Optional[float]:
-    if value in (None, ""):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _extract_depth_m(text: str) -> Optional[float]:
-    match = _DEPTH_RE.search(text)
-    if not match:
-        return None
-    value = float(match.group(1))
-    unit = match.group(2).lower()
-    if unit.startswith("cm") or unit.startswith("centimet"):
-        return round(value / 100, 2)
-    return value
 
 
 def _twiml(message: str) -> Response:
@@ -178,8 +91,8 @@ async def whatsapp_inbound(request: Request) -> Response:
     # Twilio's real field names when a WhatsApp user shares their live
     # location (not just typed text) - a far more reliable signal than
     # text district-matching when present.
-    latitude = _to_float(form_dict.get("Latitude"))
-    longitude = _to_float(form_dict.get("Longitude"))
+    latitude = to_float(form_dict.get("Latitude"))
+    longitude = to_float(form_dict.get("Longitude"))
 
     if not body:
         return _twiml(
@@ -195,22 +108,17 @@ async def whatsapp_inbound(request: Request) -> Response:
             "cars can't pass'.\nYou can attach a photo."
         )
 
-    district, community = _extract_location(body)
-    urgency = _extract_urgency(body)
-
-    report_data = {
-        "district": district or "Unclassified - needs triage",
-        "community": community or "Unspecified",
-        "report_type": _extract_report_type(body),
-        "description": body,
-        "flood_depth_m": _extract_depth_m(body),
-        "photo_url": photo_url,
-        "reporter_name": profile_name,
-        "reporter_phone": from_number,
-        "latitude": latitude,
-        "longitude": longitude,
-        "urgency": urgency,
-    }
+    report_data = build_report_data(
+        body=body,
+        reporter_phone=from_number,
+        reporter_name=profile_name,
+        photo_url=photo_url,
+        latitude=latitude,
+        longitude=longitude,
+    )
+    district = report_data["district"] if report_data["district"] != "Unclassified - needs triage" else None
+    community = report_data["community"] if report_data["community"] != "Unspecified" else None
+    urgency = report_data["urgency"]
 
     try:
         result = community_memory.submit_report(report_data)

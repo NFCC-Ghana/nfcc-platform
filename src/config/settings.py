@@ -130,6 +130,17 @@ class Settings:
     SMS_MAX_RETRIES: int = get_env_int("SMS_MAX_RETRIES", 3) or 3
     SMS_RETRY_DELAY: float = float(os.getenv("SMS_RETRY_DELAY", "2.0") or "2.0")
 
+    # Telegram citizen reporting (src/api/routes/telegram_webhook.py) - a
+    # second, always-free intake channel alongside WhatsApp, added because
+    # Telegram's Bot API has no trial/billing restriction anywhere,
+    # unlike Twilio (see whatsapp_webhook.py's module docstring). Token
+    # comes from @BotFather; webhook secret is an arbitrary string you
+    # choose and pass to Telegram's setWebhook call, then Telegram echoes
+    # it back on every request via X-Telegram-Bot-Api-Secret-Token so this
+    # app can verify a request actually came from Telegram.
+    TELEGRAM_BOT_TOKEN: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_WEBHOOK_SECRET: Optional[str] = os.getenv("TELEGRAM_WEBHOOK_SECRET")
+
     # SMTP Email (Optional)
     SMTP_HOST: Optional[str] = os.getenv("SMTP_HOST")
     SMTP_PORT: Optional[int] = get_env_int("SMTP_PORT")

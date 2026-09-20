@@ -28,17 +28,35 @@ which this repo doesn't have at the root).
 Real secrets (Twilio auth token, the API key) live in Secret Manager, not as
 plain env vars:
 
-| Secret name           | Cloud Run env var    |
-|------------------------|-----------------------|
-| `twilio-account-sid`   | `TWILIO_ACCOUNT_SID`  |
-| `twilio-auth-token`    | `TWILIO_AUTH_TOKEN`   |
-| `nfcc-api-key`         | `API_KEY`             |
+| Secret name              | Cloud Run env var         |
+|--------------------------|----------------------------|
+| `twilio-account-sid`     | `TWILIO_ACCOUNT_SID`       |
+| `twilio-auth-token`      | `TWILIO_AUTH_TOKEN`        |
+| `nfcc-api-key`           | `API_KEY`                  |
+| `telegram-bot-token`     | `TELEGRAM_BOT_TOKEN`       |
+| `telegram-webhook-secret`| `TELEGRAM_WEBHOOK_SECRET`  |
 
 Wired in with `--update-secrets=TWILIO_ACCOUNT_SID=twilio-account-sid:latest,...`
 on `gcloud run services update`. The Cloud Run service's runtime identity
 (the project's default compute service account,
 `355353600602-compute@developer.gserviceaccount.com`) needs
 `roles/secretmanager.secretAccessor` on each secret - already granted.
+
+**Telegram setup** (src/api/routes/telegram_webhook.py) - a second,
+always-free citizen-reporting channel added alongside WhatsApp because
+Telegram's Bot API has no trial/billing restriction anywhere, unlike
+Twilio:
+1. Message `@BotFather` on Telegram, `/newbot`, get a bot token.
+2. Generate a random webhook secret (any string - e.g. `openssl rand -hex 20`).
+3. Store both in Secret Manager under the names above, wire them onto
+   the Cloud Run service the same way as the Twilio secrets.
+4. Register the webhook URL with Telegram (one-time, from any machine
+   with the token, not a Cloud Run env step):
+   ```bash
+   curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+     -d "url=https://nfcc-platform-355353600602.europe-west1.run.app/webhooks/telegram" \
+     -d "secret_token=<the same webhook secret from step 2>"
+   ```
 
 Non-secret config is set as plain env vars via `--update-env-vars`, currently:
 `NFCC_ENV=production`, `ENVIRONMENT=production`.

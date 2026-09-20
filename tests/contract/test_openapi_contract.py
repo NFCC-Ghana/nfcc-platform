@@ -166,6 +166,7 @@ class TestOpenAPISpec:
             "/v1/community-reports",
             "/v1/community-reports/{report_id}/validate",
             "/webhooks/whatsapp",
+            "/webhooks/telegram",
         ],
     )
     def test_route_registered_in_spec(self, api_client: TestClient, path_template):
