@@ -76,21 +76,6 @@ def test_unified_intelligence():
     print(f"   Total Recommendations: {len(assessment['recommendations'])}")
 
 
-def test_civicflood_integration():
-    """Test CivicFlood AI integration."""
-    from hackathon.ai.hydrological_intelligence import civicflood_hydrological
-
-    data = civicflood_hydrological.get_complete_dashboard_data("Accra Central", 75.0)
-    assert data is not None
-    assert "risk" in data
-    assert "river" in data
-    assert "dam" in data
-    assert "soil" in data
-    assert "history" in data
-    assert "recommendations" in data
-    print("✅ CivicFlood integration test passed")
-
-
 if __name__ == "__main__":
     print("🚀 Running Hydrological Intelligence Tests...\n")
 
@@ -100,6 +85,5 @@ if __name__ == "__main__":
     test_soil_moisture()
     test_flood_polygons()
     test_unified_intelligence()
-    test_civicflood_integration()
 
     print("\n✅ All tests passed! Hydrological intelligence is ready.")

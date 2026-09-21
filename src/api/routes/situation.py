@@ -283,7 +283,20 @@ async def get_situation(request: SituationRequest):
             if soil_moisture.get("available")
             else None
         )
-        response["recommendations"] = hydrology.get("recommendations", [])
+        # NOT exposed: hydrology.get("recommendations", []). Found during
+        # a codebase-wide "wired but never actually verified" audit -
+        # unified_intelligence.py's _generate_recommendations() (and the
+        # _calculate_risk_factors() score feeding it) still runs on the
+        # OLD fabricated river_intelligence/reservoir_intelligence/
+        # soil_moisture inputs (np.random.seed(hash(...)) - see this
+        # file's river_level_m/soil_saturation_percent comments above for
+        # the same pattern already fixed for those two fields). This one
+        # generates specific, named, undisclosed-fabricated text like
+        # "{dam_name} at spillage risk - Monitor closely" for a real named
+        # dam, driven entirely by a random seed. Confirmed zero real
+        # consumers today (not the dashboard, not the AI Copilot) - safe
+        # to drop rather than carry a live, callable, documented API field
+        # that silently fabricates dam/river/soil-specific guidance.
         # Real Sentinel-1 SAR satellite flood detection (Google Earth
         # Engine, via src/hydrology/sentinel_processor.py) when reachable;
         # satellite["source"] says "Sentinel-1 SAR" for a real detection

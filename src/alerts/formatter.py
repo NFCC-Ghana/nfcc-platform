@@ -2,6 +2,8 @@
 
 from typing import Dict, Any, Optional
 
+from src.config.settings import settings
+
 # Canonical tier ordering - used to compare a real alert's tier against a
 # subscriber's chosen minimum (src/database/channel_subscriptions_db.py),
 # so "notify me for HIGH+" doesn't fire on a MODERATE alert.
@@ -30,14 +32,22 @@ def calculate_score(precipitation: float, temperature: float = None) -> float:
 
 
 def get_risk_tier(score: float) -> str:
-    """Get risk tier from score."""
-    if score < 30:
+    """Get risk tier from score. Boundaries come from settings
+    (ALERT_THRESHOLD_MODERATE/HIGH/CRITICAL/EXTREME) - found during a
+    codebase audit that these were documented in .env.example as
+    deployer-configurable since this file's earliest version, but this
+    function (and, independently, AlertEngine.THRESHOLDS in
+    src/alerts/engine.py) had the same boundaries hardcoded and never
+    actually read them. Both now derive from the same settings values so
+    the risk TIER a score maps to and the tier AlertEngine gates sending
+    on can never silently diverge."""
+    if score < settings.ALERT_THRESHOLD_MODERATE:
         return "LOW"
-    elif score < 50:
+    elif score < settings.ALERT_THRESHOLD_HIGH:
         return "MODERATE"
-    elif score < 70:
+    elif score < settings.ALERT_THRESHOLD_CRITICAL:
         return "HIGH"
-    elif score < 85:
+    elif score < settings.ALERT_THRESHOLD_EXTREME:
         return "CRITICAL"
     else:
         return "EXTREME"

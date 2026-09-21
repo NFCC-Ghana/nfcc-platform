@@ -16,12 +16,18 @@ logger = logging.getLogger("nfcc.alert.engine")
 class AlertEngine:
     """Core alert processing engine with singleton providers."""
 
+    # Derived from the same settings values src/alerts/formatter.py's
+    # get_risk_tier() uses - previously two independently hardcoded
+    # copies of the same boundaries (30/50/70/85), found during a
+    # codebase audit. Kept as a class attribute (not computed per-
+    # instance) since settings is a fully-initialized singleton by the
+    # time this module is ever imported.
     THRESHOLDS = {
-        "LOW": (0, 30),
-        "MODERATE": (30, 50),
-        "HIGH": (50, 70),
-        "CRITICAL": (70, 85),
-        "EXTREME": (85, 101),
+        "LOW": (0, settings.ALERT_THRESHOLD_MODERATE),
+        "MODERATE": (settings.ALERT_THRESHOLD_MODERATE, settings.ALERT_THRESHOLD_HIGH),
+        "HIGH": (settings.ALERT_THRESHOLD_HIGH, settings.ALERT_THRESHOLD_CRITICAL),
+        "CRITICAL": (settings.ALERT_THRESHOLD_CRITICAL, settings.ALERT_THRESHOLD_EXTREME),
+        "EXTREME": (settings.ALERT_THRESHOLD_EXTREME, 101),
     }
 
     def __init__(

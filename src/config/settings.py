@@ -96,6 +96,13 @@ class Settings:
 
     API_KEY_HEADER: str = "X-API-Key"
     JWT_SECRET_KEY: Optional[str] = os.getenv("JWT_SECRET_KEY")
+    # src/alerts/cooldown.py reads REDIS_URL directly via os.getenv (its
+    # own lazy-connect logic needs the raw value, not this attribute) -
+    # this copy exists only so GET /health's "configured" field can
+    # report real presence instead of always False via
+    # getattr(settings, "REDIS_URL", None), found during a codebase audit
+    # to have never actually been a Settings attribute.
+    REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = get_env_bool("RATE_LIMIT_ENABLED", False)
@@ -209,6 +216,18 @@ class Settings:
 
     # Alert Engine
     ALERTS_PER_HOUR: int = get_env_int("ALERTS_PER_HOUR", 3) or 3
+    # Found during a codebase-wide audit: .env.example has documented
+    # these five as real, deployer-configurable since this file's
+    # earliest version, but nothing ever actually read them -
+    # src/alerts/engine.py's THRESHOLDS dict and cooldown_minutes used
+    # hardcoded literals that happened to match .env.example's numbers,
+    # so the disconnect was invisible unless someone actually tried
+    # changing one. Same bug class as ALERT_DRY_RUN above.
+    ALERT_COOLDOWN_MINUTES: int = get_env_int("ALERT_COOLDOWN_MINUTES", 30) or 30
+    ALERT_THRESHOLD_MODERATE: int = get_env_int("ALERT_THRESHOLD_MODERATE", 30) or 30
+    ALERT_THRESHOLD_HIGH: int = get_env_int("ALERT_THRESHOLD_HIGH", 50) or 50
+    ALERT_THRESHOLD_CRITICAL: int = get_env_int("ALERT_THRESHOLD_CRITICAL", 70) or 70
+    ALERT_THRESHOLD_EXTREME: int = get_env_int("ALERT_THRESHOLD_EXTREME", 85) or 85
 
     # Observability
     ENABLE_METRICS: bool = get_env_bool("ENABLE_METRICS", False)
