@@ -16,7 +16,6 @@ from src.api.dam_router import router as dam_router
 from src.api.routes.alerts import router as alerts_router
 from src.api.routes.forecast import router as forecast_router
 from src.api.routes.explain_fusion import router as explain_fusion_router
-from src.api.routes.subscriptions import router as subscriptions_router
 from src.api.routes.situation import router as situation_router
 from src.api.routes.alert_review import router as alert_review_router
 from src.api.routes.cap_export import router as cap_export_router
@@ -28,7 +27,7 @@ from src.alerts.formatter import calculate_score, get_risk_tier
 from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
-from src.database.alert_db import init_subscriptions_table, get_alert_history, get_total_alerts_count
+from src.database.alert_db import get_alert_history, get_total_alerts_count
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -69,13 +68,6 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Model loaded successfully")
     except Exception as e:
         logger.error(f"❌ Failed to load model: {e}")
-
-    # Initialize subscription storage
-    try:
-        init_subscriptions_table()
-        logger.info("✅ Subscriptions table initialized")
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize subscriptions table: {e}")
 
     # Initialize alert engine
     alert_engine = AlertEngine()
@@ -203,7 +195,6 @@ app.include_router(alerts_router)
 app.include_router(forecast_router)
 app.include_router(explain_fusion_router)
 app.include_router(dam_router)
-app.include_router(subscriptions_router)
 app.include_router(explain_router)
 app.include_router(health_router)
 app.include_router(situation_router)

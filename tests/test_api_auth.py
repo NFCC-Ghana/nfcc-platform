@@ -45,16 +45,20 @@ def test_protected_route_accepts_real_key():
 
 def test_read_only_route_needs_no_key():
     """GET /v1/districts stays open - read-only routes weren't part of
-    this fix's scope (except subscriptions' PII-leaking list, covered
+    this fix's scope (except a PII-leaking subscriber list, covered
     separately)."""
     with TestClient(app) as client:
         resp = client.get("/v1/districts")
     assert resp.status_code == 200
 
 
-def test_subscriptions_list_rejects_missing_key():
-    """The one GET this fix did protect - it leaks every subscriber's
-    email/phone/unsubscribe_token, not just computed risk data."""
+def test_alert_subscriptions_list_rejects_missing_key():
+    """GET /v1/alert-subscriptions (src/api/v1/alert_subscriptions.py) -
+    the real, wired-in WhatsApp/Telegram subscriber list that replaced
+    the old email-based /subscriptions/ endpoint (removed - confirmed
+    zero real callers and zero real consumers in the send path). Still
+    leaks every subscriber's phone number/chat_id, not just computed
+    risk data, so it stays protected the same way."""
     with TestClient(app) as client:
-        resp = client.get("/subscriptions/")
+        resp = client.get("/v1/alert-subscriptions")
     assert resp.status_code == 401

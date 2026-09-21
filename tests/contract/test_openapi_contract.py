@@ -74,9 +74,6 @@ PROTECTED_ROUTES = [
         {"precipitation_mm": 10},
     ),
     # Subscriptions (create/delete/list-with-PII)
-    ("POST", "/subscriptions/", {"email": "contract-test@example.com"}),
-    ("DELETE", "/subscriptions/contract-test@example.com", None),
-    ("GET", "/subscriptions/", None),
     ("GET", "/v1/alert-subscriptions", None),
     # AI Copilot
     ("POST", "/v1/copilot/ask", {"question": "ping"}),
@@ -143,7 +140,6 @@ class TestOpenAPISpec:
             "/health",
             "/situation",
             "/decision/card",
-            "/subscriptions/",
             "/v1/districts",
             "/v1/districts/{district}",
             "/v1/districts/{district}/risk",

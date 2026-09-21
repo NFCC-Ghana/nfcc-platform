@@ -58,7 +58,6 @@ def get_db_connection():
 def init_db() -> None:
     """Initialize the alerts database with table and indexes."""
     init_alerts_table()
-    init_subscriptions_table()
     init_pending_alerts_table()
 
 
@@ -419,161 +418,15 @@ def get_total_alerts_count(location_filter: Optional[str] = None) -> int:
         return row[0] if row else 0
 
 
-# ============================================================
-# Subscription Management Functions
-# ============================================================
-
-
-def init_subscriptions_table() -> None:
-    """Initialize the subscriptions table."""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS subscriptions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL UNIQUE,
-                phone TEXT,
-                preferred_provider TEXT NOT NULL DEFAULT 'email',
-                location_filter TEXT,
-                min_risk_tier TEXT NOT NULL DEFAULT 'MODERATE',
-                active BOOLEAN NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                unsubscribe_token TEXT UNIQUE
-            )
-        """)
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_subscription_email ON subscriptions(email)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_subscription_active ON subscriptions(active)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_subscription_location ON subscriptions(location_filter)"
-        )
-        conn.commit()
-
-
-def subscribe(data_dict: Dict[str, Any]) -> int:
-    """Create a new subscription."""
-    now = datetime.now().isoformat()
-    token = secrets.token_urlsafe(16)
-
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO subscriptions (
-                email, phone, preferred_provider, location_filter,
-                min_risk_tier, active, created_at, updated_at, unsubscribe_token
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                data_dict.get("email"),
-                data_dict.get("phone"),
-                data_dict.get("preferred_provider", "email"),
-                data_dict.get("location_filter"),
-                data_dict.get("min_risk_tier", "MODERATE"),
-                1,
-                now,
-                now,
-                token,
-            ),
-        )
-        conn.commit()
-        return cursor.lastrowid
-
-
-def unsubscribe(email: str) -> bool:
-    """Unsubscribe a user by marking their subscription as inactive."""
-    now = datetime.now().isoformat()
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE subscriptions SET active = 0, updated_at = ? WHERE email = ?",
-            (now, email),
-        )
-        conn.commit()
-        return cursor.rowcount > 0
-
-
-def get_subscription(email: str) -> Optional[Dict[str, Any]]:
-    """Retrieve a subscription by email address."""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM subscriptions WHERE email = ?", (email,))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
-
-
-def get_all_subscriptions(active_only: bool = True) -> List[Dict[str, Any]]:
-    """Retrieve all subscriptions, optionally filtered by active status."""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        if active_only:
-            cursor.execute(
-                "SELECT * FROM subscriptions WHERE active = 1 ORDER BY created_at DESC"
-            )
-        else:
-            cursor.execute("SELECT * FROM subscriptions ORDER BY created_at DESC")
-        return [dict(row) for row in cursor.fetchall()]
-
-
-def get_subscriptions_for_location(
-    location: str, active_only: bool = True
-) -> List[Dict[str, Any]]:
-    """Retrieve subscriptions for a specific location."""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        if active_only:
-            cursor.execute(
-                """
-                SELECT * FROM subscriptions
-                WHERE (location_filter = ? OR location_filter IS NULL)
-                AND active = 1
-                ORDER BY created_at DESC
-            """,
-                (location,),
-            )
-        else:
-            cursor.execute(
-                """
-                SELECT * FROM subscriptions
-                WHERE location_filter = ? OR location_filter IS NULL
-                ORDER BY created_at DESC
-            """,
-                (location,),
-            )
-        return [dict(row) for row in cursor.fetchall()]
-
-
-def update_subscription(email: str, updates: Dict[str, Any]) -> bool:
-    """Update a subscription with provided fields."""
-    if not updates:
-        return True
-
-    now = datetime.now().isoformat()
-    set_clause = ", ".join([f"{key} = ?" for key in updates.keys()])
-    values = list(updates.values())
-    values.append(now)
-    values.append(email)
-
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            f"UPDATE subscriptions SET {set_clause}, updated_at = ? WHERE email = ?",
-            values,
-        )
-        conn.commit()
-        return cursor.rowcount > 0
-
-
-def delete_subscription(email: str) -> bool:
-    """Permanently delete a subscription record."""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM subscriptions WHERE email = ?", (email,))
-        conn.commit()
-        return cursor.rowcount > 0
+# Subscription Management Functions (email-based) removed - confirmed
+# during a codebase-wide "wired but never actually connected" audit to
+# have zero real callers anywhere: no dashboard signup form, no
+# external integration, and (separately, found earlier) no send-path
+# code ever queried get_subscriptions_for_location() - a subscription
+# made through this system never once affected who got alerted. Real,
+# working outbound alert opt-in now lives in
+# src/database/channel_subscriptions_db.py (WhatsApp/Telegram, wired
+# into src/alerts/providers/whatsapp_provider.py and
+# telegram_provider.py on every real send). The old `subscriptions`
+# table itself is left in place in already-deployed alerts.db files
+# (harmless inert leftover) rather than requiring a migration.
