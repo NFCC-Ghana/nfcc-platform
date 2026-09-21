@@ -73,35 +73,39 @@ Twilio:
 Non-secret config is set as plain env vars via `--update-env-vars`, currently:
 `NFCC_ENV=production`, `ENVIRONMENT=production`.
 
-**All external alert channels (WhatsApp, SMS, email) are currently
-disabled** - `GET /health` reports `"whatsapp": {"status": "disabled"}` and
-this is intentional, not a bug:
+**SMS and email are still genuinely disabled.** SMTP/email and Twilio SMS
+were never functional even on Railway - the values there (`SMTP_USER`,
+`SMTP_PASS`, `TWILIO_SMS_FROM`, some SMS recipients) were placeholder/
+template text, not real credentials. Note also that Railway's variable
+names (`SMTP_PASS`, `ALERT_EMAIL_FROM`) didn't even match what
+`src/config/settings.py` reads (`SMTP_PASSWORD`, `SMTP_FROM`) - if/when real
+SMTP credentials are added, set them under the names `settings.py` expects,
+not the old Railway names.
 
-- SMTP/email and Twilio SMS were never functional even on Railway - the
-  values there (`SMTP_USER`, `SMTP_PASS`, `TWILIO_SMS_FROM`, some SMS
-  recipients) were placeholder/template text, not real credentials. Note also
-  that Railway's variable names (`SMTP_PASS`, `ALERT_EMAIL_FROM`) didn't even
-  match what `src/config/settings.py` reads (`SMTP_PASSWORD`, `SMTP_FROM`) -
-  if/when real SMTP credentials are added, set them under the names
-  `settings.py` expects, not the old Railway names.
-- WhatsApp's `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` secrets *are* real and
-  wired up (see table above), but were left disconnected after testing showed
-  the Twilio account behind them has no free trial units and Twilio does not
-  offer free trials in Ghana at all - sending anything (even sandbox
-  WhatsApp messages) requires an upgraded/paid Twilio account. `whatsapp` is
-  disabled by simply not setting `TWILIO_WHATSAPP_FROM` /
-  `ALERT_WHATSAPP_RECIPIENTS` as env vars (settings.py treats empty
-  recipients as disabled), rather than by removing the secrets, so
-  re-enabling later - once there's budget for a paid Twilio account - is just
-  adding those two env vars back:
-  ```bash
-  gcloud run services update nfcc-platform --region=europe-west1 \
-    --update-env-vars="TWILIO_WHATSAPP_FROM=whatsapp:+14155238886,ALERT_WHATSAPP_RECIPIENTS=+233244714242"
-  ```
-  Twilio's WhatsApp sandbox uses a shared number
-  (`whatsapp:+14155238886`), not a purchased one - each recipient must send
-  the sandbox's join code to it from WhatsApp before messages will deliver
-  to them, and sandbox join codes/sessions can expire and need repeating.
+**WhatsApp and Telegram outbound alerts are real and live**, not just
+inbound reporting. Real per-district recipients come from
+`src/database/channel_subscriptions_db.py` - a citizen replies "ALERTS ON
+\<district\>" in the same chat they report floods from
+(`src/community/alert_subscription_commands.py`), and
+`WhatsAppAlertProvider`/`TelegramAlertProvider` genuinely query that table
+on every real alert send. Neither provider requires a static recipient
+list to be considered usable any more (`settings.get_provider_status()`
+only checks credentials) - `WHATSAPP_RECIPIENTS`/`TWILIO_WHATSAPP_FROM` are
+now optional and additive: set them only if you want specific numbers
+(e.g. a NADMO/GMET duty phone) to receive every alert regardless of who's
+subscribed, unioned with the real dynamic subscriber list:
+```bash
+gcloud run services update nfcc-platform --region=europe-west1 \
+  --update-env-vars="TWILIO_WHATSAPP_FROM=whatsapp:+14155238886,ALERT_WHATSAPP_RECIPIENTS=+233244714242"
+```
+
+One real constraint specific to WhatsApp Sandbox (not Telegram, which has
+none): each recipient - static or dynamically subscribed - must have
+already sent the sandbox's join code to `whatsapp:+14155238886` before
+messages deliver to them, and sandbox sessions can expire and need
+repeating. This is why Telegram (`t.me/CivicFlood_Bot`) exists as a second
+channel: no join step, no billing tier, works for anyone the moment they
+send the bot one message.
 
 ## IAM roles needed by a deploying identity
 

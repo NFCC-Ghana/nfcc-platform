@@ -75,6 +75,11 @@ async def health_check() -> Dict[str, Any]:
                 if provider_status["whatsapp"]
                 else {"status": "disabled"}
             ),
+            "telegram": (
+                {"status": "configured"}
+                if provider_status["telegram"]
+                else {"status": "disabled"}
+            ),
             "sms": (
                 {"status": "configured"}
                 if provider_status["sms"]

@@ -28,9 +28,10 @@ Telegram's alternate "answer via webhook response body" mechanism.
 
 import logging
 
-import requests
 from fastapi import APIRouter, HTTPException, Request
 
+from src.alerts.providers.telegram_provider import send_telegram_message
+from src.community.alert_subscription_commands import handle_subscription_command
 from src.community.community_memory import community_memory
 from src.community.report_parsing import build_report_data, to_float
 from src.config.settings import settings
@@ -39,28 +40,22 @@ logger = logging.getLogger("nfcc-api.telegram-webhook")
 
 router = APIRouter(prefix="/webhooks", tags=["telegram"])
 
-TELEGRAM_API_BASE = "https://api.telegram.org"
-
 _HELP_TEXT = (
     "NFCC Flood Reporting. Send your community name and what you're "
     "seeing, e.g.:\n'Kaneshie - flooding on market road, cars can't "
     "pass'.\nYou can also share your location (paperclip > Location) or "
-    "a photo."
+    "a photo.\nSend 'ALERTS ON' to receive flood warnings for your area."
 )
 
 
 def _send_message(chat_id, text: str) -> None:
-    if not settings.TELEGRAM_BOT_TOKEN:
-        logger.warning("TELEGRAM_BOT_TOKEN not configured - cannot reply to chat_id=%s", chat_id)
-        return
-    try:
-        requests.post(
-            f"{TELEGRAM_API_BASE}/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": chat_id, "text": text},
-            timeout=10,
-        )
-    except Exception:
-        logger.exception("Failed to send Telegram reply to chat_id=%s", chat_id)
+    """Thin wrapper for logging only - the actual HTTP call is shared
+    with the outbound alert path (src/alerts/providers/
+    telegram_provider.py's send_telegram_message), one place that knows
+    how to call Telegram's sendMessage API."""
+    result = send_telegram_message(chat_id, text)
+    if not result.get("success"):
+        logger.warning("Failed to send Telegram reply to chat_id=%s: %s", chat_id, result)
 
 
 @router.post("/telegram")
@@ -109,6 +104,11 @@ async def telegram_inbound(request: Request) -> dict:
 
     if body.lower() in ("/start", "/help", "help", "menu"):
         _send_message(chat_id, _HELP_TEXT)
+        return {"ok": True}
+
+    subscription_reply = handle_subscription_command("telegram", str(chat_id), body)
+    if subscription_reply is not None:
+        _send_message(chat_id, subscription_reply)
         return {"ok": True}
 
     if not body and not location:

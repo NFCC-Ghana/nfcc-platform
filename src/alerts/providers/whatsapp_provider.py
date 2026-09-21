@@ -7,6 +7,7 @@ from dataclasses import dataclass, asdict
 from src.alerts.providers.base import BaseAlertProvider
 from src.alerts.models import AlertPayload
 from src.config.settings import settings
+from src.database.channel_subscriptions_db import get_subscribers_for_alert
 
 logger = logging.getLogger("nfcc.alert.whatsapp")
 
@@ -135,20 +136,37 @@ class WhatsAppAlertProvider(BaseAlertProvider):
             f"🕐 {alert.timestamp[:19]}"
         )
 
+    def _get_recipients(self, alert: AlertPayload) -> List[str]:
+        """Static settings.WHATSAPP_RECIPIENTS (e.g. NADMO/GMET official
+        numbers that should always get every alert) UNIONED with real,
+        dynamic per-district subscribers (src/database/
+        channel_subscriptions_db.py) - a citizen who replied "ALERTS ON
+        Kaneshie" to this same WhatsApp number. Previously this provider
+        only ever sent to the static list; no subscription a citizen made
+        anywhere in this platform ever actually changed who got alerted."""
+        dynamic = [
+            s["identifier"]
+            for s in get_subscribers_for_alert("whatsapp", alert.location, alert.risk_tier)
+        ]
+        combined = list(dict.fromkeys(self.to_numbers + dynamic))  # de-dupe, keep order
+        return [n if n.startswith("whatsapp:") else f"whatsapp:{n}" for n in combined]
+
     def send(self, alert: AlertPayload) -> Dict[str, Any]:
         """Send WhatsApp alert with lazy initialization and dry run support."""
+        recipients = self._get_recipients(alert)
+
         # Dry run mode - no actual sending
         if self._is_dry_run():
-            logger.info(f"🔵 DRY RUN: Would send WhatsApp to {self.to_numbers}")
+            logger.info(f"🔵 DRY RUN: Would send WhatsApp to {recipients}")
             return {
                 "success": True,
-                "message": f"DRY RUN: Would send to {len(self.to_numbers)} recipient(s)",
+                "message": f"DRY RUN: Would send to {len(recipients)} recipient(s)",
                 "provider": self.name,
-                "recipient_count": len(self.to_numbers),
+                "recipient_count": len(recipients),
                 "dry_run": True,
             }
 
-        if not self.to_numbers:
+        if not recipients:
             return {
                 "success": False,
                 "message": "No WhatsApp recipients",
@@ -160,7 +178,7 @@ class WhatsAppAlertProvider(BaseAlertProvider):
         self._ensure_client()
 
         results = []
-        for to_number in self.to_numbers:
+        for to_number in recipients:
             for attempt in range(1, self.max_retries + 1):
                 try:
                     if self._mock_mode:

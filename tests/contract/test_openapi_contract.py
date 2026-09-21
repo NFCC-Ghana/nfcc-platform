@@ -77,6 +77,7 @@ PROTECTED_ROUTES = [
     ("POST", "/subscriptions/", {"email": "contract-test@example.com"}),
     ("DELETE", "/subscriptions/contract-test@example.com", None),
     ("GET", "/subscriptions/", None),
+    ("GET", "/v1/alert-subscriptions", None),
     # AI Copilot
     ("POST", "/v1/copilot/ask", {"question": "ping"}),
     # Community report triage
@@ -165,6 +166,7 @@ class TestOpenAPISpec:
             "/v1/alerts/pending",
             "/v1/community-reports",
             "/v1/community-reports/{report_id}/validate",
+            "/v1/alert-subscriptions",
             "/webhooks/whatsapp",
             "/webhooks/telegram",
         ],

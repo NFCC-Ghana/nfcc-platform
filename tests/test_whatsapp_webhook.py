@@ -208,3 +208,46 @@ def test_validate_unknown_report_id_404s(api_client):
         headers={"X-API-Key": settings.API_KEY},
     )
     assert resp.status_code == 404
+
+
+class TestAlertSubscriptionCommands:
+    """"ALERTS ON/OFF" - opting into outbound flood warnings through the
+    same WhatsApp chat used to report floods
+    (src/community/alert_subscription_commands.py), rather than a
+    separate signup flow."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self):
+        from src.database import channel_subscriptions_db
+
+        channel_subscriptions_db.init_channel_subscriptions_table()
+        yield
+        channel_subscriptions_db.unsubscribe("whatsapp", "+233209998888")
+
+    def test_alerts_on_with_district_subscribes(self, api_client):
+        resp = _post_whatsapp(api_client, "ALERTS ON Kaneshie", from_number="whatsapp:+233209998888")
+        assert resp.status_code == 200
+        assert "Accra Central" in resp.text
+
+        from src.database import channel_subscriptions_db
+
+        matches = channel_subscriptions_db.get_subscribers_for_alert("whatsapp", "Accra Central", "HIGH")
+        assert any(m["identifier"] == "+233209998888" for m in matches)
+
+    def test_alerts_on_command_never_creates_a_flood_report(self, api_client):
+        """A subscription command is not a flood report - it must not
+        also land in community_reports."""
+        before = api_client.get("/v1/community-reports?limit=100").json()["count"]
+        _post_whatsapp(api_client, "ALERTS ON", from_number="whatsapp:+233209998888")
+        after = api_client.get("/v1/community-reports?limit=100").json()["count"]
+        assert after == before
+
+    def test_alerts_off_unsubscribes(self, api_client):
+        _post_whatsapp(api_client, "ALERTS ON", from_number="whatsapp:+233209998888")
+        resp = _post_whatsapp(api_client, "ALERTS OFF", from_number="whatsapp:+233209998888")
+        assert resp.status_code == 200
+        assert "unsubscribed" in resp.text.lower()
+
+    def test_unrecognized_district_does_not_subscribe(self, api_client):
+        resp = _post_whatsapp(api_client, "ALERTS ON Narnia", from_number="whatsapp:+233209998888")
+        assert "didn't recognize" in resp.text

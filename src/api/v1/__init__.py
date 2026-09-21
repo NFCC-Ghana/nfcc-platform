@@ -16,6 +16,7 @@ lands.
 
 from fastapi import APIRouter
 
+from src.api.v1.alert_subscriptions import router as alert_subscriptions_router
 from src.api.v1.alerts import router as alerts_router
 from src.api.v1.antecedent_rainfall import router as antecedent_rainfall_router
 from src.api.v1.backtest import router as backtest_router
@@ -54,3 +55,4 @@ router.include_router(observations_router)
 router.include_router(predictions_router)
 router.include_router(copilot_router)
 router.include_router(community_reports_router)
+router.include_router(alert_subscriptions_router)

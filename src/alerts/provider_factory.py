@@ -20,6 +20,7 @@ class ProviderFactory:
         from src.alerts.providers import (
             SMSAlertProvider,
             WhatsAppAlertProvider,
+            TelegramAlertProvider,
             EmailAlertProvider,
             MockAlertProvider,
         )
@@ -28,6 +29,7 @@ class ProviderFactory:
         provider_map = {
             "sms": lambda: SMSAlertProvider(),
             "whatsapp": lambda: WhatsAppAlertProvider(),
+            "telegram": lambda: TelegramAlertProvider(),
             "email": lambda: EmailAlertProvider(),
             "mock": lambda: MockAlertProvider(),
         }

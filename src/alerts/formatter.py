@@ -2,6 +2,18 @@
 
 from typing import Dict, Any, Optional
 
+# Canonical tier ordering - used to compare a real alert's tier against a
+# subscriber's chosen minimum (src/database/channel_subscriptions_db.py),
+# so "notify me for HIGH+" doesn't fire on a MODERATE alert.
+TIER_RANK: Dict[str, int] = {"LOW": 0, "MODERATE": 1, "HIGH": 2, "CRITICAL": 3, "EXTREME": 4}
+
+
+def tier_at_least(candidate_tier: str, minimum_tier: str) -> bool:
+    """True if candidate_tier is at or above minimum_tier in severity.
+    Unknown tier strings rank below everything (never spuriously alert
+    on a typo'd/unrecognized tier)."""
+    return TIER_RANK.get(candidate_tier, -1) >= TIER_RANK.get(minimum_tier, 0)
+
 
 def calculate_score(precipitation: float, temperature: float = None) -> float:
     """Convert precipitation (mm) to a 0-100 flood risk score."""

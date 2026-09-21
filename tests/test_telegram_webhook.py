@@ -36,8 +36,11 @@ def _telegram_settings(monkeypatch):
 
 @pytest.fixture
 def mock_send():
-    with patch("src.api.routes.telegram_webhook.requests.post") as mock_post:
-        mock_post.return_value = MagicMock(status_code=200)
+    # telegram_webhook.py's _send_message delegates to
+    # src/alerts/providers/telegram_provider.py's send_telegram_message
+    # (shared with the outbound alert path) - patch the real call site.
+    with patch("src.alerts.providers.telegram_provider.requests.post") as mock_post:
+        mock_post.return_value = MagicMock(status_code=200, json=lambda: {"ok": True})
         yield mock_post
 
 
@@ -121,3 +124,42 @@ def test_critical_urgency_escalates_reply(api_client, mock_send):
     assert resp.status_code == 200
     reply_text = mock_send.call_args.kwargs["json"]["text"]
     assert "immediate danger" in reply_text
+
+
+class TestAlertSubscriptionCommands:
+    @pytest.fixture(autouse=True)
+    def _cleanup(self):
+        from src.database import channel_subscriptions_db
+
+        channel_subscriptions_db.init_channel_subscriptions_table()
+        yield
+        channel_subscriptions_db.unsubscribe("telegram", "424242")
+
+    def test_alerts_on_with_district_subscribes(self, api_client, mock_send):
+        resp = api_client.post(
+            "/webhooks/telegram",
+            json=_update(chat_id=424242, user_id=424242, text="ALERTS ON Kaneshie"),
+        )
+        assert resp.status_code == 200
+        reply_text = mock_send.call_args.kwargs["json"]["text"]
+        assert "Accra Central" in reply_text
+
+        from src.database import channel_subscriptions_db
+
+        matches = channel_subscriptions_db.get_subscribers_for_alert("telegram", "Accra Central", "HIGH")
+        assert any(m["identifier"] == "424242" for m in matches)
+
+    def test_alerts_on_command_never_creates_a_flood_report(self, api_client, mock_send):
+        before = api_client.get("/v1/community-reports?limit=100").json()["count"]
+        api_client.post("/webhooks/telegram", json=_update(chat_id=424242, user_id=424242, text="ALERTS ON"))
+        after = api_client.get("/v1/community-reports?limit=100").json()["count"]
+        assert after == before
+
+    def test_alerts_off_unsubscribes(self, api_client, mock_send):
+        api_client.post("/webhooks/telegram", json=_update(chat_id=424242, user_id=424242, text="ALERTS ON"))
+        resp = api_client.post(
+            "/webhooks/telegram", json=_update(chat_id=424242, user_id=424242, text="ALERTS OFF")
+        )
+        assert resp.status_code == 200
+        reply_text = mock_send.call_args.kwargs["json"]["text"]
+        assert "unsubscribed" in reply_text.lower()

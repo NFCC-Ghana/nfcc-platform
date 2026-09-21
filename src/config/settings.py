@@ -229,7 +229,13 @@ class Settings:
     @classmethod
     def get_provider_status(cls) -> Dict[str, bool]:
         return {
-            "whatsapp": bool(cls.TWILIO_ACCOUNT_SID and cls.WHATSAPP_RECIPIENTS),
+            # WHATSAPP_RECIPIENTS is no longer required for this provider
+            # to be usable - src/database/channel_subscriptions_db.py now
+            # supplies real, dynamic per-district recipients (a citizen
+            # replying "ALERTS ON <district>"), so credentials alone are
+            # enough to make sending worthwhile.
+            "whatsapp": bool(cls.TWILIO_ACCOUNT_SID and cls.TWILIO_AUTH_TOKEN),
+            "telegram": bool(cls.TELEGRAM_BOT_TOKEN),
             "sms": bool(
                 cls.TWILIO_ACCOUNT_SID and cls.SMS_RECIPIENTS and cls.TWILIO_SMS_FROM
             ),
@@ -281,7 +287,18 @@ print(f"   Providers: {settings.get_provider_status()}")
 # ============================================================
 # DRY RUN MODE - Prevent accidental alerts during testing
 # ============================================================
+# Real bug found while adding TelegramAlertProvider: this was a bare
+# module-level variable, never attached to the `settings` object. Every
+# real consumer (whatsapp_provider.py, telegram_provider.py, health.py)
+# reads it via getattr(settings, "ALERT_DRY_RUN", False) - since the
+# instance never actually had this attribute, that getattr silently
+# fell back to False every time, regardless of the real env var. Setting
+# ALERT_DRY_RUN=true to safely test never actually prevented a real
+# WhatsApp send. The explicit assignment onto `settings` below is what
+# makes every existing getattr(settings, "ALERT_DRY_RUN", ...) call
+# actually work.
 ALERT_DRY_RUN: bool = get_env_bool("ALERT_DRY_RUN", False)
+settings.ALERT_DRY_RUN = ALERT_DRY_RUN
 
 if ALERT_DRY_RUN:
     print("⚠️  ALERT_DRY_RUN is ENABLED - No real alerts will be sent")

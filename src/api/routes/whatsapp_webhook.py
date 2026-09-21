@@ -46,6 +46,7 @@ from fastapi.responses import Response
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 
+from src.community.alert_subscription_commands import handle_subscription_command
 from src.community.community_memory import community_memory
 from src.community.report_parsing import build_report_data, to_float
 from src.config.settings import settings
@@ -105,8 +106,13 @@ async def whatsapp_inbound(request: Request) -> Response:
         return _twiml(
             "NFCC Flood Reporting. Reply with your community name and what "
             "you're seeing, e.g.:\n'Kaneshie - flooding on market road, "
-            "cars can't pass'.\nYou can attach a photo."
+            "cars can't pass'.\nYou can attach a photo.\nReply 'ALERTS ON' "
+            "to receive flood warnings for your area."
         )
+
+    subscription_reply = handle_subscription_command("whatsapp", from_number, body)
+    if subscription_reply is not None:
+        return _twiml(subscription_reply)
 
     report_data = build_report_data(
         body=body,
