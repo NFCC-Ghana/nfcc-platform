@@ -19,6 +19,16 @@ docs) and set RELIEFWEB_APPNAME. Honestly reports available=False
 with that exact instruction until it's set, rather than silently
 never checking this source - the same disclosed-configuration-gap
 pattern already used for DAHITI_API_KEY elsewhere in this platform.
+
+Second real, confirmed constraint (found the same way - a live call
+through the actual outcome_verifier.py code path, after the appname was
+approved, not from the docs): ReliefWeb's date.created range filter
+rejects a bare 'YYYY-MM-DD' value with 'UnexpectedValueException:
+Invalid range from value ... It must be an ISO 8601 date' - it actually
+wants a full ISO 8601 DATETIME (e.g. '2026-09-21T00:00:00+00:00').
+outcome_verifier.py naturally deals in dates, not datetimes, so this
+module normalizes both bounds before sending rather than pushing a
+ReliefWeb-specific quirk onto every caller.
 """
 
 import logging
@@ -28,6 +38,19 @@ from typing import Dict, List
 import requests
 
 logger = logging.getLogger("nfcc.verification.reliefweb")
+
+
+def _to_iso_datetime(value: str, end_of_day: bool = False) -> str:
+    """Accepts either a bare date ('2026-09-21') or an already-full
+    datetime, and returns a full ISO 8601 datetime - what ReliefWeb's
+    date.created range filter actually requires (see module docstring).
+    end_of_day pushes a bare date to 23:59:59 instead of midnight, so an
+    inclusive 'to' bound doesn't silently exclude same-day reports."""
+    if "T" in value:
+        return value
+    time_part = "T23:59:59+00:00" if end_of_day else "T00:00:00+00:00"
+    return f"{value}{time_part}"
+
 
 _BASE_URL = "https://api.reliefweb.int/v2/reports"
 
@@ -58,8 +81,8 @@ def search_flood_reports(district: str, start_date: str, end_date: str) -> Dict:
                 "appname": appname,
                 "query[value]": f"Ghana flood {district}",
                 "filter[field]": "date.created",
-                "filter[value][from]": start_date,
-                "filter[value][to]": end_date,
+                "filter[value][from]": _to_iso_datetime(start_date),
+                "filter[value][to]": _to_iso_datetime(end_date, end_of_day=True),
                 "limit": 10,
             },
             timeout=20,
