@@ -37,6 +37,7 @@ plain env vars:
 | `telegram-webhook-secret`| `TELEGRAM_WEBHOOK_SECRET`  |
 | `dahiti-api-key`         | `DAHITI_API_KEY`           |
 | `reliefweb-appname`      | `RELIEFWEB_APPNAME`        |
+| `gemini-api-key`         | `GEMINI_API_KEY`           |
 
 **Note on writing secrets from PowerShell**: piping a string directly to
 `gcloud secrets versions add ... --data-file=-` (`$value | & gcloud ...`)
