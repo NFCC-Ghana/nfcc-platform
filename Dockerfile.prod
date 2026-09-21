@@ -51,9 +51,6 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy application code
 COPY . .
 
-# Copy model files (ensure they exist)
-COPY models/ ./models/
-
 # Create necessary directories
 RUN mkdir -p logs data/processed reports/coverage
 
