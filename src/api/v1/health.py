@@ -86,6 +86,26 @@ def _check_dahiti() -> DataSourceStatus:
     )
 
 
+def _check_reliefweb() -> DataSourceStatus:
+    """RELIEFWEB_APPNAME presence (src/verification/reliefweb_client.py) -
+    not a live call, for the same reason _check_dahiti() isn't: a real
+    query needs a district and date window that only exist at actual
+    outcome-verification time (src/verification/outcome_verifier.py)."""
+    import os
+
+    if os.getenv("RELIEFWEB_APPNAME"):
+        return DataSourceStatus(
+            name="ReliefWeb (UN OCHA humanitarian report archive)",
+            status="configured",
+            detail="Approved appname present - real outcome verification against ReliefWeb's Ghana flood reports available",
+        )
+    return DataSourceStatus(
+        name="ReliefWeb (UN OCHA humanitarian report archive)",
+        status="not_configured",
+        detail="RELIEFWEB_APPNAME not set - request a free approved appname at https://apidoc.reliefweb.int/parameters#appname",
+    )
+
+
 def _check_open_meteo() -> DataSourceStatus:
     """The one real live call this endpoint makes - Open-Meteo needs no
     API key and responds quickly, and confirming it's actually reachable
@@ -169,6 +189,7 @@ async def get_data_source_health() -> DataSourceHealthResponse:
     sources = [
         _check_earth_engine(),
         _check_dahiti(),
+        _check_reliefweb(),
         _check_open_meteo(),
         _check_river_gauges(),
         _check_community_reports_db(),

@@ -15,6 +15,7 @@ def test_data_source_health_schema(api_client):
     names = {s["name"] for s in data["sources"]}
     assert any("Earth Engine" in n for n in names)
     assert any("DAHITI" in n for n in names)
+    assert any("ReliefWeb" in n for n in names)
     assert any("Open-Meteo" in n for n in names)
     assert any("River Gauges" in n for n in names)
     assert any("Community reports" in n for n in names)
@@ -42,6 +43,24 @@ def test_dahiti_not_configured_is_not_degraded(monkeypatch):
     monkeypatch.delenv("DAHITI_API_KEY", raising=False)
     result = _check_dahiti()
     assert result.status == "not_configured"
+
+
+def test_reliefweb_not_configured_is_not_degraded(monkeypatch):
+    """Same reasoning as DAHITI - unconfigured is a real, expected,
+    functioning-without-it state, never 'unavailable'."""
+    from src.api.v1.health import _check_reliefweb
+
+    monkeypatch.delenv("RELIEFWEB_APPNAME", raising=False)
+    result = _check_reliefweb()
+    assert result.status == "not_configured"
+
+
+def test_reliefweb_configured_reports_status(monkeypatch):
+    from src.api.v1.health import _check_reliefweb
+
+    monkeypatch.setenv("RELIEFWEB_APPNAME", "nfccghana-floodmonitor-8k2p")
+    result = _check_reliefweb()
+    assert result.status == "configured"
 
 
 def test_open_meteo_unreachable_marks_degraded(api_client):

@@ -35,6 +35,18 @@ plain env vars:
 | `nfcc-api-key`           | `API_KEY`                  |
 | `telegram-bot-token`     | `TELEGRAM_BOT_TOKEN`       |
 | `telegram-webhook-secret`| `TELEGRAM_WEBHOOK_SECRET`  |
+| `dahiti-api-key`         | `DAHITI_API_KEY`           |
+| `reliefweb-appname`      | `RELIEFWEB_APPNAME`        |
+
+**Note on writing secrets from PowerShell**: piping a string directly to
+`gcloud secrets versions add ... --data-file=-` (`$value | & gcloud ...`)
+silently prepends a UTF-8 BOM and appends a CRLF - PowerShell's pipe-to-
+stdin behavior, not a gcloud quirk. This corrupted all four Twilio/
+Telegram secrets on first attempt and broke webhook signature validation
+in a way that looked like a wrong credential. Write to a temp file first
+with `[System.IO.File]::WriteAllText($path, $value, (New-Object
+System.Text.UTF8Encoding $false))` (no BOM, no trailing newline), then
+`--data-file=$path`.
 
 Wired in with `--update-secrets=TWILIO_ACCOUNT_SID=twilio-account-sid:latest,...`
 on `gcloud run services update`. The Cloud Run service's runtime identity
