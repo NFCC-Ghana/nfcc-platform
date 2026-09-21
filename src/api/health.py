@@ -20,36 +20,6 @@ def check_twilio_health() -> Dict[str, Any]:
     return {"status": "configured", "message": "Twilio credentials present"}
 
 
-def check_model_health() -> Dict[str, Any]:
-    """Check model health (no network calls).
-
-    Honesty note for anyone reading this endpoint's output: a "healthy"
-    XGBoost model here does NOT mean flood risk scoring is ML-driven.
-    grep confirms .predict() is never called anywhere in the live
-    request path (src/models/historical_backtest.py's own module
-    docstring documents this) - every real score comes from
-    calculate_score()'s hand-authored precipitation curve
-    (src/alerts/formatter.py). This model is loaded and reported on here
-    only so a genuine load failure is visible; it is not part of any
-    real prediction today.
-    """
-    from src.config.settings import settings
-
-    try:
-        # This will trigger model load if not already loaded
-        model = settings.model
-        return {
-            "status": "healthy",
-            "message": (
-                f"Model file loads correctly from {settings.MODEL_PATH}. "
-                "Not used in live risk scoring - see calculate_score() "
-                "(src/alerts/formatter.py) for the real scoring logic."
-            ),
-        }
-    except Exception as e:
-        return {"status": "unhealthy", "message": str(e)}
-
-
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
     """Comprehensive health check - no startup network calls."""
@@ -96,7 +66,6 @@ async def health_check() -> Dict[str, Any]:
             "available": is_redis_available(),
             "configured": bool(getattr(settings, "REDIS_URL", None)),
         },
-        "model": check_model_health(),
         "config": {
             "alerts_per_hour": settings.ALERTS_PER_HOUR,
             "rate_limit": f"{settings.RATE_LIMIT_REQUESTS}/{settings.RATE_LIMIT_PERIOD}s",
@@ -112,9 +81,10 @@ async def liveness_check() -> Dict[str, str]:
 
 @router.get("/health/ready")
 async def readiness_check() -> Dict[str, Any]:
-    """Kubernetes readiness probe."""
-    model_health = check_model_health()
-    if model_health["status"] != "healthy":
-        return {"status": "not_ready", "reason": model_health["message"]}
-
+    """Kubernetes readiness probe. Used to gate on a model file load
+    (models/xgboost_flood_risk.pkl, removed - confirmed never used in
+    live risk scoring and, when tested against real historical flood
+    events, showed no reliable improvement over calculate_score()) -
+    that was never a meaningful readiness signal anyway, since nothing
+    this service actually serves depended on the model loading."""
     return {"status": "ready"}

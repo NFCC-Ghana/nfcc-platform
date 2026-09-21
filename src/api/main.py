@@ -62,13 +62,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting NFCC Flood Alert Platform v{settings.API_VERSION}...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
 
-    # Verify model loads
-    try:
-        model = settings.model
-        logger.info("✅ Model loaded successfully")
-    except Exception as e:
-        logger.error(f"❌ Failed to load model: {e}")
-
     # Initialize alert engine
     alert_engine = AlertEngine()
     logger.info("✅ Alert engine initialized")

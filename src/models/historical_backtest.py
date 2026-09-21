@@ -2,15 +2,19 @@
 this real flood event?"
 
 Deliberately backtests calculate_score() (src/alerts/formatter.py) - the
-exact function every live endpoint in this platform actually uses - not
-the dormant models/xgboost_flood_risk.pkl. That model is loaded only for
-a health check (confirmed by grep: .predict() is called nowhere in the
-live pipeline) and was trained against flood_risk_score, a value that
-correlates 0.92 with same-day precipitation in its own training data -
-a synthetic formula derived from the same rolling-window features used
-to predict it, not a real historical flood outcome. Backtesting the
-function that's actually live is the only way to honestly answer what
-this platform would really have said.
+exact function every live endpoint in this platform actually uses.
+models/xgboost_flood_risk.pkl (src/models/train_model.py) was removed
+after this same backtest methodology was extended to test it head-to-
+head against calculate_score() on these real events (real CHIRPS
+rainfall, real historical floods): tied on detection (7/7), and its
+apparent lead-time edge was driven by a single event out of seven -
+not reliable evidence, especially since it was trained against
+flood_risk_score, a value that correlates 0.92 with same-day
+precipitation in its own training data - a synthetic formula derived
+from the same rolling-window features used to predict it, not a real
+historical flood outcome. Backtesting the function that's actually
+live is the only way to honestly answer what this platform would
+really have said.
 
 Two scoring variants are backtested per event, to give a real, evidence-
 based answer to "do temporal features help" rather than an opinion:
