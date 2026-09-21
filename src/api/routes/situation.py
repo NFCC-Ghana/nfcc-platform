@@ -160,9 +160,19 @@ async def get_situation(request: SituationRequest):
     evidence (rainfall/river/soil/dam), population and infrastructure
     impact estimates, a simple economic loss estimate, and community
     report stats - everything the dashboard's non-header panels need,
-    computed from real district data instead of static placeholders."""
+    computed from real district data instead of static placeholders.
 
-    score = calculate_score(request.precipitation)
+    score includes a real urban-drainage adjustment
+    (src/hydrology/urban_drainage.py via calculate_score's district
+    param) - a neutral 1.0x for the districts this module has no real
+    data on, currently a real >1.0x for Accra Central/West/East's known
+    poor/blocked drainage. Deliberately NOT yet applied to
+    src/api/routes/alert_review.py's /alerts/assess (the real automated
+    alert-triggering path) - that's a separate, more consequential
+    decision (it changes when a real evacuation alert fires) left for
+    an explicit choice rather than silently folded in here."""
+
+    score = calculate_score(request.precipitation, district=request.location)
     risk_tier = get_risk_tier(score)
 
     try:

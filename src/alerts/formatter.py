@@ -3,6 +3,7 @@
 from typing import Dict, Any, Optional
 
 from src.config.settings import settings
+from src.hydrology.urban_drainage import urban_drainage
 
 # Canonical tier ordering - used to compare a real alert's tier against a
 # subscriber's chosen minimum (src/database/channel_subscriptions_db.py),
@@ -17,18 +18,43 @@ def tier_at_least(candidate_tier: str, minimum_tier: str) -> bool:
     return TIER_RANK.get(candidate_tier, -1) >= TIER_RANK.get(minimum_tier, 0)
 
 
-def calculate_score(precipitation: float, temperature: float = None) -> float:
-    """Convert precipitation (mm) to a 0-100 flood risk score."""
+def calculate_score(
+    precipitation: float, temperature: float = None, district: Optional[str] = None
+) -> float:
+    """Convert precipitation (mm) to a 0-100 flood risk score.
+
+    district is optional and, when given, applies a real urban-drainage
+    adjustment (src/hydrology/urban_drainage.py, first wired in here
+    after being imported-but-never-called since early development) on
+    top of the base precipitation curve: a multiplier above 1.0 for a
+    district with known poor/blocked drainage (currently real data only
+    for Accra Central/West/East - see that module's docstring), and a
+    neutral 1.0 (no change at all) for every other district, including
+    ones this module has zero real data on.
+
+    Every existing caller that doesn't pass district is completely
+    unaffected - deliberately minimal blast radius, since this function
+    is also called from historical backtesting/rare-event verification
+    (src/models/historical_backtest.py, rare_event_verification.py),
+    which need the pure precipitation-only curve to stay comparable
+    against real past events.
+    """
     if precipitation <= 0:
-        return 0.0
+        base = 0.0
     elif precipitation < 10:
-        return min(100, precipitation * 3)
+        base = min(100, precipitation * 3)
     elif precipitation < 30:
-        return min(100, 30 + (precipitation - 10) * 2)
+        base = min(100, 30 + (precipitation - 10) * 2)
     elif precipitation < 50:
-        return min(100, 70 + (precipitation - 30) * 1.5)
+        base = min(100, 70 + (precipitation - 30) * 1.5)
     else:
-        return min(100, 95 + (precipitation - 50) * 0.2)
+        base = min(100, 95 + (precipitation - 50) * 0.2)
+
+    if district and base > 0:
+        drainage_factor = urban_drainage.get_flood_risk_factor(district, precipitation)
+        base = min(100, base * drainage_factor)
+
+    return base
 
 
 def get_risk_tier(score: float) -> str:

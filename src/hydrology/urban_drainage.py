@@ -1,4 +1,35 @@
-"""Urban drainage mapping and flood routing for Accra."""
+"""Urban drainage mapping and flood routing for Accra.
+
+Real, named infrastructure (the Odaw/Densu rivers, Korle lagoon, Ring
+Road drainage channel are all genuine, well-documented contributors to
+Accra's flooding - the Odaw in particular is repeatedly cited in real
+flood reporting), but a hand-curated, manually-estimated snapshot, NOT
+"OpenStreetMap and drainage network data" as this module's class
+docstring previously (inaccurately) claimed - _load_drainage_network()
+is a static dict with no data-loading logic at all. Capacity/status
+values have no cited source or update mechanism; treat this as a
+reasonable structural estimate, not a live measurement.
+
+Real coverage is narrower than the district list below implies: only
+Accra Central/West/East have area names that actually match anything in
+drainage_network (Kaneshie, Weija, Mallam, Korle, Chorkor, etc.). Tema/
+Kumasi/Tamale's area_map entries ("Community 1", "Atwima", "Gushegu")
+never match anything real in this dataset and always resolve to
+UNKNOWN, same as the 3 districts with no area_map entry at all - kept
+here (not fixed) since correcting them with fabricated/guessed drainage
+data would repeat exactly the undisclosed-fabrication mistake found
+elsewhere in this codebase; UNKNOWN is the honest state until real
+Tema/Kumasi/Tamale drainage data exists.
+
+Found and fixed while first wiring this into the real, live score
+(src/alerts/formatter.py's calculate_score) rather than
+src/hydrology/unified_intelligence.py's already-disconnected composite
+score (nothing reads its output - see situation.py's "recommendations"
+removal for that history): get_flood_risk_factor() used to return the
+same 0.8x multiplier for a genuinely GOOD-drainage district and for a
+district this module has zero real data on (UNKNOWN) - silently
+LOWERING the risk estimate for missing data, backwards for a life-
+safety system. UNKNOWN now returns a neutral 1.0x."""
 
 import json
 import logging
@@ -12,10 +43,8 @@ logger = logging.getLogger(__name__)
 
 
 class UrbanDrainage:
-    """
-    Urban drainage mapping for flood routing.
-    Uses OpenStreetMap and drainage network data.
-    """
+    """Urban drainage mapping for flood routing - see module docstring
+    for real coverage/accuracy caveats."""
 
     def __init__(self):
         self.data_path = Path("data/urban/drainage")
@@ -157,10 +186,18 @@ class UrbanDrainage:
         Calculate flood risk factor based on drainage capacity.
 
         Returns:
-            Risk multiplier (1.0 = baseline)
+            Risk multiplier (1.0 = baseline, no adjustment).
         """
         status = self.get_drainage_status(district)
         overall = status.get("overall_status", "UNKNOWN")
+
+        # UNKNOWN means this module has no real drainage data for this
+        # district (most of the tracked districts, and Tema/Kumasi/Tamale
+        # despite their area_map entries - see module docstring) - a
+        # neutral 1.0 multiplier, not the "GOOD" 0.8, which used to
+        # silently LOWER the risk estimate for missing data.
+        if overall == "UNKNOWN":
+            return 1.0
 
         # Base multiplier
         if overall == "CRITICAL":
