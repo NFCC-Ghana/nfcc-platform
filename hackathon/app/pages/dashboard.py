@@ -11,6 +11,7 @@ International-standard professional dashboard
 import os
 import sys
 import time
+from urllib.parse import quote
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -520,6 +521,20 @@ def render_control_panel():
         start_demo = False
         if demo_mode:
             start_demo = st.button("▶ Start Demo", use_container_width=True)
+
+        st.divider()
+        st.markdown("### 📺 Public Kiosk Screen")
+        st.caption(
+            "A full-screen, auto-refreshing live view of real current "
+            "conditions - no clicking required. Point any screen's "
+            "browser at this link to run it as an unattended public "
+            "display."
+        )
+        st.link_button(
+            "📺 Open Public Kiosk Screen",
+            url=f"?kiosk=1&district={quote(district)}",
+            use_container_width=True,
+        )
 
         st.divider()
         st.markdown("### 🔔 Alert Review Queue")
@@ -1860,6 +1875,129 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
     return "paused"
 
 
+# Refresh cadence for the unattended kiosk screen (render_kiosk_view) -
+# real conditions don't change meaningfully faster than this, and it
+# keeps the Open-Meteo call volume for an unattended, always-on screen
+# reasonable. Matches the cadence of a real public transit departure
+# board, not a stock ticker.
+KIOSK_REFRESH_SECONDS = 90
+
+
+def render_kiosk_view(district: str) -> None:
+    """Unattended, full-screen public display for one district's real
+    current conditions - the actual "digital screen simulating the
+    weather situation" a non-literate viewer can read from across a
+    room, meant to run continuously on a physical screen (community
+    center, market, chief's palace), not a presenter clicking through a
+    briefing.
+
+    Deliberately does NOT reuse render_broadcast_view wholesale: that
+    function also queues an exercise alert and waits for an operator to
+    Approve/Dismiss it (see its docstring), which is correct for a
+    presenter-driven demo but actively wrong here - a screen refreshing
+    itself every KIOSK_REFRESH_SECONDS with nobody present to click
+    Approve/Dismiss would either queue exercise alerts nobody clears or
+    silently stall on the same "awaiting operator action" block forever.
+    This shows the same real display blocks (weather banner, risk-tier
+    block, recommendation) with none of that stitching.
+
+    Rainfall is the real next-24h forecast (weather_forecast_24h), not a
+    manual slider value or a scripted demo stage - this is meant to show
+    what's actually happening, continuously, unattended.
+
+    Entered via ?kiosk=1&district=<name> in the URL (see main()), so a
+    physical screen's browser can simply be pointed at a fixed link -
+    e.g. a Raspberry Pi or Android box running Chromium in --kiosk mode,
+    the standard pattern real public-information screens use worldwide
+    rather than custom kiosk software."""
+    st.markdown(
+        """<style>
+        [data-testid="stSidebar"], header[data-testid="stHeader"],
+        #MainMenu, footer {display: none !important;}
+        .block-container {padding-top: 1.5rem !important; max-width: 100% !important;}
+        </style>""",
+        unsafe_allow_html=True,
+    )
+
+    try:
+        rainfall_mm = weather_forecast_24h(district)
+    except Exception:
+        rainfall_mm = 0.0
+
+    state, _ = fetch_situation_state(district, rainfall_mm)
+    summary, color, recommendation = SITUATION_BY_TIER.get(
+        state.risk_category, SITUATION_BY_TIER["MODERATE"]
+    )
+    style = get_risk_tier_style(tier=state.risk_category)
+
+    st.markdown(
+        f"<div style='background:#111827;color:#fff;padding:14px 28px;"
+        f"border-radius:8px;display:flex;justify-content:space-between;"
+        f"align-items:center;margin-bottom:20px;'>"
+        f"<span style='font-size:22px;font-weight:700;letter-spacing:1px;'>"
+        f"📺 LIVE — {district}</span>"
+        f"<span style='font-size:16px;color:#9ca3af;'>Updated "
+        f"{datetime.now().strftime('%H:%M:%S UTC')}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    if state.temperature_c is not None:
+        day_night_label = "Day" if state.is_day else "Night"
+        st.markdown(
+            f"<div style='background:#1f2937;color:#fff;padding:32px 24px;"
+            f"border-radius:20px;text-align:center;margin-bottom:16px;"
+            f"display:flex;align-items:center;justify-content:center;gap:32px;'>"
+            f"<span style='font-size:96px;line-height:1;'>{state.weather_icon}</span>"
+            f"<div style='text-align:left;'>"
+            f"<div style='font-size:56px;font-weight:800;line-height:1.1;'>"
+            f"{state.temperature_c:.0f}°C / {state.temperature_f:.0f}°F</div>"
+            f"<div style='font-size:26px;color:#d1d5db;'>"
+            f"{state.weather_description} • {day_night_label}</div>"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if state.forecast_source == "fallback":
+            st.markdown(
+                "<div style='text-align:center;color:#facc15;font-size:16px;"
+                "margin-bottom:16px;'>⚠️ Weather service unreachable — "
+                "showing a seasonal estimate, not a live reading.</div>",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown(
+        f"<div style='background:{style['color']};color:#fff;"
+        f"padding:48px 24px;border-radius:20px;text-align:center;"
+        f"margin-bottom:20px;'>"
+        f"<div style='font-size:96px;line-height:1;'>{style['emoji']}</div>"
+        f"<div style='font-size:80px;font-weight:800;line-height:1.1;'>"
+        f"{state.risk_score:.0f}%</div>"
+        f"<div style='font-size:34px;font-weight:700;letter-spacing:2px;'>"
+        f"{state.risk_category}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"<div style='background:#161616;padding:20px 24px;"
+        f"border-radius:8px;border-left:8px solid {color};"
+        f"font-size:20px;text-align:center;'>"
+        f"<strong>{summary}</strong><br>"
+        f"<span style='font-size:17px;'>Recommended: {recommendation}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.caption(
+        f"🔄 Refreshes automatically every {KIOSK_REFRESH_SECONDS}s • "
+        f"NFCC Platform • real-time satellite and weather data, not a recording"
+    )
+
+    time.sleep(KIOSK_REFRESH_SECONDS)
+    st.rerun()
+
+
 # All districts this platform has real hydrology/impact data for - used
 # by the "Run Automated Check Now" button to mirror what
 # scripts/automated_risk_assessment.py does on its 3-hourly schedule
@@ -2206,7 +2344,20 @@ def main():
     message after only a flash of stage 1. Advancing via rerun instead of
     a loop works *with* that behavior instead of fighting it - it's
     exactly how normal manual-slider mode already renders every time the
-    slider moves, which is why that path never hit this problem."""
+    slider moves, which is why that path never hit this problem.
+
+    Checks for kiosk mode (?kiosk=1&district=<name>) before anything
+    else - a physical unattended screen should never pay for or render
+    the full operator sidebar/control panel just to be immediately
+    hidden by render_kiosk_view's own CSS."""
+    query_params = st.query_params
+    if query_params.get("kiosk") in ("1", "true", "True"):
+        kiosk_district = query_params.get("district", ALL_TRACKED_DISTRICTS[0])
+        if kiosk_district not in ALL_TRACKED_DISTRICTS:
+            kiosk_district = ALL_TRACKED_DISTRICTS[0]
+        render_kiosk_view(kiosk_district)
+        return
+
     control_data = render_control_panel()
     district = control_data["district"]
 
