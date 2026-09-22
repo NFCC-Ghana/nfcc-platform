@@ -52,6 +52,25 @@ class DashboardState:
     # WEATHER & ENVIRONMENT
     # ============================================================
     rainfall_mm: float = 75.0
+    # Real current temperature/sky condition (src/hydrology/
+    # weather_forecast.py's Open-Meteo integration, via /situation) -
+    # keeps the dashboard useful outside rainy season, when risk_score
+    # sits near zero for every district: a real reading of what it's
+    # actually like outside right now, not just a flood-risk number.
+    # temperature_c is None when /situation wasn't called or the
+    # forecast call failed - consumers must show "N/A", not 0degC.
+    temperature_c: float = None
+    temperature_f: float = None
+    weather_description: str = "Unknown"
+    weather_icon: str = "❓"
+    is_day: bool = True
+    is_raining_now: bool = False
+    # Real "chance of rain" (Open-Meteo's own forecast model output) -
+    # deliberately separate from risk_score, which is this platform's
+    # own derived FLOOD risk given an assumed rainfall amount, not a
+    # probability rain happens at all.
+    rain_probability_today_percent: float = None
+    forecast_source: str = "unknown"
     river_level_m: float = 1.5
     soil_saturation_percent: float = 65.0
     # Real NASA SMAP satellite soil moisture (src/hydrology/
@@ -288,6 +307,14 @@ def create_state_from_api(api_data: dict) -> DashboardState:
     state.forecast_24h_mm = api_data.get("forecast_24h_mm", 45.0)
     state.forecast_48h_mm = api_data.get("forecast_48h_mm", 60.0)
     state.forecast_72h_mm = api_data.get("forecast_72h_mm", 30.0)
+    state.forecast_source = api_data.get("forecast_source", "unknown")
+    state.temperature_c = api_data.get("temperature_c")
+    state.temperature_f = api_data.get("temperature_f")
+    state.weather_description = api_data.get("weather_description") or "Unknown"
+    state.weather_icon = api_data.get("weather_icon") or "❓"
+    state.is_day = api_data.get("is_day", True)
+    state.is_raining_now = api_data.get("is_raining_now", False)
+    state.rain_probability_today_percent = api_data.get("rain_probability_today_percent")
     state.risk_timeline = api_data.get("risk_timeline", [])
     state.shelter_names = api_data.get("shelter_names", [])
     state.dam_intelligence = api_data.get("dam_intelligence", [])

@@ -340,6 +340,26 @@ async def get_situation(request: SituationRequest):
         response["forecast_48h_mm"] = forecast.get("48h", 0.0)
         response["forecast_72h_mm"] = forecast.get("72h", 0.0)
         response["forecast_source"] = forecast.get("source", "unknown")
+        # Real current temperature/sky condition (src/hydrology/
+        # weather_forecast.py, Open-Meteo's "current" block) - the
+        # system stays useful outside rainy season, when score/risk_tier
+        # sit near zero for every district: a citizen or operator still
+        # gets a real reading of what it's actually like outside right
+        # now. "fallback" values (forecast_source == "fallback") are a
+        # climatological estimate, never a live measurement - always
+        # check forecast_source before treating this as a real reading.
+        response["temperature_c"] = forecast.get("temperature_c")
+        response["temperature_f"] = forecast.get("temperature_f")
+        response["weather_description"] = forecast.get("weather_description")
+        response["weather_icon"] = forecast.get("weather_icon")
+        response["is_day"] = forecast.get("is_day")
+        response["is_raining_now"] = forecast.get("is_raining_now")
+        # Real "chance of rain" (Open-Meteo's own forecast model output) -
+        # deliberately separate from score/risk_tier above, which is
+        # this platform's own derived FLOOD risk given an assumed
+        # rainfall amount, not a probability rain happens at all.
+        response["rain_probability_now_percent"] = forecast.get("rain_probability_now_percent")
+        response["rain_probability_today_percent"] = forecast.get("rain_probability_today_percent")
     except Exception as e:
         logger.error(f"Weather forecast failed for {request.location}: {e}")
 

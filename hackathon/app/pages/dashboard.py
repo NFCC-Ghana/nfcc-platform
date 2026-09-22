@@ -600,6 +600,49 @@ def render_executive_summary(state):
         if state.confidence_explanation:
             st.caption(f"💡 {state.confidence_explanation}")
 
+        # Real current weather (src/hydrology/weather_forecast.py's
+        # Open-Meteo integration, via /situation) - keeps this panel
+        # useful outside rainy season, when risk_score sits near zero for
+        # every district: a citizen or operator still sees a real
+        # reading of what it's actually like outside right now, not just
+        # a flood-risk number with nothing to show for a dry, sunny day.
+        if state.temperature_c is not None:
+            day_night_label = "Day" if state.is_day else "Night"
+            render_quick_stats(
+                [
+                    {
+                        "label": "Temperature",
+                        "value": f"{state.temperature_c:.0f}°C",
+                        "emoji": state.weather_icon,
+                        "color": "#dd6b20",
+                        "subtitle": f"{state.temperature_f:.0f}°F",
+                    },
+                    {
+                        "label": "Sky Condition",
+                        "value": state.weather_description,
+                        "emoji": "🌦️" if state.is_raining_now else "🔭",
+                        "color": "#4299e1",
+                        "subtitle": day_night_label,
+                    },
+                    {
+                        "label": "Chance of Rain Today",
+                        "value": (
+                            f"{state.rain_probability_today_percent:.0f}%"
+                            if state.rain_probability_today_percent is not None
+                            else "N/A"
+                        ),
+                        "emoji": "☔",
+                        "color": "#3182ce",
+                    },
+                ],
+                columns=3,
+            )
+            if state.forecast_source == "fallback":
+                st.caption(
+                    "⚠️ Weather service unreachable - temperature/rain chance are a "
+                    "seasonal estimate, not a live reading."
+                )
+
     with col2:
         # Was labeled "AI Situation Summary" - misleading, since
         # SITUATION_BY_TIER (below) is a static 5-row lookup table with no
@@ -1625,6 +1668,30 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
         f"</div>",
         unsafe_allow_html=True,
     )
+
+    # Real sky condition (src/hydrology/weather_forecast.py, via
+    # /situation) as a large, symbol-first banner - deliberately
+    # separate from the risk-level block below it. A giant sun/cloud/
+    # rain icon reads instantly to someone who can't read the English
+    # text next to it, the same way a real TV weather broadcast or
+    # airport board leads with an icon, not a sentence. This is "what
+    # the sky actually looks like right now" - the risk block below is
+    # "what that means for you", a deliberately separate second signal
+    # rather than one collapsed number.
+    if state.temperature_c is not None:
+        st.markdown(
+            f"<div style='background:#1f2937;color:#fff;padding:20px 24px;"
+            f"border-radius:16px;text-align:center;margin-bottom:12px;"
+            f"display:flex;align-items:center;justify-content:center;gap:24px;'>"
+            f"<span style='font-size:64px;line-height:1;'>{state.weather_icon}</span>"
+            f"<div style='text-align:left;'>"
+            f"<div style='font-size:36px;font-weight:800;line-height:1.1;'>"
+            f"{state.temperature_c:.0f}°C / {state.temperature_f:.0f}°F</div>"
+            f"<div style='font-size:18px;color:#d1d5db;'>{state.weather_description}</div>"
+            f"</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown(
         f"<div style='background:{style['color']};color:#fff;"
