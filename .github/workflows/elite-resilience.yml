@@ -19,7 +19,7 @@ jobs:
         test-type: [deterministic, chaos, security, fuzz, stress]
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: Setup Python
       uses: actions/setup-python@v5
