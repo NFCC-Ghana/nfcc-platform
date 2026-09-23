@@ -77,12 +77,20 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down...")
 
 
-# Create FastAPI app
+# Create FastAPI app. Swagger UI (/docs), ReDoc (/redoc), and the raw
+# schema (/openapi.json) are disabled in production - a security audit
+# found all three fully public with zero auth, handing anyone a
+# complete structured map of every endpoint and schema this API has.
+# Left open in development, where that map is a convenience, not a
+# reconnaissance surface.
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.API_VERSION,
     description="National Flood Intelligence Platform API",
     lifespan=lifespan,
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
 
 # CORS middleware - real allowlist (settings.ALLOWED_ORIGINS), not a
@@ -92,12 +100,17 @@ app = FastAPI(
 # audit shouldn't rely on that browser-side backstop). allow_credentials
 # is now False: every real client authenticates via the X-API-Key
 # header, not cookies, so there is nothing here that needs it.
+# allow_methods/allow_headers were left wildcarded in that same fix -
+# tightened here to exactly what this API actually uses: GET/POST (every
+# route is one or the other) + OPTIONS (the browser preflight method
+# itself), and Content-Type/X-API-Key (the only two headers any real
+# request sends).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", settings.API_KEY_HEADER],
 )
 
 # Registers the @limiter.limit(...) decorators applied in
@@ -110,9 +123,19 @@ app.state.limiter = limiter
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    # Retry-After tells a well-behaved client exactly when to try again,
+    # rather than leaving it to guess/retry immediately - the actual
+    # window this limit resets on (e.g. 60 for "30/minute"), not a
+    # rough guess. Falls back to 60s if slowapi's exception shape ever
+    # changes in a way that breaks this specific attribute path.
+    try:
+        retry_after = exc.limit.limit.get_expiry()
+    except Exception:
+        retry_after = 60
     return JSONResponse(
         status_code=429,
         content={"detail": f"Rate limit exceeded: {exc.detail}"},
+        headers={"Retry-After": str(retry_after)},
     )
 
 
