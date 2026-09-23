@@ -60,12 +60,11 @@ pytest==7.4.3
 pytest-cov==4.1.0
 pytest-mock==3.12.0
 # Bumped from 0.25.1: google-genai hard-requires httpx>=0.28.1,<1.0.0.
-# starlette==0.40.0 (below, itself bumped for a real DoS advisory fix)
-# already works fine with httpx 0.28.1 - the TestClient breakage this
-# looked like it would cause turned out to be stale packages in the
-# local dev env, not a real incompatibility; verified via a fresh
-# install of the versions actually pinned here, then the full test
-# suite - re-verified again after the starlette 0.38.6 -> 0.40.0 bump.
+# starlette==0.38.6 (below) already works fine with httpx 0.28.1 - the
+# TestClient breakage this looked like it would cause turned out to be
+# stale packages in the local dev env, not a real incompatibility;
+# verified via a fresh install of the versions actually pinned here,
+# then the full test suite.
 pytest-asyncio==0.21.1
 httpx==0.28.1
 
@@ -77,7 +76,16 @@ rich==13.7.0
 requests>=2.31.0
 gunicorn>=20.1.0
 apscheduler>=3.10.0
-# Bumped from 0.38.6: that version predates 0.40.0's fix for a DoS
-# advisory in multipart/form-data parsing (GHSA-2c2j-9gv5-cj73). Also
-# the actual floor fastapi==0.115.0 declares (starlette>=0.40.0,<0.47.0).
-starlette==0.40.0
+# NOT bumped, despite a real DoS advisory (GHSA-2c2j-9gv5-cj73) fixed in
+# starlette 0.40.0: fastapi==0.115.0's real, PyPI-verified constraint is
+# starlette<0.39.0,>=0.37.2 (confirmed the hard way - an initial attempt
+# to bump to 0.40.0 was checked against a local dev environment where
+# fastapi itself had silently drifted to a newer, unpinned version, so
+# its wider starlette range looked compatible when it wasn't; that bump
+# broke CI's actual `pip install -r requirements.txt` with a real
+# resolver conflict against the genuinely pinned fastapi==0.115.0).
+# 0.38.6 is the latest version within that real constraint - clearing
+# this advisory requires a FastAPI major-version bump, which needs its
+# own dedicated compatibility pass across the whole app, not a blind
+# version bump inside an otherwise-unrelated hardening sweep.
+starlette==0.38.6
