@@ -45,8 +45,14 @@ class ObservationListResponse(BaseModel):
 
 
 class RecordObservationRequest(BaseModel):
-    source: str = Field(..., description="e.g. 'rainfall_forecast', 'river_gauge', 'dam_akosombo', 'smap_soil_moisture'")
-    value: Optional[float] = Field(default=None, description="None is a real, honest 'missing' reading, not skipped")
+    source: str = Field(
+        ...,
+        description="e.g. 'rainfall_forecast', 'river_gauge', 'dam_akosombo', 'smap_soil_moisture'",
+    )
+    value: Optional[float] = Field(
+        default=None,
+        description="None is a real, honest 'missing' reading, not skipped",
+    )
     unit: str = Field(..., description="e.g. 'mm', 'm', 'risk_0_100', 'm3m3'")
     quality_flag: str = Field(
         default="not_evaluated",
@@ -76,7 +82,9 @@ async def get_district_observations(
 ) -> ObservationListResponse:
     _require_tracked_district(district)
     rows = get_observations(district=district, source=source, limit=limit)
-    return ObservationListResponse(district=district, count=len(rows), observations=rows)
+    return ObservationListResponse(
+        district=district, count=len(rows), observations=rows
+    )
 
 
 @router.post(

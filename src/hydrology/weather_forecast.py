@@ -28,8 +28,16 @@ WMO_WEATHER_CODES: Dict[int, Dict] = {
     51: {"description": "Light drizzle", "icon": "🌦️", "is_precipitating": True},
     53: {"description": "Moderate drizzle", "icon": "🌦️", "is_precipitating": True},
     55: {"description": "Dense drizzle", "icon": "🌧️", "is_precipitating": True},
-    56: {"description": "Light freezing drizzle", "icon": "🌦️", "is_precipitating": True},
-    57: {"description": "Dense freezing drizzle", "icon": "🌧️", "is_precipitating": True},
+    56: {
+        "description": "Light freezing drizzle",
+        "icon": "🌦️",
+        "is_precipitating": True,
+    },
+    57: {
+        "description": "Dense freezing drizzle",
+        "icon": "🌧️",
+        "is_precipitating": True,
+    },
     61: {"description": "Slight rain", "icon": "🌦️", "is_precipitating": True},
     63: {"description": "Moderate rain", "icon": "🌧️", "is_precipitating": True},
     65: {"description": "Heavy rain", "icon": "🌧️", "is_precipitating": True},
@@ -40,13 +48,25 @@ WMO_WEATHER_CODES: Dict[int, Dict] = {
     75: {"description": "Heavy snow fall", "icon": "🌨️", "is_precipitating": True},
     77: {"description": "Snow grains", "icon": "🌨️", "is_precipitating": True},
     80: {"description": "Slight rain showers", "icon": "🌦️", "is_precipitating": True},
-    81: {"description": "Moderate rain showers", "icon": "🌧️", "is_precipitating": True},
+    81: {
+        "description": "Moderate rain showers",
+        "icon": "🌧️",
+        "is_precipitating": True,
+    },
     82: {"description": "Violent rain showers", "icon": "⛈️", "is_precipitating": True},
     85: {"description": "Slight snow showers", "icon": "🌨️", "is_precipitating": True},
     86: {"description": "Heavy snow showers", "icon": "🌨️", "is_precipitating": True},
     95: {"description": "Thunderstorm", "icon": "⛈️", "is_precipitating": True},
-    96: {"description": "Thunderstorm with slight hail", "icon": "⛈️", "is_precipitating": True},
-    99: {"description": "Thunderstorm with heavy hail", "icon": "⛈️", "is_precipitating": True},
+    96: {
+        "description": "Thunderstorm with slight hail",
+        "icon": "⛈️",
+        "is_precipitating": True,
+    },
+    99: {
+        "description": "Thunderstorm with heavy hail",
+        "icon": "⛈️",
+        "is_precipitating": True,
+    },
 }
 
 _UNKNOWN_WEATHER = {"description": "Unknown", "icon": "❓", "is_precipitating": False}

@@ -61,7 +61,9 @@ class OperationalResourcesResponse(BaseModel):
 async def get_district_resources(
     district: str,
     precipitation_mm: float = Query(
-        ..., ge=0, description="Precipitation in mm, used to compute infrastructure exposure"
+        ...,
+        ge=0,
+        description="Precipitation in mm, used to compute infrastructure exposure",
     ),
 ) -> OperationalResourcesResponse:
     if get_district(district) is None:

@@ -208,7 +208,11 @@ class CommunityMemoryEngine:
 
             conn.commit()
 
-            return {"status": "validated", "report_id": report_id, "confidence": confidence}
+            return {
+                "status": "validated",
+                "report_id": report_id,
+                "confidence": confidence,
+            }
         except Exception:
             conn.rollback()
             raise

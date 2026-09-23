@@ -38,7 +38,12 @@ from src.api.routes.alert_review import (
     dismiss_pending_alert,
     list_pending_alerts,
 )
-from src.api.routes.alerts import AlertHistoryResponse, AlertStatsResponse, get_history, get_stats
+from src.api.routes.alerts import (
+    AlertHistoryResponse,
+    AlertStatsResponse,
+    get_history,
+    get_stats,
+)
 from src.api.routes.cap_export import export_cap_xml
 
 router = APIRouter(prefix="/alerts", tags=["v1"])
@@ -108,7 +113,9 @@ async def v1_cap_xml(alert_id: int):
 async def v1_history(
     limit: int = 50, offset: int = 0, location_filter: Optional[str] = None
 ):
-    return await get_history(limit=limit, offset=offset, location_filter=location_filter)
+    return await get_history(
+        limit=limit, offset=offset, location_filter=location_filter
+    )
 
 
 @router.get("/stats", response_model=AlertStatsResponse)

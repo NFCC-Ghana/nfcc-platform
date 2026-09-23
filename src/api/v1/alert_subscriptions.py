@@ -34,8 +34,14 @@ class ChannelSubscriptionListResponse(BaseModel):
     subscriptions: List[ChannelSubscription]
 
 
-@router.get("", response_model=ChannelSubscriptionListResponse, dependencies=[Depends(verify_api_key)])
-async def list_alert_subscriptions(active_only: bool = True) -> ChannelSubscriptionListResponse:
+@router.get(
+    "",
+    response_model=ChannelSubscriptionListResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+async def list_alert_subscriptions(
+    active_only: bool = True,
+) -> ChannelSubscriptionListResponse:
     """Protected like /subscriptions/'s GET (src/api/routes/
     subscriptions.py) - a real WhatsApp phone number or Telegram
     chat_id is PII, not just risk-assessment output."""

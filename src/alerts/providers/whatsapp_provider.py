@@ -146,7 +146,9 @@ class WhatsAppAlertProvider(BaseAlertProvider):
         anywhere in this platform ever actually changed who got alerted."""
         dynamic = [
             s["identifier"]
-            for s in get_subscribers_for_alert("whatsapp", alert.location, alert.risk_tier)
+            for s in get_subscribers_for_alert(
+                "whatsapp", alert.location, alert.risk_tier
+            )
         ]
         combined = list(dict.fromkeys(self.to_numbers + dynamic))  # de-dupe, keep order
         return [n if n.startswith("whatsapp:") else f"whatsapp:{n}" for n in combined]

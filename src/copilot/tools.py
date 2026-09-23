@@ -65,7 +65,10 @@ async def _live_precipitation_mm(district: str) -> tuple[float, str]:
     so callers never present an auto-fetched number as if it were
     operator-confirmed."""
     forecast = weather_forecast.get_forecast_for_district(district)
-    return forecast.get("24h", 0.0), "auto: Open-Meteo 24h forecast (no precipitation_mm supplied)"
+    return (
+        forecast.get("24h", 0.0),
+        "auto: Open-Meteo 24h forecast (no precipitation_mm supplied)",
+    )
 
 
 async def list_tracked_districts() -> dict:
@@ -102,7 +105,9 @@ async def get_current_risk_overview() -> dict:
     return {"districts": overview}
 
 
-async def get_district_decision(district: str, precipitation_mm: Optional[float] = None) -> dict:
+async def get_district_decision(
+    district: str, precipitation_mm: Optional[float] = None
+) -> dict:
     """Get the full AI Decision Card for one district: risk_tier, score,
     fused_risk_score/tier (combining rainfall with river/dam/satellite
     pathways), the recommended action and priority, a confidence block
@@ -134,7 +139,9 @@ async def get_district_decision(district: str, precipitation_mm: Optional[float]
     return result
 
 
-async def get_district_evidence(district: str, precipitation_mm: Optional[float] = None) -> dict:
+async def get_district_evidence(
+    district: str, precipitation_mm: Optional[float] = None
+) -> dict:
     """Get just the evidence array and confidence block behind a
     district's current risk tier, without the full decision card. Use
     this for "what evidence supports the current risk" questions.
@@ -156,7 +163,9 @@ async def get_district_evidence(district: str, precipitation_mm: Optional[float]
         SituationRequest(location=district, precipitation=precipitation_mm)
     )
     tier = situation.get("risk_tier", "LOW")
-    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(tier, situation)
+    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(
+        tier, situation
+    )
     fusion = build_confidence(district, situation, sat_confirmed, verified)
 
     return {
@@ -178,7 +187,9 @@ async def get_district_evidence(district: str, precipitation_mm: Optional[float]
     }
 
 
-async def get_district_forecast(district: str, current_precipitation_mm: Optional[float] = None) -> dict:
+async def get_district_forecast(
+    district: str, current_precipitation_mm: Optional[float] = None
+) -> dict:
     """Get the real rainfall forecast (24h/48h/72h/daily) and the
     resulting risk projection at +6h/+12h/+18h/+24h for a district. Use
     this for "what's expected in the next 6 hours" questions.
@@ -201,12 +212,18 @@ async def get_district_forecast(district: str, current_precipitation_mm: Optiona
     forecast = weather_forecast.get_forecast_for_district(district)
     cumulative = forecast.get("cumulative_6h", {})
     score_now = calculate_score(current_precipitation_mm)
-    timeline = [{"hour": "Now", "score": score_now, "risk_tier": get_risk_tier(score_now)}]
+    timeline = [
+        {"hour": "Now", "score": score_now, "risk_tier": get_risk_tier(score_now)}
+    ]
     for h in (6, 12, 18, 24):
         future_precip = current_precipitation_mm + cumulative.get(str(h), 0.0)
         future_score = calculate_score(future_precip)
         timeline.append(
-            {"hour": f"{h}h", "score": future_score, "risk_tier": get_risk_tier(future_score)}
+            {
+                "hour": f"{h}h",
+                "score": future_score,
+                "risk_tier": get_risk_tier(future_score),
+            }
         )
 
     return {
@@ -224,7 +241,9 @@ async def get_district_forecast(district: str, current_precipitation_mm: Optiona
     }
 
 
-async def get_district_resources(district: str, precipitation_mm: Optional[float] = None) -> dict:
+async def get_district_resources(
+    district: str, precipitation_mm: Optional[float] = None
+) -> dict:
     """Get real operational resources for a district: named public
     buildings that could serve as shelters, real dam disclosure
     (availability, water level, downstream communities), and

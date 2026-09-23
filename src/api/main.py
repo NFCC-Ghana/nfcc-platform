@@ -149,7 +149,9 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
     return response
 
 
@@ -159,7 +161,7 @@ async def root():
     return {
         "name": settings.APP_NAME,
         "version": settings.API_VERSION,
-        "environment": settings.ENVIRONMENT
+        "environment": settings.ENVIRONMENT,
     }
 
 
@@ -229,7 +231,7 @@ def _score_one(request: ScoreRequest) -> ScoreResponse:
         score=round(score_value, 1),
         risk_tier=risk_tier,
         alert_sent=alert_sent,
-        timestamp=datetime.now().isoformat()
+        timestamp=datetime.now().isoformat(),
     )
 
 

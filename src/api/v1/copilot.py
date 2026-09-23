@@ -33,7 +33,9 @@ class CopilotAskResponse(BaseModel):
     model: str
 
 
-@router.post("/ask", response_model=CopilotAskResponse, dependencies=[Depends(verify_api_key)])
+@router.post(
+    "/ask", response_model=CopilotAskResponse, dependencies=[Depends(verify_api_key)]
+)
 # 10/minute per IP - this calls the real Gemini API (src/copilot/engine.py),
 # a paid/quota-limited external service, on every request. A security
 # audit found no rate limiting anywhere on this endpoint - anyone holding

@@ -83,10 +83,15 @@ class TelegramAlertProvider(BaseAlertProvider):
                 "recipient_count": 0,
             }
 
-        subscribers = get_subscribers_for_alert("telegram", alert.location, alert.risk_tier)
+        subscribers = get_subscribers_for_alert(
+            "telegram", alert.location, alert.risk_tier
+        )
 
         if self._is_dry_run():
-            logger.info("DRY RUN: Would send Telegram alert to %d subscriber(s)", len(subscribers))
+            logger.info(
+                "DRY RUN: Would send Telegram alert to %d subscriber(s)",
+                len(subscribers),
+            )
             return {
                 "success": True,
                 "message": f"DRY RUN: Would send to {len(subscribers)} subscriber(s)",

@@ -56,7 +56,8 @@ class PredictionRecord(BaseModel):
 class RecordPredictionRequest(BaseModel):
     district: str
     evidence_snapshot: Dict[str, Any] = Field(
-        ..., description="Real evidence at prediction time - a /decision/card response is the intended shape"
+        ...,
+        description="Real evidence at prediction time - a /decision/card response is the intended shape",
     )
     risk_score: Optional[float] = None
     risk_tier: Optional[str] = None
@@ -69,10 +70,12 @@ class RecordPredictionRequest(BaseModel):
 
 class RecordOutcomeRequest(BaseModel):
     outcome: str = Field(
-        ..., description="e.g. 'flood_confirmed', 'no_flood_confirmed' - a real, known outcome, never guessed"
+        ...,
+        description="e.g. 'flood_confirmed', 'no_flood_confirmed' - a real, known outcome, never guessed",
     )
     outcome_source: str = Field(
-        ..., description="e.g. 'news_report', 'verified_citizen_reports', 'documented_event', 'manual_review'"
+        ...,
+        description="e.g. 'news_report', 'verified_citizen_reports', 'documented_event', 'manual_review'",
     )
 
 
@@ -81,7 +84,9 @@ class PredictionListResponse(BaseModel):
     predictions: List[PredictionRecord]
 
 
-@router.post("/record", response_model=PredictionRecord, dependencies=[Depends(verify_api_key)])
+@router.post(
+    "/record", response_model=PredictionRecord, dependencies=[Depends(verify_api_key)]
+)
 async def record_prediction(request: RecordPredictionRequest) -> PredictionRecord:
     if get_district(request.district) is None:
         raise HTTPException(
@@ -130,7 +135,11 @@ async def get_one_prediction(prediction_id: int) -> PredictionRecord:
     return row
 
 
-@router.post("/{prediction_id}/outcome", response_model=PredictionRecord, dependencies=[Depends(verify_api_key)])
+@router.post(
+    "/{prediction_id}/outcome",
+    response_model=PredictionRecord,
+    dependencies=[Depends(verify_api_key)],
+)
 async def record_prediction_outcome(
     prediction_id: int, request: RecordOutcomeRequest
 ) -> PredictionRecord:

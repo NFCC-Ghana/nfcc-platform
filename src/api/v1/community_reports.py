@@ -50,19 +50,28 @@ class CommunityReportListResponse(BaseModel):
 
 
 class ValidateReportRequest(BaseModel):
-    confidence: float = Field(0.9, ge=0.0, le=1.0, description="Human reviewer's confidence this report is real")
+    confidence: float = Field(
+        0.9,
+        ge=0.0,
+        le=1.0,
+        description="Human reviewer's confidence this report is real",
+    )
 
 
 @router.get("", response_model=CommunityReportListResponse)
 async def list_community_reports(
     district: Optional[str] = None, validated_only: bool = False, limit: int = 50
 ) -> CommunityReportListResponse:
-    rows = community_memory.get_reports(district=district, validated_only=validated_only, limit=limit)
+    rows = community_memory.get_reports(
+        district=district, validated_only=validated_only, limit=limit
+    )
     return CommunityReportListResponse(count=len(rows), reports=rows)
 
 
 @router.post("/{report_id}/validate", dependencies=[Depends(verify_api_key)])
-async def validate_community_report(report_id: str, request: ValidateReportRequest) -> dict:
+async def validate_community_report(
+    report_id: str, request: ValidateReportRequest
+) -> dict:
     matches = community_memory.get_reports(limit=1000)
     if not any(r["report_id"] == report_id for r in matches):
         raise HTTPException(status_code=404, detail=f"No report '{report_id}'")

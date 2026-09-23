@@ -19,6 +19,8 @@ router = APIRouter(prefix="/districts", tags=["v1"])
 @router.get("/{district}/antecedent-rainfall")
 async def get_district_antecedent_rainfall(district: str) -> dict:
     result = get_antecedent_rainfall(district)
-    if not result["available"] and "not one of the 9 districts" in result.get("reason", ""):
+    if not result["available"] and "not one of the 9 districts" in result.get(
+        "reason", ""
+    ):
         raise HTTPException(status_code=404, detail=result["reason"])
     return result

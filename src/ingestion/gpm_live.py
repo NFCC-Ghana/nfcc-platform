@@ -140,9 +140,7 @@ class GpmLiveIngester:
                 }
 
             # Sum half-hourly precipitation (mm/hr) * 0.5 h per granule
-            daily_total = collection.map(
-                lambda img: img.multiply(0.5)
-            ).sum()
+            daily_total = collection.map(lambda img: img.multiply(0.5)).sum()
 
             stats = daily_total.reduceRegion(
                 reducer=ee.Reducer.mean()
@@ -226,9 +224,7 @@ class GpmLiveIngester:
     def validate_record(record: dict[str, Any]) -> dict[str, Any]:
         issues: list[str] = []
         precip_fields = [
-            f
-            for f in record
-            if "precipitation" in f and f.endswith(("_mm", "_mm_hr"))
+            f for f in record if "precipitation" in f and f.endswith(("_mm", "_mm_hr"))
         ]
 
         if record.get("valid_pixel_count", 0) == 0:

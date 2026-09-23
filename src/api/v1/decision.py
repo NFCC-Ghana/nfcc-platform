@@ -15,7 +15,11 @@ compatibility) predates this /v1 pattern.
 
 from fastapi import APIRouter, HTTPException, Query
 
-from src.api.routes.decision_card import DecisionCard, DecisionCardRequest, get_decision_card
+from src.api.routes.decision_card import (
+    DecisionCard,
+    DecisionCardRequest,
+    get_decision_card,
+)
 from src.exposure.districts import get_district
 
 router = APIRouter(prefix="/districts", tags=["v1"])

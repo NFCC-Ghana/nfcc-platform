@@ -159,8 +159,12 @@ def _fetch_soil_moisture_for_district(district: str) -> Dict:
         return {
             "district": district,
             "available": True,
-            "surface_vwc_m3m3": round(surface_vwc, 3) if surface_vwc is not None else None,
-            "root_zone_vwc_m3m3": round(rootzone_vwc, 3) if rootzone_vwc is not None else None,
+            "surface_vwc_m3m3": (
+                round(surface_vwc, 3) if surface_vwc is not None else None
+            ),
+            "root_zone_vwc_m3m3": (
+                round(rootzone_vwc, 3) if rootzone_vwc is not None else None
+            ),
             "saturation_percent_estimate": saturation_percent_estimate,
             "observation_date": observation_date.isoformat(),
             "age_hours": round(age_hours, 1),

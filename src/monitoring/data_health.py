@@ -70,9 +70,7 @@ class DataHealthMonitor:
         files = sorted(directory.glob(pattern), key=lambda p: p.stat().st_mtime)
         if not files:
             return None
-        return datetime.fromtimestamp(
-            files[-1].stat().st_mtime, tz=timezone.utc
-        )
+        return datetime.fromtimestamp(files[-1].stat().st_mtime, tz=timezone.utc)
 
     def _chirps_status(self) -> dict[str, Any]:
         latest_csv = self._latest_file_mtime(self.raw_chirps, "chirps_daily_*.csv")
@@ -98,8 +96,7 @@ class DataHealthMonitor:
             try:
                 data = json.loads(latest.read_text(encoding="utf-8"))
                 last_update = self._parse_timestamp(
-                    data.get("ingested_at_utc")
-                    or data.get("observation_time_utc")
+                    data.get("ingested_at_utc") or data.get("observation_time_utc")
                 )
             except (json.JSONDecodeError, OSError):
                 last_update = self._latest_file_mtime(self.raw_gpm, "gpm_*.json")

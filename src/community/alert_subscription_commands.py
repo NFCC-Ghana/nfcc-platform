@@ -50,11 +50,15 @@ def parse_subscription_command(text: str) -> Optional[SubscriptionCommand]:
 
     district, _community = extract_location(remainder)
     if district:
-        return SubscriptionCommand(action="subscribe", district=district, recognized=True)
+        return SubscriptionCommand(
+            action="subscribe", district=district, recognized=True
+        )
     return SubscriptionCommand(action="subscribe", district=None, recognized=False)
 
 
-def handle_subscription_command(channel: str, identifier: str, text: str) -> Optional[str]:
+def handle_subscription_command(
+    channel: str, identifier: str, text: str
+) -> Optional[str]:
     """If `text` is an ALERTS ON/OFF command, applies it (real DB write)
     and returns the reply text. Returns None if it wasn't a subscription
     command at all, so the caller falls through to normal report

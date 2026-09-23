@@ -26,7 +26,10 @@ class AlertEngine:
         "LOW": (0, settings.ALERT_THRESHOLD_MODERATE),
         "MODERATE": (settings.ALERT_THRESHOLD_MODERATE, settings.ALERT_THRESHOLD_HIGH),
         "HIGH": (settings.ALERT_THRESHOLD_HIGH, settings.ALERT_THRESHOLD_CRITICAL),
-        "CRITICAL": (settings.ALERT_THRESHOLD_CRITICAL, settings.ALERT_THRESHOLD_EXTREME),
+        "CRITICAL": (
+            settings.ALERT_THRESHOLD_CRITICAL,
+            settings.ALERT_THRESHOLD_EXTREME,
+        ),
         "EXTREME": (settings.ALERT_THRESHOLD_EXTREME, 101),
     }
 

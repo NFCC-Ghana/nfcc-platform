@@ -8,7 +8,13 @@ from src.hydrology.urban_drainage import urban_drainage
 # Canonical tier ordering - used to compare a real alert's tier against a
 # subscriber's chosen minimum (src/database/channel_subscriptions_db.py),
 # so "notify me for HIGH+" doesn't fire on a MODERATE alert.
-TIER_RANK: Dict[str, int] = {"LOW": 0, "MODERATE": 1, "HIGH": 2, "CRITICAL": 3, "EXTREME": 4}
+TIER_RANK: Dict[str, int] = {
+    "LOW": 0,
+    "MODERATE": 1,
+    "HIGH": 2,
+    "CRITICAL": 3,
+    "EXTREME": 4,
+}
 
 
 def tier_at_least(candidate_tier: str, minimum_tier: str) -> bool:

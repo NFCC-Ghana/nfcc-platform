@@ -87,7 +87,9 @@ def gross_range_test(
             QCFlag.FAIL,
             f"{value} outside real plausible range [{valid_min}, {valid_max}]",
         )
-    return QCResult("gross_range", QCFlag.PASS, f"{value} within [{valid_min}, {valid_max}]")
+    return QCResult(
+        "gross_range", QCFlag.PASS, f"{value} within [{valid_min}, {valid_max}]"
+    )
 
 
 def spike_test(
@@ -103,11 +105,17 @@ def spike_test(
     on the newest point) - the recommended tradeoff to avoid false
     positives on genuine fast-moving events (QARTOD manuals)."""
     if value is None or previous is None or following is None:
-        return QCResult("spike", QCFlag.NOT_EVALUATED, "insufficient neighboring readings")
-    spike_magnitude = abs(value - (previous + following) / 2.0) - abs(following - previous) / 2.0
+        return QCResult(
+            "spike", QCFlag.NOT_EVALUATED, "insufficient neighboring readings"
+        )
+    spike_magnitude = (
+        abs(value - (previous + following) / 2.0) - abs(following - previous) / 2.0
+    )
     if spike_magnitude > threshold:
         return QCResult(
-            "spike", QCFlag.SUSPECT, f"spike magnitude {spike_magnitude:.2f} > {threshold}"
+            "spike",
+            QCFlag.SUSPECT,
+            f"spike magnitude {spike_magnitude:.2f} > {threshold}",
         )
     return QCResult("spike", QCFlag.PASS, "no spike detected")
 
@@ -165,10 +173,16 @@ def freshness_test(
         return QCResult("freshness", QCFlag.MISSING, "no observation timestamp")
     age_hours = (now - observation_time).total_seconds() / 3600.0
     if age_hours < 0:
-        return QCResult("freshness", QCFlag.SUSPECT, f"observation time is {-age_hours:.1f}h in the future")
+        return QCResult(
+            "freshness",
+            QCFlag.SUSPECT,
+            f"observation time is {-age_hours:.1f}h in the future",
+        )
     if age_hours > max_age_hours:
         return QCResult(
-            "freshness", QCFlag.FAIL, f"{age_hours:.1f}h old exceeds {max_age_hours}h max"
+            "freshness",
+            QCFlag.FAIL,
+            f"{age_hours:.1f}h old exceeds {max_age_hours}h max",
         )
     return QCResult("freshness", QCFlag.PASS, f"{age_hours:.1f}h old")
 

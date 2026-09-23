@@ -88,9 +88,7 @@ async def get_national_summary():
 
     results = {}
     for district, coords in weather_forecast.district_coords.items():
-        results[district] = _is_district_flood_zone_active(
-            coords["lat"], coords["lon"]
-        )
+        results[district] = _is_district_flood_zone_active(coords["lat"], coords["lon"])
 
     active = [d for d, is_active in results.items() if is_active]
     checked = [d for d, is_active in results.items() if is_active is not None]
@@ -374,8 +372,12 @@ async def _build_situation_response(body: SituationRequest) -> dict:
         # deliberately separate from score/risk_tier above, which is
         # this platform's own derived FLOOD risk given an assumed
         # rainfall amount, not a probability rain happens at all.
-        response["rain_probability_now_percent"] = forecast.get("rain_probability_now_percent")
-        response["rain_probability_today_percent"] = forecast.get("rain_probability_today_percent")
+        response["rain_probability_now_percent"] = forecast.get(
+            "rain_probability_now_percent"
+        )
+        response["rain_probability_today_percent"] = forecast.get(
+            "rain_probability_today_percent"
+        )
     except Exception as e:
         logger.error(f"Weather forecast failed for {body.location}: {e}")
 

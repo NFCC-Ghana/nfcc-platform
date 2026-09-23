@@ -88,7 +88,9 @@ def fetch_historical_chirps_series(
     production error - "No bands in collection" - when the Final
     product was queried for the last 14 days)."""
     if not initialize_earth_engine():
-        logger.warning("Earth Engine unavailable - cannot fetch historical CHIRPS series")
+        logger.warning(
+            "Earth Engine unavailable - cannot fetch historical CHIRPS series"
+        )
         return []
 
     import ee
@@ -113,7 +115,9 @@ def fetch_historical_chirps_series(
             if row[idx_precip] is None:
                 continue
             day = datetime.utcfromtimestamp(row[idx_time] / 1000).date()
-            series.append({"date": day.isoformat(), "precipitation_mm": row[idx_precip]})
+            series.append(
+                {"date": day.isoformat(), "precipitation_mm": row[idx_precip]}
+            )
         series.sort(key=lambda r: r["date"])
         return series
     except Exception as e:
@@ -226,9 +230,7 @@ def run_full_backtest() -> Dict:
     def _aggregate(variant: str) -> Dict:
         evaluated = [r for r in results if r.get("available")]
         detected = [r for r in evaluated if r[variant]["detected"]]
-        lead_times = [
-            r[variant]["first_crossing"]["lead_time_days"] for r in detected
-        ]
+        lead_times = [r[variant]["first_crossing"]["lead_time_days"] for r in detected]
         return {
             "events_evaluated": len(evaluated),
             "events_detected": len(detected),
@@ -236,7 +238,9 @@ def run_full_backtest() -> Dict:
                 round(len(detected) / len(evaluated), 2) if evaluated else None
             ),
             "lead_time_days": {
-                "mean": round(sum(lead_times) / len(lead_times), 1) if lead_times else None,
+                "mean": (
+                    round(sum(lead_times) / len(lead_times), 1) if lead_times else None
+                ),
                 "min": min(lead_times) if lead_times else None,
                 "max": max(lead_times) if lead_times else None,
             },

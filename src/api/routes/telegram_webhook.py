@@ -55,7 +55,9 @@ def _send_message(chat_id, text: str) -> None:
     how to call Telegram's sendMessage API."""
     result = send_telegram_message(chat_id, text)
     if not result.get("success"):
-        logger.warning("Failed to send Telegram reply to chat_id=%s: %s", chat_id, result)
+        logger.warning(
+            "Failed to send Telegram reply to chat_id=%s: %s", chat_id, result
+        )
 
 
 @router.post("/telegram")
@@ -82,7 +84,9 @@ async def telegram_inbound(request: Request) -> dict:
     chat_id = message["chat"]["id"]
     from_user = message.get("from", {})
     reporter_name = (
-        " ".join(filter(None, [from_user.get("first_name"), from_user.get("last_name")]))
+        " ".join(
+            filter(None, [from_user.get("first_name"), from_user.get("last_name")])
+        )
         or from_user.get("username")
         or None
     )
@@ -128,22 +132,35 @@ async def telegram_inbound(request: Request) -> dict:
         latitude=latitude,
         longitude=longitude,
     )
-    district = report_data["district"] if report_data["district"] != "Unclassified - needs triage" else None
-    community = report_data["community"] if report_data["community"] != "Unspecified" else None
+    district = (
+        report_data["district"]
+        if report_data["district"] != "Unclassified - needs triage"
+        else None
+    )
+    community = (
+        report_data["community"] if report_data["community"] != "Unspecified" else None
+    )
     urgency = report_data["urgency"]
 
     try:
         result = community_memory.submit_report(report_data)
     except Exception:
         logger.exception("Failed to save Telegram community report")
-        _send_message(chat_id, "Sorry, we couldn't save your report right now. Please try again shortly.")
+        _send_message(
+            chat_id,
+            "Sorry, we couldn't save your report right now. Please try again shortly.",
+        )
         return {"ok": True}
 
     log_level = logger.warning if urgency == "CRITICAL" else logger.info
     log_level(
         "Telegram report saved: id=%s district=%s community=%s urgency=%s gps=%s from=%s",
-        result.get("report_id"), report_data["district"], report_data["community"],
-        urgency, bool(latitude and longitude), reporter_id,
+        result.get("report_id"),
+        report_data["district"],
+        report_data["community"],
+        urgency,
+        bool(latitude and longitude),
+        reporter_id,
     )
 
     if district:

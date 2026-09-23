@@ -58,7 +58,10 @@ router = APIRouter(prefix="/decision", tags=["decision-intelligence"])
 # src/api/routes/alert_review.py for consistency across the platform.
 _ACTION_BY_TIER = {
     "EXTREME": ("EVACUATE_ALL", "Issue mandatory evacuation order"),
-    "CRITICAL": ("EVACUATE_VULNERABLE", "Evacuate vulnerable residents now; others prepare"),
+    "CRITICAL": (
+        "EVACUATE_VULNERABLE",
+        "Evacuate vulnerable residents now; others prepare",
+    ),
     "HIGH": ("PREPARE", "Prepare for evacuation"),
     "MODERATE": ("MONITOR", "Issue public awareness message"),
     "LOW": ("MONITOR", "Continue normal monitoring"),
@@ -167,7 +170,9 @@ def build_evidence(tier: str, situation: dict):
 
     satellite = situation.get("satellite") or {}
     sat_source = satellite.get("source", "")
-    sat_confirmed = bool(satellite.get("water_detected")) and sat_source == "Sentinel-1 SAR"
+    sat_confirmed = (
+        bool(satellite.get("water_detected")) and sat_source == "Sentinel-1 SAR"
+    )
     evidence.append(
         EvidenceItem(
             field="satellite_water_detected",
@@ -179,7 +184,9 @@ def build_evidence(tier: str, situation: dict):
     )
     if sat_confirmed:
         extent = satellite.get("flood_extent_km2", 0)
-        reason_parts.append(f"Satellite (Sentinel-1 SAR) confirms {extent:.1f} km² water extent")
+        reason_parts.append(
+            f"Satellite (Sentinel-1 SAR) confirms {extent:.1f} km² water extent"
+        )
 
     verified = situation.get("verified_reports", 0)
     evidence.append(
@@ -207,7 +214,9 @@ def build_evidence(tier: str, situation: dict):
             )
         )
         if not dam_available:
-            data_gaps.append(f"{dam.get('dam', 'Dam')}: {dam.get('reason', 'data unavailable')}")
+            data_gaps.append(
+                f"{dam.get('dam', 'Dam')}: {dam.get('reason', 'data unavailable')}"
+            )
         elif dam.get("water_surface_elevation_m") is not None:
             reason_parts.append(
                 f"{dam['dam']} water surface elevation: {dam['water_surface_elevation_m']}m "
@@ -270,7 +279,9 @@ def build_confidence(
             available=situation.get("score") is not None,
             risk_0_100=situation.get("score"),
             weight=RAINFALL_WEIGHT,
-            unavailable_reason="no precipitation input" if situation.get("score") is None else None,
+            unavailable_reason=(
+                "no precipitation input" if situation.get("score") is None else None
+            ),
         )
     ]
 
@@ -402,7 +413,9 @@ class ExpectedImpact(BaseModel):
     children_exposed: Optional[int] = None
     elderly_exposed: Optional[int] = None
     estimated_cost_ghs: Optional[float] = None
-    cost_basis: str = "Illustrative per-person estimate - no calibrated operations-cost model exists"
+    cost_basis: str = (
+        "Illustrative per-person estimate - no calibrated operations-cost model exists"
+    )
 
 
 class DecisionCard(BaseModel):
@@ -475,7 +488,9 @@ def basis_from_fusion(result: OverallFusionResult) -> List[str]:
     return basis or ["No real evidence sources available"]
 
 
-@router.post("/card", response_model=DecisionCard, dependencies=[Depends(verify_api_key)])
+@router.post(
+    "/card", response_model=DecisionCard, dependencies=[Depends(verify_api_key)]
+)
 async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
     """Grounded decision output for one district - see module docstring."""
     # _build_situation_response, not the /situation route function
@@ -488,7 +503,9 @@ async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
     )
 
     tier = situation.get("risk_tier", "LOW")
-    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(tier, situation)
+    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(
+        tier, situation
+    )
     fusion = build_confidence(request.location, situation, sat_confirmed, verified)
 
     action_type, action_label = _ACTION_BY_TIER.get(tier, _ACTION_BY_TIER["LOW"])

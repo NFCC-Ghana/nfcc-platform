@@ -47,7 +47,10 @@ from typing import Dict, List, Optional
 
 import requests
 
-from src.hydrology.altimetry_thresholds import classify_level, compute_relative_thresholds
+from src.hydrology.altimetry_thresholds import (
+    classify_level,
+    compute_relative_thresholds,
+)
 from src.utils.http_errors import safe_error_message
 
 logger = logging.getLogger("nfcc.hydrology.river_level_intelligence")

@@ -229,9 +229,7 @@ def init_pending_alerts_table() -> None:
         # column error is the standard way to make this idempotent.
         for column in ("severity", "urgency", "certainty"):
             try:
-                cursor.execute(
-                    f"ALTER TABLE pending_alerts ADD COLUMN {column} TEXT"
-                )
+                cursor.execute(f"ALTER TABLE pending_alerts ADD COLUMN {column} TEXT")
             except Exception:
                 pass  # column already exists
 
@@ -257,9 +255,7 @@ def init_pending_alerts_table() -> None:
         # reviewer sees this context without recomputing it every render.
         for column in ("affected_communities", "response_guidance"):
             try:
-                cursor.execute(
-                    f"ALTER TABLE pending_alerts ADD COLUMN {column} TEXT"
-                )
+                cursor.execute(f"ALTER TABLE pending_alerts ADD COLUMN {column} TEXT")
             except Exception:
                 pass
 

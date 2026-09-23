@@ -116,9 +116,7 @@ def _label_flood_days(series_dates: List[str], event_dates: List[date]) -> List[
     _EVENT_WINDOW_DAYS before, or on, any documented event date for
     this district. See module docstring: absence of a documented event
     is the best available "no flood" label, not a certainty."""
-    windows = [
-        (ev - timedelta(days=_EVENT_WINDOW_DAYS), ev) for ev in event_dates
-    ]
+    windows = [(ev - timedelta(days=_EVENT_WINDOW_DAYS), ev) for ev in event_dates]
     labels = []
     for d_str in series_dates:
         d = date.fromisoformat(d_str)
@@ -141,7 +139,9 @@ def contingency_table(flags: List[bool], labels: List[bool]) -> Dict[str, int]:
     }
 
 
-def compute_sedi(hits: int, misses: int, false_alarms: int, correct_negatives: int) -> Optional[float]:
+def compute_sedi(
+    hits: int, misses: int, false_alarms: int, correct_negatives: int
+) -> Optional[float]:
     """Symmetric Extremal Dependence Index (Ferro & Stephenson 2011).
     Ranges -1 to 1 (1 = perfect discrimination, 0 = no better than a
     random/climatological guess); unlike POD/FAR/CSI it does not
@@ -167,7 +167,9 @@ def compute_sedi(hits: int, misses: int, false_alarms: int, correct_negatives: i
     return round(numerator / denominator, 3)
 
 
-def compute_edi(hits: int, misses: int, false_alarms: int, correct_negatives: int) -> Optional[float]:
+def compute_edi(
+    hits: int, misses: int, false_alarms: int, correct_negatives: int
+) -> Optional[float]:
     """Extremal Dependence Index - SEDI's non-symmetric predecessor
     (same paper). Reported alongside SEDI for reference; SEDI is the
     headline score since the literature recommends it as the more
@@ -257,7 +259,9 @@ def _bootstrap_sedi_ci(
     scores.sort()
     lower_idx = int((1 - _BOOTSTRAP_CI) / 2 * len(scores))
     upper_idx = int((1 - (1 - _BOOTSTRAP_CI) / 2) * len(scores)) - 1
-    return round(scores[lower_idx], 3), round(scores[min(upper_idx, len(scores) - 1)], 3)
+    return round(scores[lower_idx], 3), round(
+        scores[min(upper_idx, len(scores) - 1)], 3
+    )
 
 
 def _threshold_report(
@@ -292,9 +296,7 @@ def _threshold_report(
     }
 
 
-def run_district_verification(
-    district_name: str, percentile: float = 95.0
-) -> Dict:
+def run_district_verification(district_name: str, percentile: float = 95.0) -> Dict:
     """Full rare-event verification for one district: real full-record
     CHIRPS rainfall, real documented events, both the current absolute
     alert threshold and a locally-calibrated percentile alternative,

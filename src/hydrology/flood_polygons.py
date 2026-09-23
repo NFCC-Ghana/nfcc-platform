@@ -274,7 +274,9 @@ class FloodPolygonEngine:
                 best_match = event
 
         rain_ratio = rainfall_mm / max(1, best_match["rainfall_mm"])
-        estimated_affected = int((best_match.get("population_affected") or 0) * rain_ratio)
+        estimated_affected = int(
+            (best_match.get("population_affected") or 0) * rain_ratio
+        )
 
         return {
             "district": district,

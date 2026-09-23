@@ -50,7 +50,11 @@ def init_risk_history_table() -> None:
 
 
 def save_risk_snapshot(
-    district: str, score: float, risk_tier: str, precipitation: float, source: str = "scheduled"
+    district: str,
+    score: float,
+    risk_tier: str,
+    precipitation: float,
+    source: str = "scheduled",
 ) -> Dict[str, Any]:
     """Record one real, timestamped risk computation. Returns
     {"id": ..., "recorded_at": ...} - callers building a response should

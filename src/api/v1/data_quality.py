@@ -40,10 +40,17 @@ router = APIRouter(prefix="/data-quality", tags=["v1"])
 
 # Real, documented per-source thresholds - see module docstring for why
 # these differ per source rather than sharing one generic value.
-_RIVER_MAX_AGE_HOURS = 35 * 24 + 48  # 35-day worst-case altimetry revisit + 2-day processing
+_RIVER_MAX_AGE_HOURS = (
+    35 * 24 + 48
+)  # 35-day worst-case altimetry revisit + 2-day processing
 _DAM_MAX_AGE_HOURS = 35 * 24 + 48
-_SMAP_MAX_AGE_HOURS = 72  # SMAP is 3-hourly; see smap_soil_moisture.py's own stale threshold
-_RAINFALL_VALID_RANGE = (0.0, 500.0)  # real-world daily rainfall extremes; >500mm/day is implausible
+_SMAP_MAX_AGE_HOURS = (
+    72  # SMAP is 3-hourly; see smap_soil_moisture.py's own stale threshold
+)
+_RAINFALL_VALID_RANGE = (
+    0.0,
+    500.0,
+)  # real-world daily rainfall extremes; >500mm/day is implausible
 _SOIL_VALID_RANGE = (0.0, 0.9)  # SMAP's own documented sensor range
 
 
@@ -73,9 +80,7 @@ async def get_data_quality() -> dict:
             gross_range_test(river.get("water_surface_elevation_m"), -50.0, 500.0),
             freshness_test(obs_date, now, _RIVER_MAX_AGE_HOURS),
         ]
-        reports.append(
-            _report_to_dict(aggregate_quality("river_gauge_tamale", tests))
-        )
+        reports.append(_report_to_dict(aggregate_quality("river_gauge_tamale", tests)))
     else:
         reports.append(
             {
@@ -135,7 +140,9 @@ async def get_data_quality() -> dict:
         forecast_mm = forecast.get("24h")
         is_real = forecast.get("source") == "open-meteo"
         tests = [gross_range_test(forecast_mm, *_RAINFALL_VALID_RANGE)]
-        overall = QCFlag.PASS if is_real and tests[0].flag == QCFlag.PASS else QCFlag.SUSPECT
+        overall = (
+            QCFlag.PASS if is_real and tests[0].flag == QCFlag.PASS else QCFlag.SUSPECT
+        )
         reports.append(
             {
                 "source": "open_meteo_forecast",

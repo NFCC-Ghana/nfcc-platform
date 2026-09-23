@@ -36,7 +36,9 @@ class RiskResponse(BaseModel):
     score: float
     risk_tier: str
     computed_at: str
-    method: str = "src/alerts/formatter.py:calculate_score - deterministic threshold model"
+    method: str = (
+        "src/alerts/formatter.py:calculate_score - deterministic threshold model"
+    )
 
 
 @router.get("/{district}/risk", response_model=RiskResponse)

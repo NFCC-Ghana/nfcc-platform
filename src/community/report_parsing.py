@@ -49,7 +49,9 @@ _URGENCY_KEYWORDS = [
     (("ankle", "minor", "small", "low"), "LOW"),
 ]
 
-_DEPTH_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(cm|centimet\w*|m\b|met(?:er|re)s?)", re.IGNORECASE)
+_DEPTH_RE = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(cm|centimet\w*|m\b|met(?:er|re)s?)", re.IGNORECASE
+)
 
 
 def extract_location(text: str) -> Tuple[Optional[str], Optional[str]]:

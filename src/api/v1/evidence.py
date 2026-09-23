@@ -58,7 +58,9 @@ async def get_district_evidence(
         SituationRequest(location=district, precipitation=precipitation_mm)
     )
     tier = situation.get("risk_tier", "LOW")
-    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(tier, situation)
+    evidence, reason, data_gaps, sat_confirmed, verified = build_evidence(
+        tier, situation
+    )
     fusion = build_confidence(district, situation, sat_confirmed, verified)
 
     return EvidenceResponse(

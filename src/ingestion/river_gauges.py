@@ -18,9 +18,7 @@ import requests
 
 logger = logging.getLogger("nfcc.ingestion.river_gauges")
 
-HSD_API_BASE_URL = os.getenv(
-    "HSD_API_BASE_URL", "https://api.hsd.gov.gh/v1"
-)
+HSD_API_BASE_URL = os.getenv("HSD_API_BASE_URL", "https://api.hsd.gov.gh/v1")
 HSD_API_KEY = os.getenv("HSD_API_KEY", "")
 HSD_API_TIMEOUT = int(os.getenv("HSD_API_TIMEOUT_SECONDS", "30"))
 
@@ -67,9 +65,7 @@ class RiverGaugeClient:
     def _request(self, path: str) -> tuple[Optional[dict[str, Any]], Optional[str]]:
         url = f"{self.base_url}{path}"
         try:
-            response = requests.get(
-                url, headers=self._headers(), timeout=self.timeout
-            )
+            response = requests.get(url, headers=self._headers(), timeout=self.timeout)
             response.raise_for_status()
             return response.json(), None
         except requests.RequestException as exc:
@@ -111,9 +107,7 @@ class RiverGaugeClient:
 
     def _save_cache(self, payload: dict[str, Any]) -> None:
         self.raw_dir.mkdir(parents=True, exist_ok=True)
-        self.cache_path.write_text(
-            json.dumps(payload, indent=2), encoding="utf-8"
-        )
+        self.cache_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def _write_quality_report(
         self, status: str, details: dict[str, Any]

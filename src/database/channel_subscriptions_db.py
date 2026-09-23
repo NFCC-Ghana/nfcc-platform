@@ -63,7 +63,10 @@ def init_channel_subscriptions_table() -> None:
 
 
 def subscribe(
-    channel: str, identifier: str, district: Optional[str] = None, min_risk_tier: str = "MODERATE"
+    channel: str,
+    identifier: str,
+    district: Optional[str] = None,
+    min_risk_tier: str = "MODERATE",
 ) -> Dict:
     """district=None means "all districts" - a citizen who didn't name
     one, or explicitly asked for every alert."""
@@ -87,7 +90,12 @@ def subscribe(
             (channel, identifier, district, min_risk_tier, now, now),
         )
         conn.commit()
-    return {"channel": channel, "identifier": identifier, "district": district, "active": True}
+    return {
+        "channel": channel,
+        "identifier": identifier,
+        "district": district,
+        "active": True,
+    }
 
 
 def unsubscribe(channel: str, identifier: str) -> bool:
@@ -105,7 +113,9 @@ def unsubscribe(channel: str, identifier: str) -> bool:
         return cursor.rowcount > 0
 
 
-def get_subscribers_for_alert(channel: str, district: str, risk_tier: str) -> List[Dict]:
+def get_subscribers_for_alert(
+    channel: str, district: str, risk_tier: str
+) -> List[Dict]:
     """Real, active subscribers for `channel` who should receive an
     alert about `district` at `risk_tier` - either subscribed to this
     exact district or to "all districts" (district IS NULL), and whose
@@ -128,7 +138,11 @@ def get_all_channel_subscriptions(active_only: bool = True) -> List[Dict]:
     with get_db() as conn:
         cursor = conn.cursor()
         if active_only:
-            cursor.execute("SELECT * FROM channel_subscriptions WHERE active = 1 ORDER BY subscribed_at DESC")
+            cursor.execute(
+                "SELECT * FROM channel_subscriptions WHERE active = 1 ORDER BY subscribed_at DESC"
+            )
         else:
-            cursor.execute("SELECT * FROM channel_subscriptions ORDER BY subscribed_at DESC")
+            cursor.execute(
+                "SELECT * FROM channel_subscriptions ORDER BY subscribed_at DESC"
+            )
         return [dict(row) for row in cursor.fetchall()]

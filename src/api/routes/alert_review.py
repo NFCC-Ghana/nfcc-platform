@@ -125,9 +125,7 @@ def _certainty_from_satellite(satellite: dict) -> str:
     Falls back to "Likely" (rainfall-forecast-based, not yet confirmed by
     satellite) when Earth Engine isn't reachable or no water is detected
     yet, rather than overclaiming certainty the system doesn't have."""
-    if satellite.get("source") == "Sentinel-1 SAR" and satellite.get(
-        "water_detected"
-    ):
+    if satellite.get("source") == "Sentinel-1 SAR" and satellite.get("water_detected"):
         return "Observed"
     return "Likely"
 
@@ -181,9 +179,7 @@ class AssessRequest(BaseModel):
 
 
 class ReviewDecision(BaseModel):
-    reviewed_by: str = Field(
-        default="dashboard", description="Who made this decision"
-    )
+    reviewed_by: str = Field(default="dashboard", description="Who made this decision")
 
 
 @router.post("/assess", dependencies=[Depends(verify_api_key)])
@@ -415,9 +411,7 @@ async def approve_pending_alert(alert_id: int, decision: ReviewDecision):
 
 class CancelDecision(BaseModel):
     reviewed_by: str = Field(default="dashboard")
-    reason: str = Field(
-        ..., description="Why this alert is being retracted/corrected"
-    )
+    reason: str = Field(..., description="Why this alert is being retracted/corrected")
 
 
 @router.post("/pending/{alert_id}/cancel", dependencies=[Depends(verify_api_key)])

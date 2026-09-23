@@ -85,5 +85,8 @@ async def get_feature_importance() -> Dict[str, Any]:
             "historical flood events and did not reliably outperform "
             "this rule-based curve (see src/models/historical_backtest.py)."
         ),
-        "inputs": ["precipitation_mm", "district (optional, urban-drainage adjustment only)"],
+        "inputs": [
+            "precipitation_mm",
+            "district (optional, urban-drainage adjustment only)",
+        ],
     }

@@ -145,7 +145,9 @@ RAINFALL_WEIGHT = 1.0
 # as ground truth, weighted above any derived or forecast estimate.
 RIVER_GAUGE_WEIGHT = 2.0
 DAM_DIRECT_WEIGHT = 2.0
-DAM_UPSTREAM_PROXY_WEIGHT = 1.2  # same principle, discounted: a spatial proxy, not the dam itself
+DAM_UPSTREAM_PROXY_WEIGHT = (
+    1.2  # same principle, discounted: a spatial proxy, not the dam itself
+)
 
 # Only used when Sentinel-1 SAR POSITIVELY confirms standing water - a
 # direct, cloud-penetrating physical detection, valued highly in real
@@ -209,7 +211,9 @@ def _weighted_mean_and_spread(
     mean = sum(r.risk_0_100 * r.weight for r in present) / total_weight
     if len(present) == 1:
         return mean, 0.0
-    variance = sum(r.weight * (r.risk_0_100 - mean) ** 2 for r in present) / total_weight
+    variance = (
+        sum(r.weight * (r.risk_0_100 - mean) ** 2 for r in present) / total_weight
+    )
     return mean, variance**0.5
 
 
@@ -228,7 +232,9 @@ def _explain(
     factors, not a hardcoded string."""
     pct = round(confidence)
     if not present:
-        return f"Confidence is {pct}% - no real evidence sources are currently available."
+        return (
+            f"Confidence is {pct}% - no real evidence sources are currently available."
+        )
 
     names = [r.display_name for r in present]
     if len(names) == 1:
@@ -439,16 +445,22 @@ def combine_pathways(pathways: List[Pathway]) -> OverallFusionResult:
         else 0.0
     )
 
-    confidence = round(max(0.0, min(100.0, (coverage_factor * agreement_factor) ** 0.5)), 1)
+    confidence = round(
+        max(0.0, min(100.0, (coverage_factor * agreement_factor) ** 0.5)), 1
+    )
     degraded = coverage_factor < _DEGRADED_COVERAGE_THRESHOLD
 
     dominant_pathway = (
-        max(present.items(), key=lambda kv: kv[1][1].unified_risk)[0] if present else None
+        max(present.items(), key=lambda kv: kv[1][1].unified_risk)[0]
+        if present
+        else None
     )
 
     pathway_results = {name: r for name, (_, r) in results.items()}
 
-    missing_labels = [label for name, (label, r) in applicable.items() if r.unified_risk is None]
+    missing_labels = [
+        label for name, (label, r) in applicable.items() if r.unified_risk is None
+    ]
     present_labels = [label for _, (label, r) in present.items()]
     if not present_labels:
         confidence_explanation = f"Confidence is {round(confidence)}% - no independent flood-risk pathway could be assessed."
@@ -460,8 +472,10 @@ def combine_pathways(pathways: List[Pathway]) -> OverallFusionResult:
             f"leaving only {', '.join(present_labels)} assessed."
         )
     else:
-        agree_word = "agree" if agreement_factor >= 75 else (
-            "broadly agree" if agreement_factor >= 45 else "disagree internally"
+        agree_word = (
+            "agree"
+            if agreement_factor >= 75
+            else ("broadly agree" if agreement_factor >= 45 else "disagree internally")
         )
         confidence_explanation = (
             f"Confidence is {round(confidence)}% because "

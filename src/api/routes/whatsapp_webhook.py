@@ -122,21 +122,33 @@ async def whatsapp_inbound(request: Request) -> Response:
         latitude=latitude,
         longitude=longitude,
     )
-    district = report_data["district"] if report_data["district"] != "Unclassified - needs triage" else None
-    community = report_data["community"] if report_data["community"] != "Unspecified" else None
+    district = (
+        report_data["district"]
+        if report_data["district"] != "Unclassified - needs triage"
+        else None
+    )
+    community = (
+        report_data["community"] if report_data["community"] != "Unspecified" else None
+    )
     urgency = report_data["urgency"]
 
     try:
         result = community_memory.submit_report(report_data)
     except Exception:
         logger.exception("Failed to save WhatsApp community report")
-        return _twiml("Sorry, we couldn't save your report right now. Please try again shortly.")
+        return _twiml(
+            "Sorry, we couldn't save your report right now. Please try again shortly."
+        )
 
     log_level = logger.warning if urgency == "CRITICAL" else logger.info
     log_level(
         "WhatsApp report saved: id=%s district=%s community=%s urgency=%s gps=%s from=%s",
-        result.get("report_id"), report_data["district"], report_data["community"],
-        urgency, bool(latitude and longitude), from_number,
+        result.get("report_id"),
+        report_data["district"],
+        report_data["community"],
+        urgency,
+        bool(latitude and longitude),
+        from_number,
     )
 
     if district:

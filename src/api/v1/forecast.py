@@ -53,7 +53,9 @@ class ForecastResponse(BaseModel):
 async def get_district_forecast(
     district: str,
     current_precipitation_mm: float = Query(
-        ..., ge=0, description="Current precipitation in mm, used to anchor the risk_timeline"
+        ...,
+        ge=0,
+        description="Current precipitation in mm, used to anchor the risk_timeline",
     ),
 ) -> ForecastResponse:
     if get_district(district) is None:
@@ -74,7 +76,9 @@ async def get_district_forecast(
     # rainfall on top of it, rather than a fixed synthetic offset.
     score_now = calculate_score(current_precipitation_mm)
     timeline = [
-        RiskTimelinePoint(hour="Now", score=score_now, risk_tier=get_risk_tier(score_now))
+        RiskTimelinePoint(
+            hour="Now", score=score_now, risk_tier=get_risk_tier(score_now)
+        )
     ]
     for h in (6, 12, 18, 24):
         future_precip = current_precipitation_mm + cumulative.get(str(h), 0.0)

@@ -123,7 +123,11 @@ class CopilotAnswer:
         self.model = model
 
     def to_dict(self) -> dict:
-        return {"answer": self.answer, "tool_calls": self.tool_calls, "model": self.model}
+        return {
+            "answer": self.answer,
+            "tool_calls": self.tool_calls,
+            "model": self.model,
+        }
 
 
 def _extract_tool_calls(response) -> List[dict]:
@@ -137,7 +141,10 @@ def _extract_tool_calls(response) -> List[dict]:
         for part in content.parts or []:
             if part.function_call is not None:
                 calls.append(
-                    {"tool": part.function_call.name, "input": dict(part.function_call.args or {})}
+                    {
+                        "tool": part.function_call.name,
+                        "input": dict(part.function_call.args or {}),
+                    }
                 )
     return calls
 
@@ -169,7 +176,9 @@ async def ask_copilot(question: str, district: Optional[str] = None) -> CopilotA
 
     user_content = question
     if district:
-        user_content = f"[Currently selected district in the dashboard: {district}]\n{question}"
+        user_content = (
+            f"[Currently selected district in the dashboard: {district}]\n{question}"
+        )
 
     config = types.GenerateContentConfig(
         system_instruction=_SYSTEM_PROMPT,

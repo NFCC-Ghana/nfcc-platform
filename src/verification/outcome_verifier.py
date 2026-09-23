@@ -57,7 +57,9 @@ _DEFAULT_WINDOW_DAYS = 14
 _VERIFIED_REPORTS_THRESHOLD = 3
 
 
-def verify_outcome(district: str, predicted_at: str, window_days: int = _DEFAULT_WINDOW_DAYS) -> Dict:
+def verify_outcome(
+    district: str, predicted_at: str, window_days: int = _DEFAULT_WINDOW_DAYS
+) -> Dict:
     """Checks all four real, independent sources for confirmation that
     a real flood happened in `district` within `window_days` after
     `predicted_at`. Returns a dict with `outcome`
@@ -87,9 +89,14 @@ def verify_outcome(district: str, predicted_at: str, window_days: int = _DEFAULT
         verified_count = community_memory.get_validated_report_count_in_window(
             district, start_iso, end_iso
         )
-        checks["citizen_reports"] = {"available": True, "verified_count": verified_count}
+        checks["citizen_reports"] = {
+            "available": True,
+            "verified_count": verified_count,
+        }
         if verified_count >= _VERIFIED_REPORTS_THRESHOLD:
-            confirmations.append(("verified_citizen_reports", checks["citizen_reports"]))
+            confirmations.append(
+                ("verified_citizen_reports", checks["citizen_reports"])
+            )
     except Exception as e:
         logger.warning(f"Citizen report check failed for {district}: {e}")
         checks["citizen_reports"] = {"available": False, "reason": str(e)}
@@ -106,7 +113,9 @@ def verify_outcome(district: str, predicted_at: str, window_days: int = _DEFAULT
         satellite_check_date = min(end_date, date.today().isoformat())
         satellite = sentinel_processor.detect_flood(district, date=satellite_check_date)
         checks["satellite"] = satellite
-        if satellite.get("source") == "Sentinel-1 SAR" and satellite.get("water_detected"):
+        if satellite.get("source") == "Sentinel-1 SAR" and satellite.get(
+            "water_detected"
+        ):
             confirmations.append(("Sentinel-1 SAR", satellite))
     except Exception as e:
         logger.warning(f"Satellite check failed for {district}: {e}")
