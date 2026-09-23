@@ -18,7 +18,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from src.api.routes.situation import SituationRequest, get_situation
+from src.api.routes.situation import SituationRequest, _build_situation_response
 from src.exposure.districts import get_district
 from src.exposure.shelter_candidates import get_shelter_names
 
@@ -73,7 +73,7 @@ async def get_district_resources(
             ),
         )
 
-    situation = await get_situation(
+    situation = await _build_situation_response(
         SituationRequest(location=district, precipitation=precipitation_mm)
     )
 

@@ -277,7 +277,7 @@ class ReservoirIntelligenceEngine:
                 "datetime": dates,
                 "level_mcm": levels,
                 "capacity_mcm": capacity,
-                "pct_full": [(l / capacity) * 100 for l in levels],
+                "pct_full": [(level / capacity) * 100 for level in levels],
                 "inflow_mcm": inflows,
                 "outflow_mcm": outflows,
                 "spillway_open": spillway_open,

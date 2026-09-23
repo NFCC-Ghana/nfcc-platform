@@ -5,11 +5,14 @@ from datetime import datetime
 from typing import Dict, Any, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from slowapi.errors import RateLimitExceeded
 
 from src.alerts.engine import AlertEngine
+from src.api.auth import limiter
 from src.api.explain import router as explain_router
 from src.api.health import router as health_router
 from src.api.dam_router import router as dam_router
@@ -27,7 +30,11 @@ from src.alerts.formatter import calculate_score, get_risk_tier
 from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
-from src.database.alert_db import get_alert_history, get_total_alerts_count
+from src.database.alert_db import get_alert_history, get_total_alerts_count, init_db
+from src.database.channel_subscriptions_db import init_channel_subscriptions_table
+from src.database.observation_history_db import init_observation_history_table
+from src.database.prediction_ledger_db import init_prediction_ledger_table
+from src.database.risk_history_db import init_risk_history_table
 
 # Setup logging
 setup_logging(settings.LOG_LEVEL)
@@ -78,14 +85,50 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware
+# CORS middleware - real allowlist (settings.ALLOWED_ORIGINS), not a
+# wildcard. The previous allow_origins=["*"] + allow_credentials=True
+# combination is a real misconfiguration (most browsers refuse to honor
+# a wildcard origin on a credentialed request at all, but a security
+# audit shouldn't rely on that browser-side backstop). allow_credentials
+# is now False: every real client authenticates via the X-API-Key
+# header, not cookies, so there is nothing here that needs it.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Registers the @limiter.limit(...) decorators applied in
+# src/api/routes/situation.py and src/api/v1/copilot.py - without this,
+# slowapi's decorators would raise at request time (no limiter attached
+# to app.state) rather than silently doing nothing, so this line is load-
+# bearing, not boilerplate.
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": f"Rate limit exceeded: {exc.detail}"},
+    )
+
+
+# Baseline security headers - a security audit found none of these set
+# anywhere. CSP is deliberately omitted: this is a JSON API with no HTML
+# responses of its own to restrict script sources for, and setting one
+# incorrectly for the OpenAPI/Swagger UI at /docs would break it.
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 
 # Root endpoint
 @app.get("/")
@@ -95,6 +138,7 @@ async def root():
         "version": settings.API_VERSION,
         "environment": settings.ENVIRONMENT
     }
+
 
 # Bare alias for the alerts_router's GET /alerts/history - same
 # underlying query functions, trimmed response. /alerts/history is the
@@ -198,11 +242,6 @@ app.include_router(telegram_webhook_router)
 app.include_router(v1_router)
 
 # Ensure database is initialized on startup
-from src.database.alert_db import init_db
-from src.database.channel_subscriptions_db import init_channel_subscriptions_table
-from src.database.observation_history_db import init_observation_history_table
-from src.database.prediction_ledger_db import init_prediction_ledger_table
-from src.database.risk_history_db import init_risk_history_table
 init_db()
 init_risk_history_table()
 init_observation_history_table()

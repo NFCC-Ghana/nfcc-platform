@@ -26,8 +26,9 @@ as the real VWC figure it's derived from.
 """
 
 import logging
+import time
 from datetime import date, timedelta
-from typing import Dict
+from typing import Dict, Tuple
 
 from src.exposure.districts import get_district
 from src.hydrology.ee_auth import initialize_earth_engine
@@ -50,11 +51,49 @@ _STALE_AFTER_HOURS = 72
 # claim about this soil's actual saturation point.
 _SENSOR_MAX_VWC = 0.9
 
+# Per-district in-memory cache, keyed by district name -> (fetched_at
+# unix time, result dict). A codebase audit found this made a live,
+# synchronous Earth Engine query on every single /situation call with
+# no caching at all - real waste (SMAP's own data only refreshes every
+# few hours) and a real quota/latency risk now that the kiosk view polls
+# /situation every 90 seconds. 3 hours matches SMAP L4's own native
+# refresh cadence: caching any longer would risk serving data older than
+# the source itself updates on, any shorter buys no real freshness given
+# the ~2-3 day EE mirror latency already noted above. In-memory (not
+# Redis/a DB) is a deliberate, honest limitation: it resets on every
+# Cloud Run cold start/new revision and isn't shared across instances if
+# Cloud Run ever scales beyond one - acceptable here because the cost of
+# a cache miss is just one real Earth Engine call, never stale-looking
+# fabricated data.
+_CACHE_TTL_SECONDS = 3 * 3600
+_cache: Dict[str, Tuple[float, Dict]] = {}
+
 
 def get_soil_moisture_for_district(district: str) -> Dict:
     """Real root-zone + surface soil moisture (volumetric water
     content) for a district, or an honest available=False - never a
-    fabricated fallback value."""
+    fabricated fallback value. Cached per district for
+    _CACHE_TTL_SECONDS - see that constant's comment for why."""
+    cached = _cache.get(district)
+    if cached is not None:
+        fetched_at, result = cached
+        if time.time() - fetched_at < _CACHE_TTL_SECONDS:
+            return result
+
+    result = _fetch_soil_moisture_for_district(district)
+    # Only cache a real, successful reading - never cache an
+    # available=False response, so a transient Earth Engine outage
+    # doesn't get "stuck" honestly-unavailable for a full 3 hours once
+    # EE recovers on the very next request.
+    if result.get("available"):
+        _cache[district] = (time.time(), result)
+    return result
+
+
+def _fetch_soil_moisture_for_district(district: str) -> Dict:
+    """The real, uncached Earth Engine fetch - see
+    get_soil_moisture_for_district for the caching wrapper every real
+    caller should use instead of this."""
     district_info = get_district(district)
     if district_info is None:
         return {

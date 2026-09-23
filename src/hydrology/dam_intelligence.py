@@ -59,6 +59,7 @@ from typing import Dict, List
 import requests
 
 from src.hydrology.altimetry_thresholds import classify_level, compute_relative_thresholds
+from src.utils.http_errors import safe_error_message
 
 logger = logging.getLogger("nfcc.hydrology.dam_intelligence")
 
@@ -182,11 +183,17 @@ def get_akosombo_status() -> Dict:
             ),
         }
     except Exception as e:
-        logger.warning(f"DAHITI request failed: {e}")
+        # safe_error_message, not str(e) - see src/utils/http_errors.py's
+        # docstring: this request puts the real DAHITI_API_KEY in its URL
+        # query string, and requests.exceptions.HTTPError's message
+        # includes that full URL - str(e) here would have put the key in
+        # both Cloud Run logs and this function's live API response body.
+        reason = safe_error_message(e, "DAHITI")
+        logger.warning(reason)
         return {
             "dam": "Akosombo",
             "available": False,
-            "reason": f"DAHITI request failed: {e}",
+            "reason": reason,
         }
 
 
@@ -251,8 +258,9 @@ def _get_bagre_upstream_proxy() -> Dict:
             ),
         }
     except Exception as e:
-        logger.warning(f"DAHITI Nakembé request failed: {e}")
-        return {"available": False, "reason": f"DAHITI request failed: {e}"}
+        reason = safe_error_message(e, "DAHITI (Nakembé)")
+        logger.warning(reason)
+        return {"available": False, "reason": reason}
 
 
 def get_bagre_status() -> Dict:

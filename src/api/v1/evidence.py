@@ -25,7 +25,7 @@ from src.api.routes.decision_card import (
     build_confidence,
     build_evidence,
 )
-from src.api.routes.situation import SituationRequest, get_situation
+from src.api.routes.situation import SituationRequest, _build_situation_response
 from src.exposure.districts import get_district
 
 router = APIRouter(prefix="/districts", tags=["v1"])
@@ -54,7 +54,7 @@ async def get_district_evidence(
             ),
         )
 
-    situation = await get_situation(
+    situation = await _build_situation_response(
         SituationRequest(location=district, precipitation=precipitation_mm)
     )
     tier = situation.get("risk_tier", "LOW")

@@ -107,25 +107,25 @@ async def get_history(
 async def get_stats(location: Optional[str] = None) -> AlertStatsResponse:
     try:
         stats_data = get_alert_stats()
-        
+
         # Transform risk tier data to response format
         risk_tier_list = [
             RiskTierStats(tier=tier, count=count)
             for tier, count in stats_data.get("by_risk_tier", {}).items()
         ]
-        
+
         # Transform top locations data to response format
         top_locations_data = stats_data.get("top_locations", [])
         top_locations_list = [
             TopLocation(location=item["location"], alert_count=item["count"])
             for item in top_locations_data[:5]
         ]
-        
+
         logger.info(
             f"Retrieved alert stats | risk_tiers={len(risk_tier_list)} | "
             f"top_locations={len(top_locations_list)}"
         )
-        
+
         return AlertStatsResponse(
             status="success",
             by_risk_tier=risk_tier_list,

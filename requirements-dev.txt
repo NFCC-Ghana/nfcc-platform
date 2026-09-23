@@ -8,6 +8,8 @@ rasterio
 xarray
 black
 flake8
+bandit
+pip-audit
 pre-commit
 pytest-cov>=4.0.0
 pytest-xdist>=3.0.0

@@ -30,7 +30,7 @@ from src.api.routes.decision_card import (
     build_evidence,
     get_decision_card,
 )
-from src.api.routes.situation import SituationRequest, get_situation
+from src.api.routes.situation import SituationRequest, _build_situation_response
 from src.database.risk_history_db import get_risk_history
 from src.exposure.districts import (
     District,
@@ -152,7 +152,7 @@ async def get_district_evidence(district: str, precipitation_mm: Optional[float]
     if precipitation_mm is None:
         precipitation_mm, precip_source = await _live_precipitation_mm(district)
 
-    situation = await get_situation(
+    situation = await _build_situation_response(
         SituationRequest(location=district, precipitation=precipitation_mm)
     )
     tier = situation.get("risk_tier", "LOW")
@@ -246,7 +246,7 @@ async def get_district_resources(district: str, precipitation_mm: Optional[float
     if precipitation_mm is None:
         precipitation_mm, precip_source = await _live_precipitation_mm(district)
 
-    situation = await get_situation(
+    situation = await _build_situation_response(
         SituationRequest(location=district, precipitation=precipitation_mm)
     )
 

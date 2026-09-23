@@ -35,7 +35,7 @@ from pydantic import BaseModel, Field
 
 from src.api.auth import verify_api_key
 from src.alerts.formatter import get_risk_tier
-from src.api.routes.situation import SituationRequest, get_situation
+from src.api.routes.situation import SituationRequest, _build_situation_response
 from src.exposure.community_names import get_affected_communities
 from src.hydrology.fluvial_pathway import build_fluvial_sources
 from src.hydrology.river_level_intelligence import has_river_coverage
@@ -478,7 +478,12 @@ def basis_from_fusion(result: OverallFusionResult) -> List[str]:
 @router.post("/card", response_model=DecisionCard, dependencies=[Depends(verify_api_key)])
 async def get_decision_card(request: DecisionCardRequest) -> DecisionCard:
     """Grounded decision output for one district - see module docstring."""
-    situation = await get_situation(
+    # _build_situation_response, not the /situation route function
+    # directly - that route now carries a rate-limit decorator
+    # requiring a real starlette.Request, which this internal,
+    # non-HTTP reuse doesn't have (this route has its own
+    # verify_api_key/rate-limit protection at its own layer).
+    situation = await _build_situation_response(
         SituationRequest(location=request.location, precipitation=request.precipitation)
     )
 

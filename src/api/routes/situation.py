@@ -16,10 +16,10 @@ import logging
 from typing import Optional
 
 import requests
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from src.api.auth import verify_api_key
+from src.api.auth import limiter, verify_api_key
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.community.community_memory import community_memory
 from src.exposure.impact_estimator import impact_estimator
@@ -154,8 +154,7 @@ def _estimate_economic_loss(
     }
 
 
-@router.post("/situation", dependencies=[Depends(verify_api_key)])
-async def get_situation(request: SituationRequest):
+async def _build_situation_response(body: SituationRequest) -> dict:
     """Full situation assessment for a district: risk score, hydrology
     evidence (rainfall/river/soil/dam), population and infrastructure
     impact estimates, a simple economic loss estimate, and community
@@ -170,9 +169,17 @@ async def get_situation(request: SituationRequest):
     src/api/routes/alert_review.py's /alerts/assess (the real automated
     alert-triggering path) - that's a separate, more consequential
     decision (it changes when a real evacuation alert fires) left for
-    an explicit choice rather than silently folded in here."""
+    an explicit choice rather than silently folded in here.
 
-    score = calculate_score(request.precipitation, district=request.location)
+    The real business logic, deliberately separate from the /situation
+    HTTP route below it - src/api/routes/decision_card.py's
+    get_decision_card() reuses this directly as a plain function call
+    (no real HTTP request involved), which broke when a rate-limit
+    decorator requiring a genuine starlette.Request first appeared on
+    the route version of this function. Routes call this; nothing else
+    should call the route function directly."""
+
+    score = calculate_score(body.precipitation, district=body.location)
     risk_tier = get_risk_tier(score)
 
     try:
@@ -189,28 +196,28 @@ async def get_situation(request: SituationRequest):
         # own module docstring warns against: "avoid reintroducing the
         # kind of drift just fixed" by letting a module compute its own
         # independent risk number nothing uses.
-        satellite = sentinel_processor.detect_flood(request.location)
+        satellite = sentinel_processor.detect_flood(body.location)
     except Exception as e:
-        logger.error(f"Satellite detection failed for {request.location}: {e}")
+        logger.error(f"Satellite detection failed for {body.location}: {e}")
         satellite = None
 
     try:
-        impact = impact_estimator.estimate_impact(request.location, score, risk_tier)
+        impact = impact_estimator.estimate_impact(body.location, score, risk_tier)
         if "error" in impact:
             logger.warning(f"Impact estimate error: {impact['error']}")
             impact = None
     except Exception as e:
-        logger.error(f"Impact estimate failed for {request.location}: {e}")
+        logger.error(f"Impact estimate failed for {body.location}: {e}")
         impact = None
 
     try:
-        report_stats = community_memory.get_report_stats(request.location)
+        report_stats = community_memory.get_report_stats(body.location)
     except Exception as e:
-        logger.error(f"Report stats failed for {request.location}: {e}")
+        logger.error(f"Report stats failed for {body.location}: {e}")
         report_stats = {"total_reports": 0, "validated_reports": 0}
 
     response = {
-        "location": request.location,
+        "location": body.location,
         "score": score,
         "risk_tier": risk_tier,
         "total_reports": report_stats.get("total_reports", 0),
@@ -220,21 +227,21 @@ async def get_situation(request: SituationRequest):
         # designated shelter registry (none exists publicly for Ghana),
         # but genuine places, not generic "{district} Senior High School"
         # placeholder text repeated for every district.
-        "shelter_names": get_shelter_names(request.location),
+        "shelter_names": get_shelter_names(body.location),
         # Honest dam/reservoir disclosure (src/hydrology/dam_intelligence.py)
         # for the 3 tracked districts genuinely downstream of a dam this
         # platform knows about - [] for the other 6. Each entry is either
         # real data (Akosombo, if DAHITI_API_KEY is configured) or an
         # explicit available=False with the real reason no live feed
         # exists, never a fabricated reservoir level.
-        "dam_intelligence": get_dam_intelligence_for_district(request.location),
+        "dam_intelligence": get_dam_intelligence_for_district(body.location),
         # Real river water level via DAHITI satellite altimetry
         # (src/hydrology/river_level_intelligence.py) - available=True
         # only for Tamale (the one tracked district with a real gauge
         # close enough to be meaningful), available=False with an honest
         # reason for the other 8. Set unconditionally, independent of the
         # satellite fetch below.
-        "river_gauge": get_river_level_for_district(request.location),
+        "river_gauge": get_river_level_for_district(body.location),
     }
 
     if impact:
@@ -270,7 +277,7 @@ async def get_situation(request: SituationRequest):
                 markets_exposed=impact["markets_exposed"],
                 power_substations_affected=power_substations_affected,
                 area_km2=impact["area_km2"],
-                rainfall_mm=request.precipitation,
+                rainfall_mm=body.precipitation,
             )
         )
 
@@ -281,7 +288,7 @@ async def get_situation(request: SituationRequest):
     # silently blank out real, independently-fetched DAHITI/SMAP data too.
     # Not gated on anything now; each field honestly reports its own
     # availability instead of inheriting an unrelated call's success.
-    response["rainfall_mm"] = request.precipitation
+    response["rainfall_mm"] = body.precipitation
     # river_level_m used to come from src/hydrology/river_intelligence.py's
     # get_river_status(), which is entirely
     # np.random.seed(hash(gauge_id))-fabricated - a sine wave plus
@@ -301,7 +308,7 @@ async def get_situation(request: SituationRequest):
     # already fixed this session for river levels and satellite
     # confidence. Honestly None (not the old fabricated number)
     # when Earth Engine can't reach a real SMAP reading.
-    soil_moisture = get_soil_moisture_for_district(request.location)
+    soil_moisture = get_soil_moisture_for_district(body.location)
     response["soil_moisture"] = soil_moisture
     response["soil_saturation_percent"] = (
         soil_moisture.get("saturation_percent_estimate")
@@ -331,11 +338,11 @@ async def get_situation(request: SituationRequest):
     # of a fixed +15/+10/+5 synthetic offset with no forecast behind it at
     # all (the dashboard's old behavior).
     try:
-        forecast = weather_forecast.get_forecast_for_district(request.location)
+        forecast = weather_forecast.get_forecast_for_district(body.location)
         cumulative = forecast.get("cumulative_6h", {})
         timeline = [{"hour": "Now", "score": score, "risk_tier": risk_tier}]
         for h in [6, 12, 18, 24]:
-            future_precip = request.precipitation + cumulative.get(str(h), 0.0)
+            future_precip = body.precipitation + cumulative.get(str(h), 0.0)
             future_score = calculate_score(future_precip)
             timeline.append(
                 {
@@ -370,6 +377,24 @@ async def get_situation(request: SituationRequest):
         response["rain_probability_now_percent"] = forecast.get("rain_probability_now_percent")
         response["rain_probability_today_percent"] = forecast.get("rain_probability_today_percent")
     except Exception as e:
-        logger.error(f"Weather forecast failed for {request.location}: {e}")
+        logger.error(f"Weather forecast failed for {body.location}: {e}")
 
     return response
+
+
+@router.post("/situation", dependencies=[Depends(verify_api_key)])
+# 30/minute per IP - a security audit found slowapi's Limiter was
+# instantiated (src/api/auth.py) but never actually applied anywhere in
+# the codebase, leaving this endpoint - which calls Google Earth Engine
+# and Google Cloud APIs on every request - with no inbound throttling at
+# all. 30/minute comfortably covers a real user, the kiosk view's 90s
+# auto-refresh (well under 1/minute), and the 3-hourly automated
+# assessment script, while still bounding how fast one source can drive
+# up Earth Engine usage/cost.
+@limiter.limit("30/minute")
+async def get_situation(request: Request, body: SituationRequest):
+    """Thin HTTP entry point - see _build_situation_response for the
+    real logic. request: Request is required by slowapi's
+    @limiter.limit decorator (it inspects the endpoint's own signature
+    for a real starlette.Request instance)."""
+    return await _build_situation_response(body)

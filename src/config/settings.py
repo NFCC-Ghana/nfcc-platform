@@ -107,9 +107,20 @@ class Settings:
     RATE_LIMIT_REQUESTS: int = get_env_int("RATE_LIMIT_REQUESTS", 100) or 100
     RATE_LIMIT_PERIOD: int = get_env_int("RATE_LIMIT_PERIOD", 60) or 60
 
-    # CORS
+    # CORS - was previously defined here but never actually read anywhere
+    # (src/api/main.py hardcoded allow_origins=["*"] instead, combined with
+    # allow_credentials=True - a real, live misconfiguration browsers
+    # normally refuse for credentialed requests). Real default now
+    # includes the actual deployed Streamlit Cloud dashboard origin, not
+    # just localhost dev URLs, since that's every browser-facing consumer
+    # this API has today.
     ALLOWED_ORIGINS: List[str] = get_env_list(
-        "ALLOWED_ORIGINS", ["http://localhost:3000", "http://localhost:8000"]
+        "ALLOWED_ORIGINS",
+        [
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "https://nfcc-platform-5geznelcktztnpazqkagxe.streamlit.app",
+        ],
     )
 
     # Twilio WhatsApp
@@ -226,18 +237,36 @@ class Settings:
 # Create singleton instance
 settings = Settings()
 
-# Production validation
+# Production validation. A security audit found that missing API_KEY
+# here was only ever printed, never enforced - src/api/auth.py's
+# verify_api_key() treats an empty settings.API_KEY as "development
+# mode" and skips authentication entirely, on every write endpoint,
+# including alert approval/dismissal. If the API_KEY secret ever failed
+# to mount (a misconfigured Cloud Run secret binding, a typo'd env var
+# name), the platform would have booted successfully in production with
+# every protected endpoint silently open to anyone, with only an easily-
+# missed print() in the boot logs to show for it. That specific case is
+# now a hard failure; TWILIO_ACCOUNT_SID/WHATSAPP_RECIPIENTS remain
+# warnings, not aborts - missing business/notification config means a
+# message doesn't send, not that authentication is bypassed, so it
+# doesn't warrant crashing the whole platform.
 if settings.is_production:
+    if not settings.API_KEY:
+        raise RuntimeError(
+            "Refusing to start in production without API_KEY set - "
+            "verify_api_key() treats a missing API_KEY as 'development "
+            "mode' and skips authentication entirely on every protected "
+            "endpoint. Set the API_KEY secret/env var before deploying."
+        )
+
     errors = []
     if not settings.TWILIO_ACCOUNT_SID:
         errors.append("TWILIO_ACCOUNT_SID is required")
     if not settings.WHATSAPP_RECIPIENTS:
         errors.append("At least one WhatsApp recipient required")
-    if not settings.API_KEY:
-        errors.append("API_KEY is required")
 
     if errors:
-        print("❌ Production configuration errors:")
+        print("⚠️ Production configuration warnings (non-fatal):")
         for error in errors:
             print(f"   - {error}")
     else:

@@ -48,6 +48,7 @@ from typing import Dict, List, Optional
 import requests
 
 from src.hydrology.altimetry_thresholds import classify_level, compute_relative_thresholds
+from src.utils.http_errors import safe_error_message
 
 logger = logging.getLogger("nfcc.hydrology.river_level_intelligence")
 
@@ -172,5 +173,11 @@ def get_river_level_for_district(district: str) -> Dict:
             result.update(thresholds)
         return result
     except Exception as e:
-        logger.warning(f"DAHITI river level request failed: {e}")
-        return {"available": False, "reason": f"DAHITI request failed: {e}"}
+        # safe_error_message, not str(e) - this request puts the real
+        # DAHITI_API_KEY in its URL query string; see
+        # src/utils/http_errors.py's docstring for why str(e) here would
+        # have leaked it into both Cloud Run logs and this function's
+        # live API response body.
+        reason = safe_error_message(e, "DAHITI")
+        logger.warning(reason)
+        return {"available": False, "reason": reason}
