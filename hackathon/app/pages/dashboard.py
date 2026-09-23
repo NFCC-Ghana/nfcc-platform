@@ -2289,6 +2289,28 @@ def render_alert_review_queue():
         "sent to real recipients until you click Approve below."
     )
 
+    # Every approve/dismiss/retract action was previously recorded under
+    # the same hardcoded "dashboard-operator" string regardless of who
+    # actually clicked it - found during a security audit of this
+    # platform's single-shared-API-key model: with no per-user login,
+    # this reviewed_by field was the only real place accountability for
+    # a genuine evacuation decision could live, and it wasn't capturing
+    # any. This is not authentication (nothing here verifies the name is
+    # true) - it's the minimum honest step of asking, and blocking
+    # action without an answer, rather than silently attributing every
+    # real decision to a generic label nobody typed.
+    operator_name = st.text_input(
+        "Your name (required before approving, dismissing, or retracting an alert)",
+        key="_operator_name",
+        placeholder="e.g. Kwame Mensah, NFCC duty officer",
+    ).strip()
+    if not operator_name:
+        st.warning(
+            "⚠️ Enter your name above before you can approve, dismiss, or "
+            "retract an alert - this is what gets recorded as who made "
+            "the decision."
+        )
+
     col1, col2 = st.columns([3, 1])
     with col2:
         if st.button("🔄 Run Automated Check Now", use_container_width=True):
@@ -2407,22 +2429,24 @@ def render_alert_review_queue():
                         "✅ Approve & Send",
                         key=f"approve_{alert['id']}",
                         use_container_width=True,
+                        disabled=not operator_name,
                     ):
                         call_api(
                             f"/alerts/pending/{alert['id']}/approve",
                             "POST",
-                            {"reviewed_by": "dashboard-operator"},
+                            {"reviewed_by": operator_name},
                         )
                         st.rerun()
                     if st.button(
                         "❌ Dismiss",
                         key=f"dismiss_{alert['id']}",
                         use_container_width=True,
+                        disabled=not operator_name,
                     ):
                         call_api(
                             f"/alerts/pending/{alert['id']}/dismiss",
                             "POST",
-                            {"reviewed_by": "dashboard-operator"},
+                            {"reviewed_by": operator_name},
                         )
                         st.rerun()
                     # Real OASIS CAP v1.2 XML (src/api/routes/cap_export.py)
@@ -2480,12 +2504,12 @@ def render_alert_review_queue():
                         "🔴 Retract Alert",
                         key=f"cancel_{alert['id']}",
                         use_container_width=True,
-                        disabled=not reason,
+                        disabled=not reason or not operator_name,
                     ):
                         call_api(
                             f"/alerts/pending/{alert['id']}/cancel",
                             "POST",
-                            {"reviewed_by": "dashboard-operator", "reason": reason},
+                            {"reviewed_by": operator_name, "reason": reason},
                         )
                         st.rerun()
                     cap_xml = fetch_cap_xml(alert["id"])
