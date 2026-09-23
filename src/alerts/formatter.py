@@ -18,9 +18,7 @@ def tier_at_least(candidate_tier: str, minimum_tier: str) -> bool:
     return TIER_RANK.get(candidate_tier, -1) >= TIER_RANK.get(minimum_tier, 0)
 
 
-def calculate_score(
-    precipitation: float, temperature: float = None, district: Optional[str] = None
-) -> float:
+def calculate_score(precipitation: float, district: Optional[str] = None) -> float:
     """Convert precipitation (mm) to a 0-100 flood risk score.
 
     district is optional and, when given, applies a real urban-drainage
@@ -38,6 +36,15 @@ def calculate_score(
     (src/models/historical_backtest.py, rare_event_verification.py),
     which need the pure precipitation-only curve to stay comparable
     against real past events.
+
+    Previously also accepted a `temperature` parameter that this
+    function silently never read - a real "wired but not connected" bug
+    on the live /score endpoint (src/api/main.py's ScoreRequest let a
+    caller supply temperature expecting it to affect the score). Removed
+    rather than given a real effect: temperature isn't a meaningful
+    direct driver of Ghana's rainfall-driven flooding, and inventing a
+    formula just to make the parameter "do something" would trade one
+    honesty problem for another.
     """
     if precipitation <= 0:
         base = 0.0

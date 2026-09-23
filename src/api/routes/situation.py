@@ -26,8 +26,8 @@ from src.exposure.impact_estimator import impact_estimator
 from src.exposure.shelter_candidates import get_shelter_names
 from src.hydrology.dam_intelligence import get_dam_intelligence_for_district
 from src.hydrology.river_level_intelligence import get_river_level_for_district
+from src.hydrology.sentinel_processor import sentinel_processor
 from src.hydrology.smap_soil_moisture import get_soil_moisture_for_district
-from src.hydrology.unified_intelligence import unified_intelligence
 from src.hydrology.weather_forecast import weather_forecast
 
 logger = logging.getLogger("nfcc-api.situation")
@@ -176,12 +176,23 @@ async def get_situation(request: SituationRequest):
     risk_tier = get_risk_tier(score)
 
     try:
-        hydrology = unified_intelligence.get_complete_risk_assessment(
-            request.location, request.precipitation
-        )
+        # Direct call, not through unified_intelligence.get_complete_risk_
+        # assessment() - that function's only genuinely live-used output
+        # was this same satellite dict (see response["satellite"] below);
+        # everything else it computed (rainfall_history, river_intelligence,
+        # reservoir_intelligence, soil_moisture - all four fabricate via
+        # random.seed(hash(...)), undisclosed, since none of their output
+        # ever reached a response) plus a whole second, independent
+        # composite_risk score/tier were being computed from scratch on
+        # every single /situation call and immediately discarded. Found
+        # during a codebase-wide audit for exactly the pattern this file's
+        # own module docstring warns against: "avoid reintroducing the
+        # kind of drift just fixed" by letting a module compute its own
+        # independent risk number nothing uses.
+        satellite = sentinel_processor.detect_flood(request.location)
     except Exception as e:
-        logger.error(f"Hydrology assessment failed for {request.location}: {e}")
-        hydrology = None
+        logger.error(f"Satellite detection failed for {request.location}: {e}")
+        satellite = None
 
     try:
         impact = impact_estimator.estimate_impact(request.location, score, risk_tier)
@@ -221,9 +232,8 @@ async def get_situation(request: SituationRequest):
         # (src/hydrology/river_level_intelligence.py) - available=True
         # only for Tamale (the one tracked district with a real gauge
         # close enough to be meaningful), available=False with an honest
-        # reason for the other 8. Independent of the unified_intelligence
-        # hydrology call below, so this is set unconditionally rather
-        # than nested inside `if hydrology:`.
+        # reason for the other 8. Set unconditionally, independent of the
+        # satellite fetch below.
         "river_gauge": get_river_level_for_district(request.location),
     }
 
@@ -264,55 +274,54 @@ async def get_situation(request: SituationRequest):
             )
         )
 
-    if hydrology:
-        response["rainfall_mm"] = request.precipitation
-        # river_level_m used to come from src/hydrology/river_intelligence.py's
-        # get_river_status(), which is entirely
-        # np.random.seed(hash(gauge_id))-fabricated - a sine wave plus
-        # noise around a static threshold, with zero connection to any
-        # real input. Now sourced from response["river_gauge"] (real
-        # DAHITI data for Tamale, honestly None for the other 8 tracked
-        # districts) instead - see src/hydrology/river_level_intelligence.py.
-        river_gauge = response["river_gauge"]
-        response["river_level_m"] = (
-            river_gauge.get("level_above_baseline_m") if river_gauge["available"] else None
-        )
-        # Real NASA SMAP satellite soil moisture (src/hydrology/
-        # smap_soil_moisture.py), replacing hydrology["soil"] -
-        # src/hydrology/soil_moisture.py's get_soil_moisture(), which
-        # generates "saturation_percent" via
-        # random.seed(hash(f"{district}_{date}")) with zero connection
-        # to any real input - the same undisclosed-fabrication pattern
-        # already fixed this session for river levels and satellite
-        # confidence. Honestly None (not the old fabricated number)
-        # when Earth Engine can't reach a real SMAP reading.
-        soil_moisture = get_soil_moisture_for_district(request.location)
-        response["soil_moisture"] = soil_moisture
-        response["soil_saturation_percent"] = (
-            soil_moisture.get("saturation_percent_estimate")
-            if soil_moisture.get("available")
-            else None
-        )
-        # NOT exposed: hydrology.get("recommendations", []). Found during
-        # a codebase-wide "wired but never actually verified" audit -
-        # unified_intelligence.py's _generate_recommendations() (and the
-        # _calculate_risk_factors() score feeding it) still runs on the
-        # OLD fabricated river_intelligence/reservoir_intelligence/
-        # soil_moisture inputs (np.random.seed(hash(...)) - see this
-        # file's river_level_m/soil_saturation_percent comments above for
-        # the same pattern already fixed for those two fields). This one
-        # generates specific, named, undisclosed-fabricated text like
-        # "{dam_name} at spillage risk - Monitor closely" for a real named
-        # dam, driven entirely by a random seed. Confirmed zero real
-        # consumers today (not the dashboard, not the AI Copilot) - safe
-        # to drop rather than carry a live, callable, documented API field
-        # that silently fabricates dam/river/soil-specific guidance.
-        # Real Sentinel-1 SAR satellite flood detection (Google Earth
-        # Engine, via src/hydrology/sentinel_processor.py) when reachable;
-        # satellite["source"] says "Sentinel-1 SAR" for a real detection
-        # or "Sentinel-1 (simulated)"/"(unavailable)" otherwise - always
-        # check this field before treating the numbers as real.
-        response["satellite"] = hydrology.get("satellite", {})
+    # rainfall_mm/river_level_m/soil_saturation_percent are each their own
+    # independent real call (DAHITI, SMAP) - previously all three, plus
+    # satellite, were nested inside `if hydrology:`, which meant a single
+    # unrelated failure in the now-removed composite pipeline above could
+    # silently blank out real, independently-fetched DAHITI/SMAP data too.
+    # Not gated on anything now; each field honestly reports its own
+    # availability instead of inheriting an unrelated call's success.
+    response["rainfall_mm"] = request.precipitation
+    # river_level_m used to come from src/hydrology/river_intelligence.py's
+    # get_river_status(), which is entirely
+    # np.random.seed(hash(gauge_id))-fabricated - a sine wave plus
+    # noise around a static threshold, with zero connection to any
+    # real input. Now sourced from response["river_gauge"] (real
+    # DAHITI data for Tamale, honestly None for the other 8 tracked
+    # districts) instead - see src/hydrology/river_level_intelligence.py.
+    river_gauge = response["river_gauge"]
+    response["river_level_m"] = (
+        river_gauge.get("level_above_baseline_m") if river_gauge["available"] else None
+    )
+    # Real NASA SMAP satellite soil moisture (src/hydrology/
+    # smap_soil_moisture.py) - src/hydrology/soil_moisture.py's
+    # get_soil_moisture() generates "saturation_percent" via
+    # random.seed(hash(f"{district}_{date}")) with zero connection
+    # to any real input - the same undisclosed-fabrication pattern
+    # already fixed this session for river levels and satellite
+    # confidence. Honestly None (not the old fabricated number)
+    # when Earth Engine can't reach a real SMAP reading.
+    soil_moisture = get_soil_moisture_for_district(request.location)
+    response["soil_moisture"] = soil_moisture
+    response["soil_saturation_percent"] = (
+        soil_moisture.get("saturation_percent_estimate")
+        if soil_moisture.get("available")
+        else None
+    )
+    # Real Sentinel-1 SAR satellite flood detection (Google Earth
+    # Engine, via src/hydrology/sentinel_processor.py) when reachable;
+    # satellite["source"] says "Sentinel-1 SAR" for a real detection
+    # or "Sentinel-1 (simulated)"/"(unavailable)" otherwise - always
+    # check this field before treating the numbers as real. Falls back
+    # to an explicit "(unavailable)" dict, matching sentinel_processor's
+    # own honest-failure shape, if the try/except above caught an error.
+    response["satellite"] = satellite or {
+        "water_detected": False,
+        "flood_extent_km2": 0,
+        "acquisition_date": None,
+        "source": "Sentinel-1 (unavailable)",
+        "confidence": 0,
+    }
 
     # Risk timeline: real Open-Meteo forecast rainfall (see
     # src/hydrology/weather_forecast.py), layered on top of the current

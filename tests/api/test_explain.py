@@ -43,15 +43,21 @@ class TestExplainEndpoint:
         assert data["risk_tier"] in ["LOW", "MODERATE", "HIGH", "CRITICAL", "EXTREME"]
 
     def test_explain_calculates_correct_risk_for_rainfall(self):
-        """Test risk score calculation for different rainfall amounts."""
+        """Test risk score calculation for different rainfall amounts -
+        expected values are calculate_score()'s real curve
+        (src/alerts/formatter.py), not a separately hand-maintained
+        approximation of it, so this test also guards against /explain
+        drifting from the real score again."""
+        from src.alerts.formatter import calculate_score, get_risk_tier
+
         # Light rain
         response = client.post(
             "/explain/", json={"location": "Accra Central", "precipitation": 5.0}
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["risk_score"] == 15.0
-        assert data["risk_tier"] == "LOW"
+        assert data["risk_score"] == round(calculate_score(5.0), 1)
+        assert data["risk_tier"] == get_risk_tier(calculate_score(5.0))
 
         # Moderate rain
         response = client.post(
@@ -59,8 +65,8 @@ class TestExplainEndpoint:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["risk_score"] == 52.5
-        assert data["risk_tier"] == "HIGH"
+        assert data["risk_score"] == round(calculate_score(25.0), 1)
+        assert data["risk_tier"] == get_risk_tier(calculate_score(25.0))
 
         # Heavy rain
         response = client.post(
@@ -68,8 +74,8 @@ class TestExplainEndpoint:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["risk_score"] == 98.3
-        assert data["risk_tier"] == "EXTREME"
+        assert data["risk_score"] == round(calculate_score(95.5), 1)
+        assert data["risk_tier"] == get_risk_tier(calculate_score(95.5))
 
     def test_explain_handles_zero_precipitation(self):
         """Zero precipitation should return minimal risk."""

@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -40,7 +40,6 @@ alert_engine = None
 class ScoreRequest(BaseModel):
     location: str = Field(..., description="District location")
     precipitation: float = Field(..., description="Precipitation in mm", ge=0)
-    temperature: Optional[float] = Field(None, description="Temperature in Celsius")
 
 
 class BatchScoreRequest(BaseModel):
@@ -132,7 +131,7 @@ async def districts():
 
 
 def _score_one(request: ScoreRequest) -> ScoreResponse:
-    score_value = calculate_score(request.precipitation, request.temperature)
+    score_value = calculate_score(request.precipitation)
     risk_tier = get_risk_tier(score_value)
 
     # Send alert if risk is high enough
