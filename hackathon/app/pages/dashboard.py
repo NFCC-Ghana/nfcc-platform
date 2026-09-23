@@ -534,6 +534,7 @@ def render_control_panel():
             "📺 Open Public Kiosk Screen",
             url=f"?kiosk=1&district={quote(district)}",
             use_container_width=True,
+            type="primary",
         )
 
         st.divider()
