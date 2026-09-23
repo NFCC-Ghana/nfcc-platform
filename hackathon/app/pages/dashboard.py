@@ -1875,6 +1875,187 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
     return "paused"
 
 
+# ============================================================
+# KIOSK MODE - custom vector icons
+# ============================================================
+# Emoji glyphs render inconsistently across OS/browser font stacks -
+# verified live in production, where the LOW-risk tier's emoji dot
+# rendered as a hollow outline instead of a filled circle on one real
+# Windows/Chrome build. A public safety screen can't depend on
+# whatever emoji font happens to be installed, so every icon below is
+# hand-drawn inline SVG from basic primitives (circle/ellipse/rect/
+# polygon/line) - identical pixels on every device, no font fallback
+# involved, and simple enough to reason about exactly (vs. a
+# hand-tuned bezier illustration that either looks right or doesn't).
+#
+# Risk-tier shapes deliberately borrow the Vienna Convention on Road
+# Traffic Signs' near-universal grammar - triangle = warning, octagon
+# = stop/danger - so a viewer who has never seen this dashboard before
+# but has seen an ordinary road sign already has a head start on what
+# the shape means, before reading any color or text. This is also the
+# redundant, non-color coding ISO 22324 (emergency management -
+# guidelines for colour-coded alerts) requires: that standard is
+# explicit that color alone is never sufficient, precisely because it
+# fails colorblind viewers (~8% of men) - the previous version's
+# tiers differed only by background color plus a colored emoji, i.e.
+# color twice, which is the exact failure mode the standard warns about.
+
+
+def _svg(inner: str, size: int) -> str:
+    return (
+        f'<svg width="{size}" height="{size}" viewBox="0 0 100 100" '
+        f'xmlns="http://www.w3.org/2000/svg">{inner}</svg>'
+    )
+
+
+def _cloud_shape(cx: float, cy: float, color: str) -> str:
+    """One puffy cloud from overlapping ellipses + a base bar - a
+    standard, robust construction that degrades gracefully (worst case
+    a slightly-off blob that still reads as a cloud) rather than a
+    hand-tuned silhouette that either looks right or doesn't."""
+    return (
+        f'<g transform="translate({cx},{cy})">'
+        f'<ellipse cx="-18" cy="6" rx="16" ry="13" fill="{color}"/>'
+        f'<ellipse cx="0" cy="-6" rx="20" ry="17" fill="{color}"/>'
+        f'<ellipse cx="20" cy="6" rx="15" ry="12" fill="{color}"/>'
+        f'<rect x="-22" y="0" width="50" height="18" rx="9" fill="{color}"/>'
+        f"</g>"
+    )
+
+
+# 8 sun rays at 45-degree increments, precomputed (inner radius 26,
+# outer radius 38, center 50,50) rather than computed at render time -
+# exact trig values, no math import needed for 8 fixed angles.
+_SUN_RAYS = [
+    (76, 50, 88, 50), (68.4, 68.4, 76.9, 76.9), (50, 76, 50, 88),
+    (31.6, 68.4, 23.1, 76.9), (24, 50, 12, 50), (31.6, 31.6, 23.1, 23.1),
+    (50, 24, 50, 12), (68.4, 31.6, 76.9, 23.1),
+]
+
+
+def _sun_shape(color: str) -> str:
+    rays = "".join(
+        f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
+        f'stroke="{color}" stroke-width="4" stroke-linecap="round"/>'
+        for x1, y1, x2, y2 in _SUN_RAYS
+    )
+    return f'<circle cx="50" cy="50" r="22" fill="{color}"/>{rays}'
+
+
+def _moon_shape(color: str, bg_color: str) -> str:
+    """Crescent = a filled circle with a same-color-as-background
+    circle overlapping one edge, visually "erasing" part of it -
+    requires knowing the real background it sits on, which every call
+    site below controls exactly."""
+    return (
+        f'<circle cx="44" cy="50" r="24" fill="{color}"/>'
+        f'<circle cx="56" cy="42" r="21" fill="{bg_color}"/>'
+    )
+
+
+def weather_icon_svg(description: str, is_raining_now: bool, is_day: bool, bg_color: str, size: int = 100) -> str:
+    """Maps the real weather description/flags already returned by
+    /situation (src/hydrology/weather_forecast.py) to one of 6 hand-
+    drawn icon categories - no backend change needed, since these
+    fields already carry enough signal to classify."""
+    d = (description or "").lower()
+    color = "#f1f5f9"
+
+    if "thunder" in d or "storm" in d:
+        inner = _cloud_shape(50, 42, color) + (
+            '<polygon points="52,58 40,80 50,80 44,96 68,68 56,68 62,58" fill="#facc15"/>'
+        )
+    elif is_raining_now or "rain" in d or "drizzle" in d or "shower" in d:
+        inner = _cloud_shape(50, 40, color) + "".join(
+            f'<line x1="{x}" y1="70" x2="{x-6}" y2="88" stroke="{color}" '
+            f'stroke-width="5" stroke-linecap="round"/>'
+            for x in (36, 50, 64)
+        )
+    elif "fog" in d or "mist" in d or "haze" in d:
+        inner = "".join(
+            f'<rect x="{x}" y="{y}" width="{w}" height="6" rx="3" fill="{color}"/>'
+            for x, y, w in [(15, 34, 70), (10, 50, 80), (15, 66, 70), (22, 82, 56)]
+        )
+    elif "overcast" in d or ("cloud" in d and "partly" not in d and "mainly" not in d):
+        inner = _cloud_shape(50, 52, color)
+    elif "clear" in d:
+        inner = _sun_shape(color) if is_day else _moon_shape(color, bg_color)
+    else:  # partly/mainly cloudy, or anything unclassified - still a real icon, not a "?"
+        small_sky = _sun_shape(color) if is_day else _moon_shape(color, bg_color)
+        inner = f'<g transform="translate(-14,-14) scale(0.55)">{small_sky}</g>' + _cloud_shape(58, 60, color)
+
+    return _svg(inner, size)
+
+
+def risk_shape_svg(tier: str, bg_color: str, mark_color: str, size: int = 100) -> str:
+    """The risk-tier shape itself, not just its color - see this
+    section's module-level comment for why (ISO 22324 redundant
+    coding + the Vienna Convention road-sign grammar)."""
+    exclaim = (
+        f'<rect x="46" y="34" width="8" height="26" rx="4" fill="{mark_color}"/>'
+        f'<circle cx="50" cy="70" r="6" fill="{mark_color}"/>'
+    )
+    check = (
+        f'<polyline points="30,52 44,66 72,36" fill="none" stroke="{mark_color}" '
+        f'stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>'
+    )
+
+    if tier in ("VERY_LOW", "LOW"):
+        inner = f'<circle cx="50" cy="50" r="42" fill="{bg_color}"/>{check}'
+    elif tier == "MODERATE":
+        inner = (
+            f'<circle cx="50" cy="50" r="42" fill="{bg_color}"/>'
+            f'<rect x="46" y="30" width="8" height="30" rx="4" fill="{mark_color}"/>'
+            f'<circle cx="50" cy="72" r="6" fill="{mark_color}"/>'
+        )
+    elif tier == "HIGH":
+        inner = f'<polygon points="50,8 94,88 6,88" fill="{bg_color}"/>{exclaim}'
+    elif tier == "CRITICAL":
+        inner = (
+            f'<polygon points="50,4 97,90 3,90" fill="none" stroke="{mark_color}" stroke-width="3"/>'
+            f'<polygon points="50,14 90,86 10,86" fill="{bg_color}"/>{exclaim}'
+        )
+    else:  # EXTREME - octagon, the real-world stop-sign shape
+        inner = (
+            f'<polygon points="32,6 68,6 94,32 94,68 68,94 32,94 6,68 6,32" fill="{bg_color}"/>'
+            f'{exclaim}'
+        )
+    return _svg(inner, size)
+
+
+# WCAG-checked (bg, mark/text) pairs per tier - the previous palette's
+# white-on-#00cc00 (LOW) measured ~2.2:1 contrast, well under the 3:1
+# WCAG floor for large bold text; every pair below is a darker,
+# desaturated shade chosen to clear 3:1 against white text at these
+# font sizes (verify with a contrast checker before changing these -
+# it is easy to pick a color that "looks" fine and isn't).
+_KIOSK_TIER_STYLE = {
+    "VERY_LOW": {"bg": "#15803d", "text": "#ffffff", "label": "LOW"},
+    "LOW": {"bg": "#15803d", "text": "#ffffff", "label": "LOW"},
+    "MODERATE": {"bg": "#b45309", "text": "#ffffff", "label": "MODERATE"},
+    "HIGH": {"bg": "#c2410c", "text": "#ffffff", "label": "HIGH"},
+    "CRITICAL": {"bg": "#b91c1c", "text": "#ffffff", "label": "CRITICAL"},
+    "EXTREME": {"bg": "#7f1d1d", "text": "#ffffff", "label": "EXTREME"},
+}
+
+
+def _kiosk_trend(risk_timeline: list, current_score: float) -> tuple:
+    """Rising/Falling/Steady vs the forecast 6h out - the timeline is
+    already fetched for the risk-history chart elsewhere in this file
+    and was simply unused here before. A frozen single number can't
+    tell a viewer whether to relax or get more worried; this can, for
+    free."""
+    future = next((p["score"] for p in risk_timeline if p.get("hour") == "6h"), None)
+    if future is None:
+        return "→", "Steady"
+    delta = future - current_score
+    if delta > 3:
+        return "↗", "Rising"
+    if delta < -3:
+        return "↘", "Falling"
+    return "→", "Steady"
+
+
 # Refresh cadence for the unattended kiosk screen (render_kiosk_view) -
 # real conditions don't change meaningfully faster than this, and it
 # keeps the Open-Meteo call volume for an unattended, always-on screen
@@ -1882,14 +2063,31 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
 # board, not a stock ticker.
 KIOSK_REFRESH_SECONDS = 90
 
+# NOTE for a future pass, deliberately not built now: every real-world
+# precedent researched for this feature (Japan's NHK disaster
+# broadcasts, South Korea's automatic warning sirens, China's rural
+# loudspeaker network) layers audio on top of the visual channel for
+# viewers who can't read AND for accessibility beyond low literacy
+# (e.g. visual impairment). An autoplaying alert tone is a natural fit
+# here, but browser autoplay-audio policy varies by platform and can
+# only be reliably guaranteed under a controlled kiosk browser flag
+# (e.g. Chromium's --autoplay-policy=no-user-gesture-required) - not
+# something this environment can verify actually plays, so it isn't
+# half-built in. Add it when a physical deployment target is chosen.
 
-def render_kiosk_view(district: str) -> None:
-    """Unattended, full-screen public display for one district's real
-    current conditions - the actual "digital screen simulating the
-    weather situation" a non-literate viewer can read from across a
-    room, meant to run continuously on a physical screen (community
-    center, market, chief's palace), not a presenter clicking through a
-    briefing.
+
+def render_kiosk_view(district_param: str) -> None:
+    """Unattended, full-screen public display for one or more
+    districts' real current conditions - the actual "digital screen
+    simulating the weather situation" a non-literate viewer can read
+    from across a room, meant to run continuously on a physical screen
+    (community center, market, chief's palace), not a presenter
+    clicking through a briefing.
+
+    district_param may be a single district or a comma-separated list
+    ("Accra Central,Kumasi,Tamale") - a shared/regional screen rotates
+    through all of them, one per KIOSK_REFRESH_SECONDS, the same
+    pattern a real departure board uses to cycle multiple gates.
 
     Deliberately does NOT reuse render_broadcast_view wholesale: that
     function also queues an exercise alert and waits for an operator to
@@ -1898,18 +2096,16 @@ def render_kiosk_view(district: str) -> None:
     itself every KIOSK_REFRESH_SECONDS with nobody present to click
     Approve/Dismiss would either queue exercise alerts nobody clears or
     silently stall on the same "awaiting operator action" block forever.
-    This shows the same real display blocks (weather banner, risk-tier
-    block, recommendation) with none of that stitching.
 
     Rainfall is the real next-24h forecast (weather_forecast_24h), not a
     manual slider value or a scripted demo stage - this is meant to show
     what's actually happening, continuously, unattended.
 
-    Entered via ?kiosk=1&district=<name> in the URL (see main()), so a
-    physical screen's browser can simply be pointed at a fixed link -
-    e.g. a Raspberry Pi or Android box running Chromium in --kiosk mode,
-    the standard pattern real public-information screens use worldwide
-    rather than custom kiosk software."""
+    Entered via ?kiosk=1&district=<name-or-list> in the URL (see
+    main()), so a physical screen's browser can simply be pointed at a
+    fixed link - e.g. a Raspberry Pi or Android box running Chromium in
+    --kiosk mode, the standard pattern real public-information screens
+    use worldwide rather than custom kiosk software."""
     st.markdown(
         """<style>
         [data-testid="stSidebar"], header[data-testid="stHeader"],
@@ -1919,40 +2115,109 @@ def render_kiosk_view(district: str) -> None:
         unsafe_allow_html=True,
     )
 
+    districts = [d.strip() for d in district_param.split(",") if d.strip()] or [ALL_TRACKED_DISTRICTS[0]]
+    districts = [d for d in districts if d in ALL_TRACKED_DISTRICTS] or [ALL_TRACKED_DISTRICTS[0]]
+    rotation_idx = st.session_state.get("_kiosk_rotation_idx", 0) % len(districts)
+    district = districts[rotation_idx]
+
+    cache_key = f"_kiosk_last_good_{district}"
     try:
         rainfall_mm = weather_forecast_24h(district)
+        state, _ = fetch_situation_state(district, rainfall_mm)
+        if not state.api_connected:
+            raise RuntimeError("API reported disconnected")
+        st.session_state[cache_key] = (state, datetime.now())
+        stale = False
     except Exception:
-        rainfall_mm = 0.0
+        cached = st.session_state.get(cache_key)
+        if cached is None:
+            st.markdown(
+                "<div style='background:#7f1d1d;color:#fff;padding:60px 24px;"
+                "border-radius:20px;text-align:center;font-size:28px;'>"
+                "⚠️ Unable to reach the NFCC system.<br>"
+                "<span style='font-size:18px;'>Retrying automatically - no "
+                "cached reading is available yet for this screen.</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            time.sleep(KIOSK_REFRESH_SECONDS)
+            st.rerun()
+            return
+        state, _ = cached
+        stale = True
 
-    state, _ = fetch_situation_state(district, rainfall_mm)
-    summary, color, recommendation = SITUATION_BY_TIER.get(
-        state.risk_category, SITUATION_BY_TIER["MODERATE"]
-    )
-    style = get_risk_tier_style(tier=state.risk_category)
+    tier_style = _KIOSK_TIER_STYLE.get(state.risk_category, _KIOSK_TIER_STYLE["MODERATE"])
+    recommendation = SITUATION_BY_TIER.get(state.risk_category, SITUATION_BY_TIER["MODERATE"])[2]
+    trend_arrow, trend_word = _kiosk_trend(state.risk_timeline, state.risk_score)
 
+    header_right = f"Local time {datetime.now().strftime('%H:%M:%S')}"
+    if len(districts) > 1:
+        header_right += f" • {rotation_idx + 1}/{len(districts)}"
     st.markdown(
         f"<div style='background:#111827;color:#fff;padding:14px 28px;"
         f"border-radius:8px;display:flex;justify-content:space-between;"
-        f"align-items:center;margin-bottom:20px;'>"
+        f"align-items:center;margin-bottom:16px;'>"
         f"<span style='font-size:22px;font-weight:700;letter-spacing:1px;'>"
         f"📺 LIVE — {district}</span>"
-        f"<span style='font-size:16px;color:#9ca3af;'>Updated "
-        f"{datetime.now().strftime('%H:%M:%S UTC')}</span>"
+        f"<span style='font-size:16px;color:#9ca3af;'>{header_right}</span>"
         f"</div>",
         unsafe_allow_html=True,
     )
 
+    if stale:
+        st.markdown(
+            "<div style='background:#78350f;color:#fff;padding:12px 20px;"
+            "border-radius:8px;text-align:center;font-size:18px;"
+            "margin-bottom:16px;'>⚠️ Connection issue — showing the last "
+            "successful reading, not a live one right now.</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Hero block: the risk tier, deliberately the single largest and
+    # first element on screen - the previous version gave the weather
+    # banner equal visual weight, splitting attention between two
+    # "hero" elements instead of leading with the one that answers the
+    # actual question ("is it safe").
+    icon_svg = risk_shape_svg(state.risk_category, "#ffffff", tier_style["bg"], size=140)
+    st.markdown(
+        f"<div style='background:{tier_style['bg']};color:{tier_style['text']};"
+        f"padding:32px 24px;border-radius:20px;text-align:center;"
+        f"margin-bottom:16px;'>"
+        f"<div>{icon_svg}</div>"
+        f"<div style='font-size:80px;font-weight:800;line-height:1.1;margin-top:8px;'>"
+        f"{state.risk_score:.0f}%</div>"
+        f"<div style='font-size:36px;font-weight:700;letter-spacing:2px;'>"
+        f"{tier_style['label']}</div>"
+        f"<div style='font-size:20px;margin-top:6px;opacity:0.9;'>"
+        f"{trend_arrow} {trend_word} over next 6h</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"<div style='background:#111827;padding:18px 24px;border-radius:12px;"
+        f"text-align:center;font-size:22px;font-weight:600;color:#fff;"
+        f"margin-bottom:16px;'>Recommended: {recommendation}</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Secondary block: real sky condition - clearly subordinate to the
+    # risk block above it (smaller icon, muted background), because
+    # it's supporting context, not the primary decision signal.
     if state.temperature_c is not None:
         day_night_label = "Day" if state.is_day else "Night"
+        weather_svg = weather_icon_svg(
+            state.weather_description, state.is_raining_now, state.is_day, "#1f2937", size=64
+        )
         st.markdown(
-            f"<div style='background:#1f2937;color:#fff;padding:32px 24px;"
-            f"border-radius:20px;text-align:center;margin-bottom:16px;"
-            f"display:flex;align-items:center;justify-content:center;gap:32px;'>"
-            f"<span style='font-size:96px;line-height:1;'>{state.weather_icon}</span>"
+            f"<div style='background:#1f2937;color:#fff;padding:18px 24px;"
+            f"border-radius:16px;margin-bottom:12px;display:flex;"
+            f"align-items:center;justify-content:center;gap:20px;'>"
+            f"<div>{weather_svg}</div>"
             f"<div style='text-align:left;'>"
-            f"<div style='font-size:56px;font-weight:800;line-height:1.1;'>"
+            f"<div style='font-size:32px;font-weight:800;line-height:1.1;'>"
             f"{state.temperature_c:.0f}°C / {state.temperature_f:.0f}°F</div>"
-            f"<div style='font-size:26px;color:#d1d5db;'>"
+            f"<div style='font-size:17px;color:#d1d5db;'>"
             f"{state.weather_description} • {day_night_label}</div>"
             f"</div>"
             f"</div>",
@@ -1960,40 +2225,18 @@ def render_kiosk_view(district: str) -> None:
         )
         if state.forecast_source == "fallback":
             st.markdown(
-                "<div style='text-align:center;color:#facc15;font-size:16px;"
-                "margin-bottom:16px;'>⚠️ Weather service unreachable — "
+                "<div style='text-align:center;color:#facc15;font-size:15px;"
+                "margin-bottom:12px;'>⚠️ Weather service unreachable — "
                 "showing a seasonal estimate, not a live reading.</div>",
                 unsafe_allow_html=True,
             )
 
-    st.markdown(
-        f"<div style='background:{style['color']};color:#fff;"
-        f"padding:48px 24px;border-radius:20px;text-align:center;"
-        f"margin-bottom:20px;'>"
-        f"<div style='font-size:96px;line-height:1;'>{style['emoji']}</div>"
-        f"<div style='font-size:80px;font-weight:800;line-height:1.1;'>"
-        f"{state.risk_score:.0f}%</div>"
-        f"<div style='font-size:34px;font-weight:700;letter-spacing:2px;'>"
-        f"{state.risk_category}</div>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        f"<div style='background:#161616;padding:20px 24px;"
-        f"border-radius:8px;border-left:8px solid {color};"
-        f"font-size:20px;text-align:center;'>"
-        f"<strong>{summary}</strong><br>"
-        f"<span style='font-size:17px;'>Recommended: {recommendation}</span>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-
     st.caption(
-        f"🔄 Refreshes automatically every {KIOSK_REFRESH_SECONDS}s • "
-        f"NFCC Platform • real-time satellite and weather data, not a recording"
+        f"🔄 Refreshes every {KIOSK_REFRESH_SECONDS}s • NFCC Platform • "
+        f"real-time satellite and weather data, not a recording"
     )
 
+    st.session_state["_kiosk_rotation_idx"] = (rotation_idx + 1) % len(districts)
     time.sleep(KIOSK_REFRESH_SECONDS)
     st.rerun()
 
@@ -2352,10 +2595,10 @@ def main():
     hidden by render_kiosk_view's own CSS."""
     query_params = st.query_params
     if query_params.get("kiosk") in ("1", "true", "True"):
-        kiosk_district = query_params.get("district", ALL_TRACKED_DISTRICTS[0])
-        if kiosk_district not in ALL_TRACKED_DISTRICTS:
-            kiosk_district = ALL_TRACKED_DISTRICTS[0]
-        render_kiosk_view(kiosk_district)
+        # A single district or a comma-separated list ("A,B,C") for a
+        # rotating regional screen - render_kiosk_view splits and
+        # validates each name itself.
+        render_kiosk_view(query_params.get("district", ALL_TRACKED_DISTRICTS[0]))
         return
 
     control_data = render_control_panel()
