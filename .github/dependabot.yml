@@ -1,0 +1,46 @@
+# Automated dependency-update monitoring - previously missing entirely
+# (a security audit's own accepted-limitations list flagged this: CI's
+# pip-audit job scans the currently pinned versions but is purely
+# reactive - nothing watches for a NEW advisory landing against an
+# already-deployed pin, or simply for upstream releasing a routine
+# security patch, between audit passes). Dependabot is free for public
+# and private GitHub repos and closes that gap without adding any new
+# paid infrastructure.
+#
+# Opens PRs only - never auto-merges. Every bump still goes through the
+# same CI gates (test/lint/security) as any other PR, and a human
+# reviews and merges. Grouped and capped to keep the volume manageable
+# rather than one PR per patch release.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      # Security patches land immediately, ungrouped, so each gets its
+      # own reviewable PR rather than waiting to be bundled.
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      # Routine version bumps are grouped into one weekly PR instead of
+      # a dozen separate ones for unrelated packages.
+      python-routine:
+        applies-to: version-updates
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
