@@ -558,9 +558,24 @@ def render_control_panel():
             "browser at this link to run it as an unattended public "
             "display."
         )
+        # Language-switching infrastructure only - every non-English
+        # option here still displays English text today, deliberately:
+        # this kiosk shows real evacuation instructions and risk-tier
+        # labels, and a wrong or garbled translation of "evacuate now"
+        # is worse than none at all. See _KIOSK_I18N's comment in
+        # render_kiosk_view. Picking one now proves the mechanism works
+        # end-to-end and makes it a one-line change to go live the
+        # moment a native speaker has reviewed real translated text.
+        kiosk_lang = st.selectbox(
+            "Kiosk screen language",
+            options=list(_KIOSK_SUPPORTED_LANGUAGES.keys()),
+            format_func=lambda code: _KIOSK_SUPPORTED_LANGUAGES[code],
+            index=0,
+            key="_kiosk_lang_choice",
+        )
         st.link_button(
             "📺 Open Public Kiosk Screen",
-            url=f"?kiosk=1&district={quote(district)}",
+            url=f"?kiosk=1&district={quote(district)}&lang={kiosk_lang}",
             use_container_width=True,
             type="primary",
         )
@@ -2066,6 +2081,86 @@ _KIOSK_TIER_STYLE = {
     "CRITICAL": {"bg": "#b91c1c", "text": "#ffffff", "label": "CRITICAL"},
     "EXTREME": {"bg": "#7f1d1d", "text": "#ffffff", "label": "EXTREME"},
 }
+_KIOSK_TIER_I18N_KEY = {
+    "VERY_LOW": "low",
+    "LOW": "low",
+    "MODERATE": "moderate",
+    "HIGH": "high",
+    "CRITICAL": "critical",
+    "EXTREME": "extreme",
+}
+
+# Kiosk display language - infrastructure only for now. Every value
+# below is English; the non-English entries are deliberately EMPTY
+# placeholders, not missing translations to fill in casually. This
+# platform's own explicit decision (raised because kiosk text includes
+# real evacuation instructions and risk-tier labels) was to ship the
+# language-SWITCHING mechanism now while leaving the actual translated
+# safety-critical text to a qualified native speaker's review before it
+# ever reaches a real public screen - a wrong or garbled translation of
+# "evacuate now" is worse than none at all, since it can give false
+# confidence to someone who would otherwise have sought help
+# understanding the English. Populate a language's dict only after that
+# review; _kiosk_text() falls back to English for any key a language
+# hasn't populated yet, so a partial translation never shows blank.
+_KIOSK_SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "tw": "Twi (awaiting native-speaker review - shows English until then)",
+    "ga": "Ga (awaiting native-speaker review - shows English until then)",
+    "ee": "Ewe (awaiting native-speaker review - shows English until then)",
+    "dag": "Dagbani (awaiting native-speaker review - shows English until then)",
+}
+_KIOSK_I18N = {
+    "en": {
+        "live_label": "LIVE",
+        "local_time": "Local time",
+        "recommended": "Recommended",
+        "trend_suffix": "over next 6h",
+        "trend_rising": "Rising",
+        "trend_falling": "Falling",
+        "trend_steady": "Steady",
+        "day": "Day",
+        "night": "Night",
+        "tier_low": "LOW",
+        "tier_moderate": "MODERATE",
+        "tier_high": "HIGH",
+        "tier_critical": "CRITICAL",
+        "tier_extreme": "EXTREME",
+        "rec_low": "✅ CONTINUE NORMAL OPERATIONS",
+        "rec_moderate": "📢 STAY INFORMED",
+        "rec_high": "⚠️ PREPARE TO EVACUATE",
+        "rec_critical": "🚨 EVACUATION ORDER LIKELY",
+        "rec_extreme": "🚨 MANDATORY EVACUATION ORDER",
+        "connection_lost_title": "⚠️ Unable to reach the NFCC system.",
+        "connection_lost_body": (
+            "Retrying automatically - no cached reading is available yet "
+            "for this screen."
+        ),
+        "stale_banner": (
+            "⚠️ Connection issue — showing the last successful reading, "
+            "not a live one right now."
+        ),
+        "weather_fallback": (
+            "⚠️ Weather service unreachable — showing a seasonal estimate, "
+            "not a live reading."
+        ),
+        "refresh_caption": (
+            "🔄 Refreshes every {seconds}s • NFCC Platform • real-time "
+            "satellite and weather data, not a recording"
+        ),
+    },
+    "tw": {},
+    "ga": {},
+    "ee": {},
+    "dag": {},
+}
+
+
+def _kiosk_text(key: str, lang: str) -> str:
+    """A kiosk display string in `lang`, falling back to English for any
+    language/key not yet populated - see _KIOSK_I18N's comment for why
+    every non-English entry is intentionally empty right now."""
+    return _KIOSK_I18N.get(lang, {}).get(key) or _KIOSK_I18N["en"][key]
 
 
 def _kiosk_trend(risk_timeline: list, current_score: float) -> tuple:
@@ -2105,7 +2200,7 @@ KIOSK_REFRESH_SECONDS = 90
 # half-built in. Add it when a physical deployment target is chosen.
 
 
-def render_kiosk_view(district_param: str) -> None:
+def render_kiosk_view(district_param: str, lang: str = "en") -> None:
     """Unattended, full-screen public display for one or more
     districts' real current conditions - the actual "digital screen
     simulating the weather situation" a non-literate viewer can read
@@ -2117,6 +2212,12 @@ def render_kiosk_view(district_param: str) -> None:
     ("Accra Central,Kumasi,Tamale") - a shared/regional screen rotates
     through all of them, one per KIOSK_REFRESH_SECONDS, the same
     pattern a real departure board uses to cycle multiple gates.
+
+    lang selects a display language via _kiosk_text()/_KIOSK_I18N -
+    English today regardless of what's passed, since every non-English
+    entry is a deliberately empty placeholder awaiting native-speaker
+    review (see _KIOSK_I18N's comment). Falls back to "en" for any
+    unrecognized code.
 
     Deliberately does NOT reuse render_broadcast_view wholesale: that
     function also queues an exercise alert and waits for an operator to
@@ -2130,11 +2231,15 @@ def render_kiosk_view(district_param: str) -> None:
     manual slider value or a scripted demo stage - this is meant to show
     what's actually happening, continuously, unattended.
 
-    Entered via ?kiosk=1&district=<name-or-list> in the URL (see
-    main()), so a physical screen's browser can simply be pointed at a
-    fixed link - e.g. a Raspberry Pi or Android box running Chromium in
-    --kiosk mode, the standard pattern real public-information screens
-    use worldwide rather than custom kiosk software."""
+    Entered via ?kiosk=1&district=<name-or-list>&lang=<code> in the URL
+    (see main()), so a physical screen's browser can simply be pointed
+    at a fixed link - e.g. a Raspberry Pi or Android box running
+    Chromium in --kiosk mode, the standard pattern real public-
+    information screens use worldwide rather than custom kiosk
+    software."""
+    if lang not in _KIOSK_SUPPORTED_LANGUAGES:
+        lang = "en"
+
     st.markdown(
         """<style>
         [data-testid="stSidebar"], header[data-testid="stHeader"],
@@ -2161,12 +2266,12 @@ def render_kiosk_view(district_param: str) -> None:
         cached = st.session_state.get(cache_key)
         if cached is None:
             st.markdown(
-                "<div style='background:#7f1d1d;color:#fff;padding:60px 24px;"
-                "border-radius:20px;text-align:center;font-size:28px;'>"
-                "⚠️ Unable to reach the NFCC system.<br>"
-                "<span style='font-size:18px;'>Retrying automatically - no "
-                "cached reading is available yet for this screen.</span>"
-                "</div>",
+                f"<div style='background:#7f1d1d;color:#fff;padding:60px 24px;"
+                f"border-radius:20px;text-align:center;font-size:28px;'>"
+                f"{_kiosk_text('connection_lost_title', lang)}<br>"
+                f"<span style='font-size:18px;'>"
+                f"{_kiosk_text('connection_lost_body', lang)}</span>"
+                f"</div>",
                 unsafe_allow_html=True,
             )
             time.sleep(KIOSK_REFRESH_SECONDS)
@@ -2176,10 +2281,13 @@ def render_kiosk_view(district_param: str) -> None:
         stale = True
 
     tier_style = _KIOSK_TIER_STYLE.get(state.risk_category, _KIOSK_TIER_STYLE["MODERATE"])
-    recommendation = SITUATION_BY_TIER.get(state.risk_category, SITUATION_BY_TIER["MODERATE"])[2]
-    trend_arrow, trend_word = _kiosk_trend(state.risk_timeline, state.risk_score)
+    tier_i18n_key = _KIOSK_TIER_I18N_KEY.get(state.risk_category, "moderate")
+    tier_label = _kiosk_text(f"tier_{tier_i18n_key}", lang)
+    recommendation = _kiosk_text(f"rec_{tier_i18n_key}", lang)
+    trend_arrow, trend_word_key = _kiosk_trend(state.risk_timeline, state.risk_score)
+    trend_word = _kiosk_text(f"trend_{trend_word_key.lower()}", lang)
 
-    header_right = f"Local time {datetime.now().strftime('%H:%M:%S')}"
+    header_right = f"{_kiosk_text('local_time', lang)} {datetime.now().strftime('%H:%M:%S')}"
     if len(districts) > 1:
         header_right += f" • {rotation_idx + 1}/{len(districts)}"
     st.markdown(
@@ -2187,7 +2295,7 @@ def render_kiosk_view(district_param: str) -> None:
         f"border-radius:8px;display:flex;justify-content:space-between;"
         f"align-items:center;margin-bottom:16px;'>"
         f"<span style='font-size:22px;font-weight:700;letter-spacing:1px;'>"
-        f"📺 LIVE — {district}</span>"
+        f"📺 {_kiosk_text('live_label', lang)} — {district}</span>"
         f"<span style='font-size:16px;color:#9ca3af;'>{header_right}</span>"
         f"</div>",
         unsafe_allow_html=True,
@@ -2195,10 +2303,9 @@ def render_kiosk_view(district_param: str) -> None:
 
     if stale:
         st.markdown(
-            "<div style='background:#78350f;color:#fff;padding:12px 20px;"
-            "border-radius:8px;text-align:center;font-size:18px;"
-            "margin-bottom:16px;'>⚠️ Connection issue — showing the last "
-            "successful reading, not a live one right now.</div>",
+            f"<div style='background:#78350f;color:#fff;padding:12px 20px;"
+            f"border-radius:8px;text-align:center;font-size:18px;"
+            f"margin-bottom:16px;'>{_kiosk_text('stale_banner', lang)}</div>",
             unsafe_allow_html=True,
         )
 
@@ -2216,9 +2323,9 @@ def render_kiosk_view(district_param: str) -> None:
         f"<div style='font-size:80px;font-weight:800;line-height:1.1;margin-top:8px;'>"
         f"{state.risk_score:.0f}%</div>"
         f"<div style='font-size:36px;font-weight:700;letter-spacing:2px;'>"
-        f"{tier_style['label']}</div>"
+        f"{tier_label}</div>"
         f"<div style='font-size:20px;margin-top:6px;opacity:0.9;'>"
-        f"{trend_arrow} {trend_word} over next 6h</div>"
+        f"{trend_arrow} {trend_word} {_kiosk_text('trend_suffix', lang)}</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -2226,7 +2333,7 @@ def render_kiosk_view(district_param: str) -> None:
     st.markdown(
         f"<div style='background:#111827;padding:18px 24px;border-radius:12px;"
         f"text-align:center;font-size:22px;font-weight:600;color:#fff;"
-        f"margin-bottom:16px;'>Recommended: {recommendation}</div>",
+        f"margin-bottom:16px;'>{_kiosk_text('recommended', lang)}: {recommendation}</div>",
         unsafe_allow_html=True,
     )
 
@@ -2234,7 +2341,7 @@ def render_kiosk_view(district_param: str) -> None:
     # risk block above it (smaller icon, muted background), because
     # it's supporting context, not the primary decision signal.
     if state.temperature_c is not None:
-        day_night_label = "Day" if state.is_day else "Night"
+        day_night_label = _kiosk_text("day", lang) if state.is_day else _kiosk_text("night", lang)
         weather_svg = weather_icon_svg(
             state.weather_description, state.is_raining_now, state.is_day, "#1f2937", size=64
         )
@@ -2254,16 +2361,12 @@ def render_kiosk_view(district_param: str) -> None:
         )
         if state.forecast_source == "fallback":
             st.markdown(
-                "<div style='text-align:center;color:#facc15;font-size:15px;"
-                "margin-bottom:12px;'>⚠️ Weather service unreachable — "
-                "showing a seasonal estimate, not a live reading.</div>",
+                f"<div style='text-align:center;color:#facc15;font-size:15px;"
+                f"margin-bottom:12px;'>{_kiosk_text('weather_fallback', lang)}</div>",
                 unsafe_allow_html=True,
             )
 
-    st.caption(
-        f"🔄 Refreshes every {KIOSK_REFRESH_SECONDS}s • NFCC Platform • "
-        f"real-time satellite and weather data, not a recording"
-    )
+    st.caption(_kiosk_text("refresh_caption", lang).format(seconds=KIOSK_REFRESH_SECONDS))
 
     st.session_state["_kiosk_rotation_idx"] = (rotation_idx + 1) % len(districts)
     time.sleep(KIOSK_REFRESH_SECONDS)
@@ -2653,8 +2756,13 @@ def main():
     if query_params.get("kiosk") in ("1", "true", "True"):
         # A single district or a comma-separated list ("A,B,C") for a
         # rotating regional screen - render_kiosk_view splits and
-        # validates each name itself.
-        render_kiosk_view(query_params.get("district", ALL_TRACKED_DISTRICTS[0]))
+        # validates each name itself. lang defaults to "en";
+        # render_kiosk_view itself falls back to "en" for any code not
+        # in _KIOSK_SUPPORTED_LANGUAGES.
+        render_kiosk_view(
+            query_params.get("district", ALL_TRACKED_DISTRICTS[0]),
+            lang=query_params.get("lang", "en"),
+        )
         return
 
     control_data = render_control_panel()
