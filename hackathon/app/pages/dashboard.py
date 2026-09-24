@@ -149,6 +149,13 @@ API_URL = os.getenv(
 # checks the header once settings.API_KEY is configured, and sending an
 # unrecognized header to an endpoint that ignores it is a no-op.
 API_KEY = os.getenv("NFCC_API_KEY", "")
+# Optional second, stronger secret the backend requires (only when
+# settings.ALERT_APPROVAL_KEY is configured there - see src/api/auth.py's
+# enforce_approval_key) on top of the regular API key for approving,
+# dismissing, or retracting a REAL (non-exercise) pending alert. Blank
+# here is a safe no-op exactly like API_KEY being blank: harmless to
+# send an empty/absent header to a backend that isn't enforcing it yet.
+APPROVAL_KEY = os.getenv("NFCC_ALERT_APPROVAL_KEY", "")
 
 st.set_page_config(
     page_title="CivicFlood AI - National Emergency Operations Center",
@@ -163,20 +170,41 @@ st.set_page_config(
 # ============================================================
 
 
-def _auth_headers() -> dict:
-    return {"X-API-Key": API_KEY} if API_KEY else {}
+def _auth_headers(include_approval_key: bool = False) -> dict:
+    headers = {"X-API-Key": API_KEY} if API_KEY else {}
+    if include_approval_key and APPROVAL_KEY:
+        headers["X-Approval-Key"] = APPROVAL_KEY
+    return headers
 
 
 def call_api(
-    endpoint: str, method: str = "GET", data: dict = None, timeout: int = 30
+    endpoint: str,
+    method: str = "GET",
+    data: dict = None,
+    timeout: int = 30,
+    include_approval_key: bool = False,
 ) -> dict:
-    """Call the NFCC API with robust error handling."""
+    """Call the NFCC API with robust error handling.
+
+    include_approval_key=True sends the stronger X-Approval-Key header
+    alongside the regular API key - set it on every real (non-exercise)
+    approve/dismiss/cancel call, matching what src/api/auth.py's
+    enforce_approval_key checks for. Harmless to pass on any other call
+    (unused headers are simply ignored) or when APPROVAL_KEY isn't set
+    (the header is just never added, see _auth_headers)."""
     url = f"{API_URL}{endpoint}"
     try:
         if method == "GET":
-            response = requests.get(url, timeout=timeout, headers=_auth_headers())
+            response = requests.get(
+                url, timeout=timeout, headers=_auth_headers(include_approval_key)
+            )
         elif method == "POST":
-            response = requests.post(url, json=data, timeout=timeout, headers=_auth_headers())
+            response = requests.post(
+                url,
+                json=data,
+                timeout=timeout,
+                headers=_auth_headers(include_approval_key),
+            )
         else:
             return {"error": f"Unsupported method: {method}"}
 
@@ -2435,6 +2463,7 @@ def render_alert_review_queue():
                             f"/alerts/pending/{alert['id']}/approve",
                             "POST",
                             {"reviewed_by": operator_name},
+                            include_approval_key=True,
                         )
                         st.rerun()
                     if st.button(
@@ -2447,6 +2476,7 @@ def render_alert_review_queue():
                             f"/alerts/pending/{alert['id']}/dismiss",
                             "POST",
                             {"reviewed_by": operator_name},
+                            include_approval_key=True,
                         )
                         st.rerun()
                     # Real OASIS CAP v1.2 XML (src/api/routes/cap_export.py)
@@ -2510,6 +2540,7 @@ def render_alert_review_queue():
                             f"/alerts/pending/{alert['id']}/cancel",
                             "POST",
                             {"reviewed_by": operator_name, "reason": reason},
+                            include_approval_key=True,
                         )
                         st.rerun()
                     cap_xml = fetch_cap_xml(alert["id"])

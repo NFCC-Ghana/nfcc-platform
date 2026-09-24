@@ -28,10 +28,10 @@ persistent store (Firestore/Cloud SQL) later.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Security
 from pydantic import BaseModel, Field
 
-from src.api.auth import verify_api_key
+from src.api.auth import approval_key_header, enforce_approval_key, verify_api_key
 from src.alerts.engine import AlertEngine
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.exposure.community_names import get_affected_communities
@@ -356,9 +356,20 @@ async def list_pending_alerts(status: str = "pending"):
 
 
 @router.post("/pending/{alert_id}/approve", dependencies=[Depends(verify_api_key)])
-async def approve_pending_alert(alert_id: int, decision: ReviewDecision):
+async def approve_pending_alert(
+    alert_id: int,
+    decision: ReviewDecision,
+    approval_key: str = Security(approval_key_header),
+):
     """Human approves a queued assessment - this is the one place a real
-    alert actually gets sent as a result of automated assessment."""
+    alert actually gets sent as a result of automated assessment.
+
+    approval_key is checked (via enforce_approval_key, only when
+    settings.ALERT_APPROVAL_KEY is configured) below, after fetching
+    `pending` - never for an exercise alert, which this function's own
+    later branch already guarantees can't send a real message by any
+    other path, so requiring a second secret to approve a drill would add
+    friction with no matching real-world safety benefit."""
     pending = get_pending_alert(alert_id)
     if pending is None:
         raise HTTPException(status_code=404, detail=f"No pending alert #{alert_id}")
@@ -390,6 +401,8 @@ async def approve_pending_alert(alert_id: int, decision: ReviewDecision):
         )
         return {"id": alert_id, "status": "approved", "send_result": result}
 
+    enforce_approval_key(approval_key)
+
     from src.api.main import alert_engine as global_alert_engine
 
     engine = global_alert_engine or AlertEngine()
@@ -415,7 +428,11 @@ class CancelDecision(BaseModel):
 
 
 @router.post("/pending/{alert_id}/cancel", dependencies=[Depends(verify_api_key)])
-async def cancel_pending_alert(alert_id: int, decision: CancelDecision):
+async def cancel_pending_alert(
+    alert_id: int,
+    decision: CancelDecision,
+    approval_key: str = Security(approval_key_header),
+):
     """Retract an already-sent alert (CAP msgType=Cancel - the OASIS
     Common Alerting Protocol standard behind FEMA IPAWS/EU/Japan/Canada
     treats retraction as a first-class alert type, not an afterthought).
@@ -464,6 +481,8 @@ async def cancel_pending_alert(alert_id: int, decision: CancelDecision):
             "retraction_send_result": result,
         }
 
+    enforce_approval_key(approval_key)
+
     from src.api.main import alert_engine as global_alert_engine
 
     engine = global_alert_engine or AlertEngine()
@@ -490,8 +509,20 @@ async def cancel_pending_alert(alert_id: int, decision: CancelDecision):
 
 
 @router.post("/pending/{alert_id}/dismiss", dependencies=[Depends(verify_api_key)])
-async def dismiss_pending_alert(alert_id: int, decision: ReviewDecision):
-    """Human dismisses a queued assessment - nothing gets sent."""
+async def dismiss_pending_alert(
+    alert_id: int,
+    decision: ReviewDecision,
+    approval_key: str = Security(approval_key_header),
+):
+    """Human dismisses a queued assessment - nothing gets sent, but for a
+    REAL (non-exercise) pending alert this is still a safety-relevant
+    decision, just one of omission rather than commission: someone
+    holding only the regular API key could otherwise silently suppress a
+    legitimate flood warning before any other human reviewer ever saw it
+    queued. Requires the same stronger approval_key as approve/cancel
+    when one is configured - except for an exercise alert (the
+    stakeholder demo's own Dismiss button uses this same endpoint and
+    must keep working without provisioning that second secret)."""
     pending = get_pending_alert(alert_id)
     if pending is None:
         raise HTTPException(status_code=404, detail=f"No pending alert #{alert_id}")
@@ -500,6 +531,9 @@ async def dismiss_pending_alert(alert_id: int, decision: ReviewDecision):
             status_code=409,
             detail=f"Alert #{alert_id} already {pending['status']}",
         )
+
+    if pending.get("cap_status") != _CAP_STATUS_EXERCISE:
+        enforce_approval_key(approval_key)
 
     update_pending_alert_status(alert_id, "dismissed", decision.reviewed_by)
     logger.info(f"Pending alert #{alert_id} dismissed by {decision.reviewed_by}")

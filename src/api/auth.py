@@ -22,6 +22,9 @@ from slowapi.util import get_remote_address
 limiter = Limiter(key_func=get_remote_address)
 
 api_key_header = APIKeyHeader(name=settings.API_KEY_HEADER, auto_error=False)
+approval_key_header = APIKeyHeader(
+    name=settings.ALERT_APPROVAL_KEY_HEADER, auto_error=False
+)
 
 
 async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
@@ -45,3 +48,39 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
         )
 
     return api_key
+
+
+def enforce_approval_key(approval_key: str) -> None:
+    """Raises if the stronger, second secret required on top of the
+    regular API key doesn't match, for actions that can send, suppress,
+    or retract a REAL evacuation alert - see settings.ALERT_APPROVAL_KEY's
+    comment for why this exists.
+
+    A plain function, not a FastAPI dependency: whether this check
+    applies at all depends on data (is this specific pending alert a
+    real one or an exercise?) that a route-decorator-level dependency
+    can't see before the handler has already fetched that alert from the
+    database - see each call site in src/api/routes/alert_review.py for
+    exactly where this is invoked, always after that fetch, and never for
+    an exercise alert (which src/api/routes/alert_review.py's own
+    approve_pending_alert already guarantees can't send a real message by
+    any other path).
+
+    When ALERT_APPROVAL_KEY isn't configured, this is a no-op - the
+    protection is additive and strictly optional to provision, never a
+    silent new requirement. The base API key (settings.API_KEY) has
+    already been verified by the route's own Depends(verify_api_key)
+    before this ever runs."""
+    if not settings.ALERT_APPROVAL_KEY:
+        return
+
+    if not approval_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Missing {settings.ALERT_APPROVAL_KEY_HEADER} header",
+        )
+
+    if not hmac.compare_digest(approval_key, settings.ALERT_APPROVAL_KEY):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid approval key"
+        )

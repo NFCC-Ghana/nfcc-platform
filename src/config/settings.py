@@ -93,6 +93,20 @@ class Settings:
         API_KEY = "dev-key-for-testing-only"
 
     API_KEY_HEADER: str = "X-API-Key"
+
+    # Optional second, stronger secret required (in addition to API_KEY)
+    # specifically on the three endpoints that can send, suppress, or
+    # retract a real evacuation alert (approve/dismiss/cancel in
+    # src/api/routes/alert_review.py) - a security audit's single-shared-
+    # API-key model meant anyone holding the one general key, used for
+    # every read and write on this platform, could also take that action.
+    # Deliberately optional and backward-compatible: when unset (the
+    # default, including every environment today), verify_approval_key()
+    # in src/api/auth.py falls back to exactly today's behavior - the
+    # regular API_KEY alone. Nothing breaks until this is explicitly
+    # provisioned as its own secret.
+    ALERT_APPROVAL_KEY: Optional[str] = os.getenv("ALERT_APPROVAL_KEY")
+    ALERT_APPROVAL_KEY_HEADER: str = "X-Approval-Key"
     JWT_SECRET_KEY: Optional[str] = os.getenv("JWT_SECRET_KEY")
     # src/alerts/cooldown.py reads REDIS_URL directly via os.getenv (its
     # own lazy-connect logic needs the raw value, not this attribute) -
