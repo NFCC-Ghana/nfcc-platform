@@ -35,13 +35,11 @@ _HEADER_NAME = api_key_header.model.name
 # decorator-level `dependencies=` before the handler body runs its own
 # "not found" lookup.
 PROTECTED_ROUTES = [
-    # Legacy alert-review path
-    ("POST", "/alerts/assess", {"location": "Tamale", "precipitation": 10}),
-    ("POST", "/alerts/exercise", {"location": "Tamale"}),
-    ("POST", "/alerts/pending/999999/approve", {"reviewed_by": "test"}),
-    ("POST", "/alerts/pending/999999/cancel", {"reviewed_by": "test", "reason": "test"}),
-    ("POST", "/alerts/pending/999999/dismiss", {"reviewed_by": "test"}),
-    # /v1/alerts - same underlying handlers, separate route registration
+    # The unversioned /alerts/* route registration (same underlying
+    # handlers) was removed 2026-09-27 once the dashboard and
+    # scripts/automated_risk_assessment.py were migrated to /v1/alerts/* -
+    # see src/api/main.py's comment. /v1/alerts is now the only real
+    # alert-review route surface.
     ("POST", "/v1/alerts/assess", {"location": "Tamale", "precipitation": 10}),
     ("POST", "/v1/alerts/exercise", {"location": "Tamale"}),
     ("POST", "/v1/alerts/pending/999999/approve", {"reviewed_by": "test"}),
@@ -144,6 +142,7 @@ class TestOpenAPISpec:
             "/v1/districts/{district}",
             "/v1/districts/{district}/risk",
             "/v1/districts/{district}/forecast",
+            "/v1/districts/{district}/forecast-fusion",
             "/v1/districts/{district}/evidence",
             "/v1/districts/{district}/decision",
             "/v1/districts/{district}/resources",

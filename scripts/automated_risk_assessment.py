@@ -3,7 +3,7 @@ Automated flood risk assessment for NFCC.
 
 Runs on a schedule (.github/workflows/automated_risk_assessment.yml) and,
 for every district this platform tracks, assesses THREE independent
-real signals and posts each to the deployed API's POST /alerts/assess -
+real signals and posts each to the deployed API's POST /v1/alerts/assess -
 two rainfall-driven (pluvial), one dam/river-driven (fluvial):
 
 1. forecast_next_24h - Open-Meteo's next-24h forecast (anticipatory:
@@ -44,7 +44,7 @@ backtested district, roughly doubling probability of detection at the
 same false-alarm rate. Before this, the automated pipeline only ever
 looked forward, and only ever looked at rainfall.
 
-/alerts/assess computes a real score/tier per signal and - if at least
+/v1/alerts/assess computes a real score/tier per signal and - if at least
 MODERATE - queues it in the pending_alerts review table
 (src/api/routes/alert_review.py), tagged with which signal triggered
 it, for a human to review in the dashboard's Alert Review Queue.
@@ -246,7 +246,7 @@ def _assess(
         payload["score_override"] = score_override
     try:
         resp = requests.post(
-            f"{api_url}/alerts/assess",
+            f"{api_url}/v1/alerts/assess",
             json=payload,
             timeout=20,
             headers=_auth_headers(),

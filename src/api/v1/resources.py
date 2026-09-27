@@ -11,6 +11,12 @@ them here as if they were a real "operational resources" contract would
 be exactly the fabrication this platform's guardrails work has been
 built to eliminate - no emergency-resource inventory system exists yet,
 so this endpoint doesn't invent one.
+
+The actual assembly (get_operational_resources_for_district below) is
+shared with the AI Copilot's get_district_resources tool - an audit found
+both independently building the same dict from the same real calls
+(_build_situation_response + get_shelter_names) by hand, a sync-by-hand
+risk if this contract's fields ever changed.
 """
 
 from typing import List, Optional
@@ -23,6 +29,27 @@ from src.exposure.districts import get_district
 from src.exposure.shelter_candidates import get_shelter_names
 
 router = APIRouter(prefix="/districts", tags=["v1"])
+
+
+async def get_operational_resources_for_district(
+    district: str, precipitation_mm: float
+) -> dict:
+    """Real shelters/dams/infrastructure-exposure for one district, as a
+    plain dict - the single shared computation this route and the AI
+    Copilot's get_district_resources tool both adapt into their own
+    response shape."""
+    situation = await _build_situation_response(
+        SituationRequest(location=district, precipitation=precipitation_mm)
+    )
+    return {
+        "district": district,
+        "shelters": get_shelter_names(district),
+        "dams": situation.get("dam_intelligence", []),
+        "schools_exposed": situation.get("schools_exposed"),
+        "hospitals_exposed": situation.get("hospitals_exposed"),
+        "markets_exposed": situation.get("markets_exposed"),
+        "power_substations_affected": situation.get("power_substations_affected"),
+    }
 
 
 class DamStatus(BaseModel):
@@ -75,16 +102,13 @@ async def get_district_resources(
             ),
         )
 
-    situation = await _build_situation_response(
-        SituationRequest(location=district, precipitation=precipitation_mm)
-    )
-
+    data = await get_operational_resources_for_district(district, precipitation_mm)
     return OperationalResourcesResponse(
-        district=district,
-        shelters=get_shelter_names(district),
-        dams=[DamStatus(**d) for d in situation.get("dam_intelligence", [])],
-        schools_exposed=situation.get("schools_exposed"),
-        hospitals_exposed=situation.get("hospitals_exposed"),
-        markets_exposed=situation.get("markets_exposed"),
-        power_substations_affected=situation.get("power_substations_affected"),
+        district=data["district"],
+        shelters=data["shelters"],
+        dams=[DamStatus(**d) for d in data["dams"]],
+        schools_exposed=data["schools_exposed"],
+        hospitals_exposed=data["hospitals_exposed"],
+        markets_exposed=data["markets_exposed"],
+        power_substations_affected=data["power_substations_affected"],
     )

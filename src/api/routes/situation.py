@@ -27,7 +27,10 @@ from src.exposure.shelter_candidates import get_shelter_names
 from src.exposure.districts import get_district
 from src.hydrology.dam_intelligence import get_dam_intelligence_for_district
 from src.hydrology.flood_hub_forecast import get_flood_hub_forecast_for_district
+from src.hydrology.glofas_discharge import is_discharge_elevated
 from src.hydrology.river_level_intelligence import get_river_level_for_district
+from src.models.forecast_timeline import build_risk_timeline
+from src.models.real_forecast_fusion import get_real_forecast_fusion
 from src.hydrology.sentinel_processor import sentinel_processor
 from src.hydrology.smap_soil_moisture import get_soil_moisture_for_district
 from src.hydrology.weather_forecast import weather_forecast
@@ -36,47 +39,13 @@ logger = logging.getLogger("nfcc-api.situation")
 
 router = APIRouter(tags=["situation"])
 
-_FLOOD_API_URL = "https://flood-api.open-meteo.com/v1/flood"
-# A district counts as an "active flood zone" when today's simulated river
-# discharge (Open-Meteo's GloFAS-based Flood API - real river gauge data
-# doesn't exist anywhere in the codebase; src/hydrology/river_gauge_api.py's
-# configured endpoint, hydrology.gov.gh, doesn't resolve) is running well
-# above its long-term seasonal mean for that day. 1.5x is an illustrative
-# threshold, not a calibrated hydrological one - no flood-stage threshold
-# per Ghana river exists publicly.
-_ELEVATED_DISCHARGE_RATIO = 1.5
-
-
-def _is_district_flood_zone_active(lat: float, lon: float) -> Optional[bool]:
-    """True if a district's real-time river discharge is elevated relative
-    to its seasonal mean; None if the Flood API call failed."""
-    try:
-        resp = requests.get(
-            _FLOOD_API_URL,
-            params={
-                "latitude": lat,
-                "longitude": lon,
-                "daily": "river_discharge,river_discharge_mean",
-                "forecast_days": 1,
-            },
-            timeout=8,
-        )
-        resp.raise_for_status()
-        daily = resp.json().get("daily", {})
-        discharge = daily.get("river_discharge", [])
-        mean = daily.get("river_discharge_mean", [])
-        # Open-Meteo returns null for either value at some coastal points
-        # where no river is resolved within their 5km grid (documented
-        # limitation, not an error) - Cape Coast hits this in practice.
-        if not discharge or not mean:
-            return None
-        latest_discharge, latest_mean = discharge[-1], mean[-1]
-        if latest_discharge is None or not latest_mean:
-            return None
-        return latest_discharge > _ELEVATED_DISCHARGE_RATIO * latest_mean
-    except Exception as e:
-        logger.warning(f"Flood API call failed for ({lat},{lon}): {e}")
-        return None
+# fetch_glofas_discharge_ratio/is_discharge_elevated/
+# ELEVATED_DISCHARGE_RATIO moved to src/hydrology/glofas_discharge.py on
+# 2026-09-27 so src/models/real_forecast_fusion.py could reuse the same
+# real fetch and threshold without a circular import (this module also
+# needs to call INTO real_forecast_fusion.py, below, to surface its
+# result on POST /situation).
+_is_district_flood_zone_active = is_discharge_elevated
 
 
 @router.get("/national/summary")
@@ -348,28 +317,32 @@ async def _build_situation_response(body: SituationRequest) -> dict:
         else {"available": False, "reason": f"'{body.location}' is not a tracked district"}
     )
 
+    # Real, per-district activation of src/models/forecast_fusion.py's
+    # math (src/models/real_forecast_fusion.py) - real CHIRPS/GloFAS/
+    # Flood Hub inputs fused through the exact same functions GET
+    # /forecast/confidence uses, added 2026-09-27 so that demo-only
+    # fusion finally has real per-district data behind it somewhere in
+    # the live platform. Additive only: not yet folded into this
+    # response's main risk_score/risk_tier, or into
+    # multi_source_confidence.py's separate real fusion for those - a
+    # deliberate, distinct decision to make later once this has been
+    # observed against real traffic.
+    response["forecast_fusion"] = get_real_forecast_fusion(body.location)
+
     # Risk timeline: real Open-Meteo forecast rainfall (see
     # src/hydrology/weather_forecast.py), layered on top of the current
     # precipitation input and scored through the same calculate_score()
     # used everywhere else - "now" always matches the score above exactly;
     # future points show what the real forecast implies is coming, instead
     # of a fixed +15/+10/+5 synthetic offset with no forecast behind it at
-    # all (the dashboard's old behavior).
+    # all (the dashboard's old behavior). build_risk_timeline is the
+    # single shared implementation (src/models/forecast_timeline.py) also
+    # used by GET /v1/districts/{d}/forecast and the AI Copilot's
+    # get_district_forecast tool - this used to be a third independent
+    # copy of the exact same logic.
     try:
         forecast = weather_forecast.get_forecast_for_district(body.location)
-        cumulative = forecast.get("cumulative_6h", {})
-        timeline = [{"hour": "Now", "score": score, "risk_tier": risk_tier}]
-        for h in [6, 12, 18, 24]:
-            future_precip = body.precipitation + cumulative.get(str(h), 0.0)
-            future_score = calculate_score(future_precip)
-            timeline.append(
-                {
-                    "hour": f"{h}h",
-                    "score": future_score,
-                    "risk_tier": get_risk_tier(future_score),
-                }
-            )
-        response["risk_timeline"] = timeline
+        response["risk_timeline"] = build_risk_timeline(body.precipitation, forecast)
         response["forecast_24h_mm"] = forecast.get("24h", 0.0)
         response["forecast_48h_mm"] = forecast.get("48h", 0.0)
         response["forecast_72h_mm"] = forecast.get("72h", 0.0)

@@ -81,7 +81,7 @@ class TestAlertHistory:
     """Test the alert history endpoint."""
     
     def test_get_history_returns_alerts(self, test_client):
-        response = test_client.get("/alerts/history")
+        response = test_client.get("/v1/alerts/history")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -89,7 +89,7 @@ class TestAlertHistory:
         assert len(data["data"]) > 0
     
     def test_history_returns_alert_fields(self, test_client):
-        response = test_client.get("/alerts/history?limit=1")
+        response = test_client.get("/v1/alerts/history?limit=1")
         assert response.status_code == 200
         data = response.json()
         alert = data["data"][0]
@@ -100,33 +100,33 @@ class TestAlertHistory:
         assert "risk_tier" in alert
     
     def test_history_pagination_limit(self, test_client):
-        response = test_client.get("/alerts/history?limit=3")
+        response = test_client.get("/v1/alerts/history?limit=3")
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) <= 3
     
     def test_history_pagination_offset(self, test_client):
-        page1 = test_client.get("/alerts/history?limit=2&offset=0").json()
-        page2 = test_client.get("/alerts/history?limit=2&offset=2").json()
+        page1 = test_client.get("/v1/alerts/history?limit=2&offset=0").json()
+        page2 = test_client.get("/v1/alerts/history?limit=2&offset=2").json()
         
         if len(page1["data"]) > 0 and len(page2["data"]) > 0:
             assert page1["data"][0]["id"] != page2["data"][0]["id"]
     
     def test_history_location_filter(self, test_client):
-        response = test_client.get("/alerts/history?location_filter=Accra")
+        response = test_client.get("/v1/alerts/history?location_filter=Accra")
         assert response.status_code == 200
         data = response.json()
         for alert in data["data"]:
             assert alert["location"] == "Accra"
     
     def test_history_location_filter_empty(self, test_client):
-        response = test_client.get("/alerts/history?location_filter=Nonexistent")
+        response = test_client.get("/v1/alerts/history?location_filter=Nonexistent")
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 0
     
     def test_history_pagination_with_location_filter(self, test_client):
-        response = test_client.get("/alerts/history?limit=2&offset=0&location_filter=Accra")
+        response = test_client.get("/v1/alerts/history?limit=2&offset=0&location_filter=Accra")
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) <= 2
@@ -134,7 +134,7 @@ class TestAlertHistory:
             assert alert["location"] == "Accra"
     
     def test_history_newest_first(self, test_client):
-        response = test_client.get("/alerts/history?limit=10")
+        response = test_client.get("/v1/alerts/history?limit=10")
         data = response.json()
         timestamps = [alert["timestamp"] for alert in data["data"]]
         assert timestamps == sorted(timestamps, reverse=True)
@@ -144,7 +144,7 @@ class TestAlertStats:
     """Test the alert statistics endpoint."""
     
     def test_stats_returns_success(self, test_client):
-        response = test_client.get("/alerts/stats")
+        response = test_client.get("/v1/alerts/stats")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -152,7 +152,7 @@ class TestAlertStats:
         assert "top_locations" in data
     
     def test_stats_risk_tier_counts(self, test_client):
-        response = test_client.get("/alerts/stats")
+        response = test_client.get("/v1/alerts/stats")
         data = response.json()
         risk_tiers = {item["tier"]: item["count"] for item in data["by_risk_tier"]}
         assert len(risk_tiers) > 0
@@ -161,7 +161,7 @@ class TestAlertStats:
             assert tier in ["LOW", "MODERATE", "HIGH", "CRITICAL", "EXTREME"]
     
     def test_stats_risk_tier_structure(self, test_client):
-        response = test_client.get("/alerts/stats")
+        response = test_client.get("/v1/alerts/stats")
         data = response.json()
         for item in data["by_risk_tier"]:
             assert "tier" in item
@@ -170,14 +170,14 @@ class TestAlertStats:
             assert item["count"] > 0
     
     def test_stats_top_locations(self, test_client):
-        response = test_client.get("/alerts/stats")
+        response = test_client.get("/v1/alerts/stats")
         data = response.json()
         top_locations = data["top_locations"]
         assert len(top_locations) <= 5
         assert len(top_locations) > 0
     
     def test_stats_top_locations_structure(self, test_client):
-        response = test_client.get("/alerts/stats")
+        response = test_client.get("/v1/alerts/stats")
         data = response.json()
         for item in data["top_locations"]:
             assert "location" in item
@@ -186,13 +186,13 @@ class TestAlertStats:
             assert item["alert_count"] > 0
     
     def test_stats_top_locations_ordered(self, test_client):
-        response = test_client.get("/alerts/stats")
+        response = test_client.get("/v1/alerts/stats")
         data = response.json()
         counts = [item["alert_count"] for item in data["top_locations"]]
         assert counts == sorted(counts, reverse=True)
     
     def test_stats_top_locations_accra_high_count(self, test_client):
-        response = test_client.get("/alerts/stats")
+        response = test_client.get("/v1/alerts/stats")
         data = response.json()
         location_names = [item["location"] for item in data["top_locations"]]
         assert "Accra" in location_names
@@ -202,9 +202,9 @@ class TestAlertIntegration:
     """Integration tests combining multiple endpoints."""
     
     def test_history_and_stats_consistency(self, test_client):
-        history_response = test_client.get("/alerts/history?limit=1000")
+        history_response = test_client.get("/v1/alerts/history?limit=1000")
         history_data = history_response.json()
-        stats_response = test_client.get("/alerts/stats")
+        stats_response = test_client.get("/v1/alerts/stats")
         stats_data = stats_response.json()
         
         tier_counts = {}

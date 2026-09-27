@@ -2,6 +2,12 @@
 
 Heavy / optional deps are imported inside the test so collection succeeds even when
 the environment is temporarily out of sync (e.g. xarray 2025+ requires pandas>=2.1).
+
+shap/sklearn/xgboost were removed 2026-09-27: leftover requirements.txt
+entries from the trained XGBoost model that was backtested against real
+historical flood events, found to show no reliable improvement over the
+rule-based score, and deleted along with its training pipeline - nothing
+in this codebase has imported any of the three since.
 """
 
 import pytest
@@ -32,9 +38,5 @@ def test_imports():
             f"Original error: {exc}"
         )
 
-    import shap
-    import sklearn
-    import xgboost
-
-    modules = [np, pd, gpd, rasterio, xr, sklearn, xgboost, shap]
+    modules = [np, pd, gpd, rasterio, xr]
     assert all(module is not None for module in modules)

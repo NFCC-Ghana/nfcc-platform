@@ -46,7 +46,9 @@ class TestAPIEndpoints:
         assert isinstance(data, list) and len(data) == 9
 
     def test_alerts_endpoint(self, api_client: TestClient):
-        """Test alerts endpoint."""
-        response = api_client.get("/alerts")
+        """The bare GET /alerts alias (and the rest of the unversioned
+        /alerts/* surface) was removed 2026-09-27 - GET /v1/alerts/history
+        is the real, current equivalent."""
+        response = api_client.get("/v1/alerts/history")
         assert response.status_code == 200
         assert response.json() is not None

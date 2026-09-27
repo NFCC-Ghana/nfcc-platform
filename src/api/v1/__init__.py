@@ -28,6 +28,7 @@ from src.api.v1.districts import router as districts_router
 from src.api.v1.evidence import router as evidence_router
 from src.api.v1.fluvial_risk import router as fluvial_risk_router
 from src.api.v1.forecast import router as forecast_router
+from src.api.v1.forecast_fusion import router as forecast_fusion_router
 from src.api.v1.observations import router as observations_router
 from src.api.v1.predictions import router as predictions_router
 from src.api.v1.health import router as v1_health_router
@@ -40,6 +41,7 @@ router = APIRouter(prefix="/v1")
 router.include_router(districts_router)
 router.include_router(risk_router)
 router.include_router(forecast_router)
+router.include_router(forecast_fusion_router)
 router.include_router(evidence_router)
 router.include_router(resources_router)
 router.include_router(decision_router)

@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Tuple
 import ee
 import numpy as np
 
+from src.exposure.districts import list_districts
+
 from .ee_auth import initialize_earth_engine
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +24,11 @@ logger = logging.getLogger(__name__)
 # it.
 _VH_THRESHOLD_DB = 3.0
 _VV_THRESHOLD_DB = 1.5
+
+# Per-district SAR analysis bounding-box radius (degrees) - larger for
+# Kumasi/Tamale's bigger urban extent, 0.05 default for everyone else.
+# Not a canonical-registry fact (see _load_districts' docstring for why).
+_DISTRICT_SAR_RADIUS = {"Kumasi": 0.08, "Tamale": 0.08}
 
 
 def _confidence_from_sar_margins(
@@ -90,26 +97,32 @@ class SentinelProcessor:
         logger.info("Sentinel-1 Processor initialized")
 
     def _load_districts(self) -> Dict:
-        """Load district geometries - matches
-        hackathon/app/pages/dashboard.py's get_district_data and
-        src/hydrology/weather_forecast.py's district_coords, the other two
-        places these are listed. This list previously only had the
-        original 6 districts, silently missing Cape Coast/Ho/Sunyani
-        added later - any request for one of those returned a plain
-        {"error": ...} dict with none of detect_flood()'s normal fields,
-        which unified_intelligence.py's satellite block then silently
-        absorbed via its own .get(..., default) fallbacks rather than
-        surfacing as an actual error."""
+        """Load district geometries - real lat/lon now from
+        src/exposure/districts.py, the canonical registry (this used to be
+        its own independent lat/lon copy, one of 5+ scattered district
+        datasets found in a 2026-09-27 audit, hand-matched against
+        weather_forecast.py's and dashboard.py's own copies rather than
+        sharing one real source). radius stays a local lookup - it's a
+        bounding-box sizing choice for this specific SAR analysis (larger
+        for Kumasi/Tamale's bigger urban extent), not a real-world fact
+        the canonical registry should carry alongside population/area.
+
+        This list previously only had the original 6 districts, silently
+        missing Cape Coast/Ho/Sunyani added later - any request for one of
+        those returned a plain {"error": ...} dict with none of
+        detect_flood()'s normal fields, which unified_intelligence.py's
+        satellite block then silently absorbed via its own
+        .get(..., default) fallbacks rather than surfacing as an actual
+        error. Reading from the canonical registry now makes that specific
+        failure mode structurally impossible - every real tracked district
+        is included by construction."""
         return {
-            "Accra Central": {"lat": 5.560, "lon": -0.210, "radius": 0.05},
-            "Accra West": {"lat": 5.550, "lon": -0.230, "radius": 0.05},
-            "Accra East": {"lat": 5.565, "lon": -0.190, "radius": 0.05},
-            "Tema": {"lat": 5.650, "lon": -0.020, "radius": 0.05},
-            "Kumasi": {"lat": 6.670, "lon": -1.620, "radius": 0.08},
-            "Tamale": {"lat": 9.400, "lon": -0.840, "radius": 0.08},
-            "Cape Coast": {"lat": 5.100, "lon": -1.250, "radius": 0.05},
-            "Ho": {"lat": 6.601, "lon": 0.471, "radius": 0.05},
-            "Sunyani": {"lat": 7.333, "lon": -2.333, "radius": 0.05},
+            district.name: {
+                "lat": district.lat,
+                "lon": district.lon,
+                "radius": _DISTRICT_SAR_RADIUS.get(district.name, 0.05),
+            }
+            for district in list_districts()
         }
 
     def detect_flood(self, district: str, date: Optional[str] = None) -> Dict:

@@ -1,13 +1,16 @@
-"""Regression tests for /v1/alerts/... (src/api/v1/alerts.py).
-
-These specifically confirm the v1 layer is a thin pass-through with no
-duplicated logic: an action taken through /v1/alerts must be visible
-through the original /alerts routes (same underlying DB row), and vice
-versa - they are two contracts over one real state, not two states.
+"""Regression tests for /v1/alerts/... (src/api/v1/alerts.py) - the real,
+now-only alert-review route surface. This module originally confirmed
+the v1 layer was a thin pass-through with no duplicated logic against the
+original /alerts routes; that dual surface was removed 2026-09-27 once
+the dashboard and scripts/automated_risk_assessment.py were migrated to
+/v1/alerts/* (see src/api/main.py's comment) - v1/alerts.py's own
+docstring still documents that it calls the exact same underlying
+alert_review.py/alerts.py/cap_export.py functions the removed routes
+called, so there is exactly one place this logic lives either way.
 """
 
 
-def test_v1_assess_then_visible_via_legacy_pending(api_client):
+def test_v1_assess_then_visible_via_pending(api_client):
     resp = api_client.post(
         "/v1/alerts/assess", json={"location": "Kumasi", "precipitation": 90}
     )
@@ -15,8 +18,8 @@ def test_v1_assess_then_visible_via_legacy_pending(api_client):
     assert resp.json()["queued"] is True
     alert_id = resp.json()["id"]
 
-    legacy = api_client.get("/alerts/pending")
-    assert any(a["id"] == alert_id for a in legacy.json()["alerts"])
+    pending = api_client.get("/v1/alerts/pending")
+    assert any(a["id"] == alert_id for a in pending.json()["alerts"])
 
 
 def test_v1_exercise_creates_real_exercise_alert(api_client):
@@ -63,16 +66,17 @@ def test_v1_approve_exercise_never_sends_real_alert(api_client):
     assert data["send_result"]["simulated"] is True
 
 
-def test_v1_cap_xml_matches_legacy_route(api_client):
+def test_v1_cap_xml_is_real_cap_document(api_client):
     created = api_client.post(
         "/v1/alerts/exercise", json={"location": "Tamale", "risk_tier": "HIGH"}
     )
     alert_id = created.json()["id"]
 
-    v1_xml = api_client.get(f"/v1/alerts/pending/{alert_id}/cap.xml")
-    legacy_xml = api_client.get(f"/alerts/pending/{alert_id}/cap.xml")
-    assert v1_xml.status_code == 200
-    assert v1_xml.text == legacy_xml.text
+    resp = api_client.get(f"/v1/alerts/pending/{alert_id}/cap.xml")
+    assert resp.status_code == 200
+    assert "<?xml" in resp.text
+    assert "<alert" in resp.text
+    assert "Tamale" in resp.text
 
 
 def test_v1_assess_basis_defaults_to_forecast(api_client):

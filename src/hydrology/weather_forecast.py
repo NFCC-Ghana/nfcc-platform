@@ -9,6 +9,8 @@ from typing import Dict, List, Optional
 
 import requests
 
+from src.exposure.districts import list_districts
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -104,19 +106,18 @@ class WeatherForecastEngine:
         self.forecast_cache = {}
         self.open_meteo_url = "https://api.open-meteo.com/v1/forecast"
 
-        # Ghana district coordinates (verified) - matches
-        # hackathon/app/pages/dashboard.py's get_district_data, the only
-        # other place these are listed.
+        # Real district coordinates from src/exposure/districts.py, the
+        # canonical registry - this used to be its own independent copy
+        # (one of 5+ scattered district datasets found in a 2026-09-27
+        # audit), matched by hand against dashboard.py's and
+        # sentinel_processor.py's own copies rather than sharing one real
+        # source. district_coords kept as an attribute (not just a module-
+        # level import used inline) since get_forecast_for_district/
+        # get_all_district_forecasts below already read it as
+        # self.district_coords.
         self.district_coords = {
-            "Accra Central": {"lat": 5.560, "lon": -0.210},
-            "Accra West": {"lat": 5.550, "lon": -0.230},
-            "Accra East": {"lat": 5.565, "lon": -0.190},
-            "Tema": {"lat": 5.650, "lon": -0.020},
-            "Kumasi": {"lat": 6.670, "lon": -1.620},
-            "Tamale": {"lat": 9.400, "lon": -0.840},
-            "Cape Coast": {"lat": 5.100, "lon": -1.250},
-            "Ho": {"lat": 6.601, "lon": 0.471},
-            "Sunyani": {"lat": 7.333, "lon": -2.333},
+            district.name: {"lat": district.lat, "lon": district.lon}
+            for district in list_districts()
         }
 
         logger.info("Weather Forecast Engine initialized")

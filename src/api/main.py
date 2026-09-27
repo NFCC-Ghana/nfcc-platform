@@ -16,12 +16,9 @@ from src.api.auth import limiter
 from src.api.explain import router as explain_router
 from src.api.health import router as health_router
 from src.api.dam_router import router as dam_router
-from src.api.routes.alerts import router as alerts_router
 from src.api.routes.forecast import router as forecast_router
 from src.api.routes.explain_fusion import router as explain_fusion_router
 from src.api.routes.situation import router as situation_router
-from src.api.routes.alert_review import router as alert_review_router
-from src.api.routes.cap_export import router as cap_export_router
 from src.api.routes.decision_card import router as decision_card_router
 from src.api.routes.telegram_webhook import router as telegram_webhook_router
 from src.api.routes.whatsapp_webhook import router as whatsapp_webhook_router
@@ -29,7 +26,7 @@ from src.api.v1 import router as v1_router
 from src.alerts.formatter import calculate_score, get_risk_tier
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
-from src.database.alert_db import get_alert_history, get_total_alerts_count, init_db
+from src.database.alert_db import init_db
 from src.database.channel_subscriptions_db import init_channel_subscriptions_table
 from src.database.observation_history_db import init_observation_history_table
 from src.database.prediction_ledger_db import init_prediction_ledger_table
@@ -164,17 +161,16 @@ async def root():
     }
 
 
-# Bare alias for the alerts_router's GET /alerts/history - same
-# underlying query functions, trimmed response. /alerts/history is the
-# real, fully-featured endpoint (pagination, location filtering, response
-# schema); this exists because a bare GET /alerts is also part of the
-# documented API surface.
-@app.get("/alerts")
-async def alerts_root(limit: int = 50):
-    return {
-        "count": get_total_alerts_count(),
-        "data": get_alert_history(limit=limit),
-    }
+# GET /alerts (a bare alias for the same query GET /v1/alerts/history
+# already serves) and the unversioned /alerts/* route surface itself
+# (src/api/routes/alerts.py, alert_review.py, cap_export.py) were removed
+# 2026-09-27: confirmed zero real callers once the dashboard and
+# scripts/automated_risk_assessment.py were migrated to GET/POST
+# /v1/alerts/*, which src/api/v1/alerts.py already wrapped as a thin,
+# non-drifting contract around these same three files' functions (see
+# that module's docstring) - those files and functions are unchanged and
+# still do all the real work; only the duplicate unversioned route
+# registration is gone.
 
 
 # GET /districts removed 2026-09-27: it served src/alerts/district_risk.py's
@@ -240,15 +236,12 @@ async def score_batch(request: BatchScoreRequest):
 
 
 # Include all routers
-app.include_router(alerts_router)
 app.include_router(forecast_router)
 app.include_router(explain_fusion_router)
 app.include_router(dam_router)
 app.include_router(explain_router)
 app.include_router(health_router)
 app.include_router(situation_router)
-app.include_router(alert_review_router)
-app.include_router(cap_export_router)
 app.include_router(decision_card_router)
 app.include_router(whatsapp_webhook_router)
 app.include_router(telegram_webhook_router)

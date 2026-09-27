@@ -1,0 +1,41 @@
+name: Model Validation Report
+
+on:
+  schedule:
+    # Monthly, not daily like verify_predictions.yml - the question this
+    # answers (does the live alert threshold still have real rare-event
+    # discriminative skill against the full historical CHIRPS record)
+    # moves slowly, and GET /v1/verification runs real multi-decade Earth
+    # Engine queries per district - running it more often would waste
+    # real Earth Engine quota for no benefit. See scripts/
+    # run_model_validation.py's module docstring for the full reasoning.
+    - cron: "0 7 1 * *"
+  workflow_dispatch:
+
+# Least-privilege default (matches this repo's other workflows, added
+# after CodeQL flagged its absence on several of them): this workflow
+# only calls the live API's two real, read-only analysis endpoints
+# (GET /v1/backtest, GET /v1/verification - neither has side effects)
+# and logs the result - never pushes commits or opens PRs.
+permissions:
+  contents: read
+
+jobs:
+  model-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run model validation report
+        run: python scripts/run_model_validation.py

@@ -40,6 +40,7 @@ from src.exposure.districts import (
 )
 from src.exposure.shelter_candidates import get_shelter_names
 from src.hydrology.weather_forecast import weather_forecast
+from src.models.forecast_timeline import get_forecast_and_timeline
 
 logger = logging.getLogger("nfcc.copilot.tools")
 
@@ -207,35 +208,10 @@ async def get_district_forecast(
     if current_precipitation_mm is None:
         current_precipitation_mm, precip_source = await _live_precipitation_mm(district)
 
-    from src.alerts.formatter import calculate_score, get_risk_tier
-
-    forecast = weather_forecast.get_forecast_for_district(district)
-    cumulative = forecast.get("cumulative_6h", {})
-    score_now = calculate_score(current_precipitation_mm)
-    timeline = [
-        {"hour": "Now", "score": score_now, "risk_tier": get_risk_tier(score_now)}
-    ]
-    for h in (6, 12, 18, 24):
-        future_precip = current_precipitation_mm + cumulative.get(str(h), 0.0)
-        future_score = calculate_score(future_precip)
-        timeline.append(
-            {
-                "hour": f"{h}h",
-                "score": future_score,
-                "risk_tier": get_risk_tier(future_score),
-            }
-        )
-
+    data = get_forecast_and_timeline(district, current_precipitation_mm)
     return {
         "district": district,
-        "forecast_24h_mm": forecast.get("24h", 0.0),
-        "forecast_48h_mm": forecast.get("48h", 0.0),
-        "forecast_72h_mm": forecast.get("72h", 0.0),
-        "cumulative_6h_mm": cumulative,
-        "daily": forecast.get("daily", []),
-        "risk_timeline": timeline,
-        "source": forecast.get("source", "unknown"),
-        "generated_at": forecast.get("timestamp", ""),
+        **data,
         "current_precipitation_mm_used": current_precipitation_mm,
         "precipitation_source": precip_source,
     }
@@ -265,18 +241,13 @@ async def get_district_resources(
     if precipitation_mm is None:
         precipitation_mm, precip_source = await _live_precipitation_mm(district)
 
-    situation = await _build_situation_response(
-        SituationRequest(location=district, precipitation=precipitation_mm)
-    )
+    # Imported here for the same circular-import reason as
+    # get_data_source_health/get_data_quality_report below.
+    from src.api.v1.resources import get_operational_resources_for_district
 
+    data = await get_operational_resources_for_district(district, precipitation_mm)
     return {
-        "district": district,
-        "shelters": get_shelter_names(district),
-        "dams": situation.get("dam_intelligence", []),
-        "schools_exposed": situation.get("schools_exposed"),
-        "hospitals_exposed": situation.get("hospitals_exposed"),
-        "markets_exposed": situation.get("markets_exposed"),
-        "power_substations_affected": situation.get("power_substations_affected"),
+        **data,
         "precipitation_mm_used": precipitation_mm,
         "precipitation_source": precip_source,
     }

@@ -29,7 +29,7 @@ def _queue_real_alert(client: TestClient, location: str = "Tamale") -> int:
     """A real (non-exercise) MODERATE+ pending alert, via score_override
     so this doesn't depend on precipitation-curve math staying the same."""
     resp = client.post(
-        "/alerts/assess",
+        "/v1/alerts/assess",
         json={"location": location, "precipitation": 0, "score_override": 60},
         headers=_api_headers(),
     )
@@ -42,7 +42,7 @@ def _queue_real_alert(client: TestClient, location: str = "Tamale") -> int:
 
 def _queue_exercise_alert(client: TestClient, location: str = "Tamale") -> int:
     resp = client.post(
-        "/alerts/exercise",
+        "/v1/alerts/exercise",
         json={"location": location, "risk_tier": "HIGH"},
         headers=_api_headers(),
     )
@@ -60,7 +60,7 @@ def test_approval_key_unset_real_alert_approves_with_just_api_key():
     with TestClient(app) as client:
         alert_id = _queue_real_alert(client)
         resp = client.post(
-            f"/alerts/pending/{alert_id}/approve",
+            f"/v1/alerts/pending/{alert_id}/approve",
             json={"reviewed_by": "test-reviewer"},
             headers=_api_headers(),
         )
@@ -75,7 +75,7 @@ def test_approval_key_required_when_configured(monkeypatch):
 
         # Missing approval key -> 401, even with a valid regular API key.
         resp = client.post(
-            f"/alerts/pending/{alert_id}/approve",
+            f"/v1/alerts/pending/{alert_id}/approve",
             json={"reviewed_by": "test-reviewer"},
             headers=_api_headers(),
         )
@@ -83,7 +83,7 @@ def test_approval_key_required_when_configured(monkeypatch):
 
         # Wrong approval key -> 403.
         resp = client.post(
-            f"/alerts/pending/{alert_id}/approve",
+            f"/v1/alerts/pending/{alert_id}/approve",
             json={"reviewed_by": "test-reviewer"},
             headers=_api_headers({_APPROVAL_HEADER: "wrong-key"}),
         )
@@ -91,7 +91,7 @@ def test_approval_key_required_when_configured(monkeypatch):
 
         # Correct approval key -> succeeds.
         resp = client.post(
-            f"/alerts/pending/{alert_id}/approve",
+            f"/v1/alerts/pending/{alert_id}/approve",
             json={"reviewed_by": "test-reviewer"},
             headers=_api_headers({_APPROVAL_HEADER: "super-secret-approval-key"}),
         )
@@ -109,7 +109,7 @@ def test_approval_key_not_required_for_exercise_alert(monkeypatch):
     with TestClient(app) as client:
         alert_id = _queue_exercise_alert(client)
         resp = client.post(
-            f"/alerts/pending/{alert_id}/approve",
+            f"/v1/alerts/pending/{alert_id}/approve",
             json={"reviewed_by": "stakeholder-demo"},
             headers=_api_headers(),
         )
@@ -122,7 +122,7 @@ def test_approval_key_required_for_dismiss_when_configured(monkeypatch):
     with TestClient(app) as client:
         alert_id = _queue_real_alert(client)
         resp = client.post(
-            f"/alerts/pending/{alert_id}/dismiss",
+            f"/v1/alerts/pending/{alert_id}/dismiss",
             json={"reviewed_by": "test-reviewer"},
             headers=_api_headers(),
         )
@@ -130,7 +130,7 @@ def test_approval_key_required_for_dismiss_when_configured(monkeypatch):
 
         alert_id_2 = _queue_real_alert(client)
         resp = client.post(
-            f"/alerts/pending/{alert_id_2}/dismiss",
+            f"/v1/alerts/pending/{alert_id_2}/dismiss",
             json={"reviewed_by": "test-reviewer"},
             headers=_api_headers({_APPROVAL_HEADER: "super-secret-approval-key"}),
         )
@@ -143,7 +143,7 @@ def test_exercise_dismiss_never_requires_approval_key(monkeypatch):
     with TestClient(app) as client:
         alert_id = _queue_exercise_alert(client)
         resp = client.post(
-            f"/alerts/pending/{alert_id}/dismiss",
+            f"/v1/alerts/pending/{alert_id}/dismiss",
             json={"reviewed_by": "stakeholder-demo"},
             headers=_api_headers(),
         )
@@ -158,7 +158,7 @@ def test_approval_key_required_for_cancel_when_configured(monkeypatch):
     with TestClient(app) as client:
         alert_id = _queue_real_alert(client)
         approve_resp = client.post(
-            f"/alerts/pending/{alert_id}/approve",
+            f"/v1/alerts/pending/{alert_id}/approve",
             json={"reviewed_by": "test-reviewer"},
             headers=_api_headers({_APPROVAL_HEADER: "super-secret-approval-key"}),
         )
@@ -166,7 +166,7 @@ def test_approval_key_required_for_cancel_when_configured(monkeypatch):
 
         # Missing approval key on cancel -> 401.
         resp = client.post(
-            f"/alerts/pending/{alert_id}/cancel",
+            f"/v1/alerts/pending/{alert_id}/cancel",
             json={"reviewed_by": "test-reviewer", "reason": "test retraction"},
             headers=_api_headers(),
         )
@@ -174,7 +174,7 @@ def test_approval_key_required_for_cancel_when_configured(monkeypatch):
 
         # Correct approval key -> succeeds.
         resp = client.post(
-            f"/alerts/pending/{alert_id}/cancel",
+            f"/v1/alerts/pending/{alert_id}/cancel",
             json={"reviewed_by": "test-reviewer", "reason": "test retraction"},
             headers=_api_headers({_APPROVAL_HEADER: "super-secret-approval-key"}),
         )

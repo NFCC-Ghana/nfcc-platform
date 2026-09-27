@@ -16,16 +16,34 @@ pending-alert endpoints, a formal Pydantic response contract matching
 the real pending_alerts schema (src/database/alert_db.py) instead of an
 unvalidated dict.
 
-Additive: GET/POST /alerts/... (the original three files) are completely
-unchanged and keep working exactly as before.
+The unversioned /alerts/... route registration (the original three
+files) was removed 2026-09-27 once the dashboard and scripts/
+automated_risk_assessment.py were migrated to call /v1/alerts/... - the
+functions themselves are unchanged and still do all the real work, only
+imported here directly instead of via their own now-unmounted routers.
+
+v1_approve/v1_cancel/v1_dismiss each redeclare their own
+approval_key: str = Security(approval_key_header) and pass it through
+explicitly, rather than just forwarding **kwargs - a 2026-09-27 audit
+found this file previously called approve_pending_alert/
+cancel_pending_alert/dismiss_pending_alert as plain Python functions
+without doing this, which meant their approval_key parameter kept
+its literal Security(...) dependency-marker default (FastAPI only
+resolves Security()/Depends() defaults when a function is invoked
+through its own request-handling pipeline, not via a direct call) and
+enforce_approval_key(approval_key) would raise a real TypeError the
+moment ALERT_APPROVAL_KEY was ever configured - harmless only by
+accident, since that key has never been activated in production, but a
+real latent bug in the code path the frontend now exclusively uses for
+alert approval/cancellation/dismissal.
 """
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Security
 from pydantic import BaseModel
 
-from src.api.auth import verify_api_key
+from src.api.auth import approval_key_header, verify_api_key
 from src.api.routes.alert_review import (
     AssessRequest,
     CancelDecision,
@@ -90,18 +108,30 @@ async def v1_list_pending(status: str = "pending"):
 
 
 @router.post("/pending/{alert_id}/approve", dependencies=[Depends(verify_api_key)])
-async def v1_approve(alert_id: int, decision: ReviewDecision):
-    return await approve_pending_alert(alert_id, decision)
+async def v1_approve(
+    alert_id: int,
+    decision: ReviewDecision,
+    approval_key: str = Security(approval_key_header),
+):
+    return await approve_pending_alert(alert_id, decision, approval_key)
 
 
 @router.post("/pending/{alert_id}/cancel", dependencies=[Depends(verify_api_key)])
-async def v1_cancel(alert_id: int, decision: CancelDecision):
-    return await cancel_pending_alert(alert_id, decision)
+async def v1_cancel(
+    alert_id: int,
+    decision: CancelDecision,
+    approval_key: str = Security(approval_key_header),
+):
+    return await cancel_pending_alert(alert_id, decision, approval_key)
 
 
 @router.post("/pending/{alert_id}/dismiss", dependencies=[Depends(verify_api_key)])
-async def v1_dismiss(alert_id: int, decision: ReviewDecision):
-    return await dismiss_pending_alert(alert_id, decision)
+async def v1_dismiss(
+    alert_id: int,
+    decision: ReviewDecision,
+    approval_key: str = Security(approval_key_header),
+):
+    return await dismiss_pending_alert(alert_id, decision, approval_key)
 
 
 @router.get("/pending/{alert_id}/cap.xml")

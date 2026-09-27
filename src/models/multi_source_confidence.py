@@ -5,16 +5,26 @@ evidence in the number itself, despite claiming to).
 
 This generalizes src/models/forecast_fusion.py + confidence_scoring.py's
 already-tested masked-weighted-mean fusion and coverage/agreement
-confidence formula (kept as-is - a disconnected chirps/glofas/flood_hub
-demo with its own tests; its flood_hub leg gained a real, honestly-
-unconfigured-in-production fetch path 2026-09-27, see
-src/hydrology/flood_hub_forecast.py, but the demo endpoint itself still
-takes caller-supplied numbers rather than fetching per-district) to the
-REAL named sources this platform actually has per district: rainfall, a
-real river gauge, a real dam level, real Sentinel-1 SAR, and real
-verified citizen reports. Folding a real Flood Hub signal into THIS
-fusion (not just the demo) is a natural next step once Flood Hub API
-access is granted and validated - not done in this pass.
+confidence formula to the REAL named sources this platform actually has
+per district: rainfall, a real river gauge, a real dam level, real
+Sentinel-1 SAR, and real verified citizen reports.
+
+forecast_fusion.py/confidence_scoring.py themselves were, until
+2026-09-27, "a disconnected chirps/glofas/flood_hub demo with its own
+tests" (GET /forecast/confidence only ever took caller-supplied numbers;
+nothing computed real ones). src/models/real_forecast_fusion.py is that
+missing real computation - real 3-day antecedent CHIRPS
+(src/hydrology/antecedent_rainfall.py), real Open-Meteo/GloFAS river
+discharge (src/hydrology/glofas_discharge.py), and Flood Hub
+(src/hydrology/flood_hub_forecast.py, honestly unconfigured in
+production until real pilot API access exists) - now genuinely fused
+per district via GET /v1/districts/{district}/forecast-fusion and
+POST /situation's forecast_fusion field. GET /forecast/confidence itself
+remains a separate, still-useful generic "fuse whatever numbers you give
+me" utility, not replaced by this. Folding this real fusion's output
+into THIS module's own weights (the one actually driving displayed risk
+tiers) is a deliberate, separate decision, not done in this pass -
+real_forecast_fusion.py's result is additive/observational for now.
 
 Grounded in how operational agencies worldwide actually do this -
 researched specifically for this redesign, not assumed:

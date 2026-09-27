@@ -227,7 +227,7 @@ def fetch_cap_xml(alert_id: int) -> Optional[str]:
     None on any failure, so a broken export never crashes the queue view)."""
     try:
         response = requests.get(
-            f"{API_URL}/alerts/pending/{alert_id}/cap.xml", timeout=15, headers=_auth_headers()
+            f"{API_URL}/v1/alerts/pending/{alert_id}/cap.xml", timeout=15, headers=_auth_headers()
         )
         return response.text if response.status_code == 200 else None
     except requests.exceptions.RequestException:
@@ -286,6 +286,37 @@ def render_data_source_status() -> None:
     checked_at = health.get("checked_at", "")
     if checked_at:
         st.caption(f"Checked: {checked_at[:19]}")
+
+    # GET /v1/data-quality (src/api/v1/data_quality.py) - real, tested,
+    # but had zero real callers anywhere (the AI Copilot's
+    # get_data_quality_report tool calls the underlying function
+    # in-process, never this HTTP route) until this expander, added
+    # 2026-09-27. Answers a different question than the health check
+    # above: not just "is this source reachable" but "is its actual
+    # latest reading fresh and plausible" (QARTOD-style gross-range and
+    # freshness tests) - a source can pass the health check while still
+    # quietly returning a stale or suspect value, which only this catches.
+    with st.expander("🔬 Detailed Data Quality Report (QARTOD checks)"):
+        quality = call_api("/v1/data-quality", "GET")
+        if "error" in quality:
+            st.caption(f"⚠️ Could not reach data-quality endpoint: {quality['error']}")
+        else:
+            status_badge = {"healthy": "🟢", "partial": "🟡", "degraded": "🔴"}.get(
+                quality.get("system_status"), "⚪"
+            )
+            st.markdown(f"{status_badge} **System status: {quality.get('system_status', 'unknown')}**")
+            for report in quality.get("sources", []):
+                flag_badge = {"pass": "✅", "suspect": "⚠️", "missing": "⚪", "fail": "❌"}.get(
+                    report.get("overall"), "⚪"
+                )
+                completeness = report.get("completeness_percent")
+                completeness_str = f" ({completeness:.0f}% complete)" if completeness is not None else ""
+                st.markdown(f"{flag_badge} **{report['source']}**{completeness_str}")
+                if report.get("reason"):
+                    st.caption(report["reason"])
+                for t in report.get("tests", []):
+                    st.caption(f"　· {t['test']}: {t['detail']}")
+            st.caption(quality.get("methodology", ""))
 
 
 # Single source of truth for tier -> (summary text, color, recommendation),
@@ -1963,7 +1994,7 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
 
     if st.session_state.get(pending_key) is None and st.session_state.get(assessed_key) != stage_label:
         result = call_api(
-            "/alerts/assess",
+            "/v1/alerts/assess",
             "POST",
             {"location": district, "precipitation": rainfall_mm, "exercise": True},
         )
@@ -2004,7 +2035,7 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
                 use_container_width=True,
             ):
                 send_result = call_api(
-                    f"/alerts/pending/{pending['id']}/approve",
+                    f"/v1/alerts/pending/{pending['id']}/approve",
                     "POST",
                     {"reviewed_by": "stakeholder-demo"},
                 )
@@ -2018,7 +2049,7 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
                 use_container_width=True,
             ):
                 call_api(
-                    f"/alerts/pending/{pending['id']}/dismiss",
+                    f"/v1/alerts/pending/{pending['id']}/dismiss",
                     "POST",
                     {"reviewed_by": "stakeholder-demo"},
                 )
@@ -2580,7 +2611,7 @@ def render_alert_review_queue():
                     except Exception:
                         continue
                     result = call_api(
-                        "/alerts/assess",
+                        "/v1/alerts/assess",
                         "POST",
                         {"location": district, "precipitation": precip},
                     )
@@ -2619,13 +2650,13 @@ def render_alert_review_queue():
             st.write("")
             if st.button("Queue Drill", use_container_width=True):
                 call_api(
-                    "/alerts/exercise",
+                    "/v1/alerts/exercise",
                     "POST",
                     {"location": ex_district, "risk_tier": ex_tier},
                 )
                 st.rerun()
 
-    pending = call_api("/alerts/pending", "GET")
+    pending = call_api("/v1/alerts/pending", "GET")
     alerts = pending.get("alerts", [])
 
     if "error" in pending:
@@ -2690,7 +2721,7 @@ def render_alert_review_queue():
                         disabled=not operator_name,
                     ):
                         call_api(
-                            f"/alerts/pending/{alert['id']}/approve",
+                            f"/v1/alerts/pending/{alert['id']}/approve",
                             "POST",
                             {"reviewed_by": operator_name},
                             include_approval_key=True,
@@ -2703,7 +2734,7 @@ def render_alert_review_queue():
                         disabled=not operator_name,
                     ):
                         call_api(
-                            f"/alerts/pending/{alert['id']}/dismiss",
+                            f"/v1/alerts/pending/{alert['id']}/dismiss",
                             "POST",
                             {"reviewed_by": operator_name},
                             include_approval_key=True,
@@ -2732,7 +2763,7 @@ def render_alert_review_queue():
     # fast, clear correction path. A sent alert is never truly final here.
     st.divider()
     st.markdown("### 📤 Recently Sent (can be retracted)")
-    sent = call_api("/alerts/pending?status=approved", "GET")
+    sent = call_api("/v1/alerts/pending?status=approved", "GET")
     sent_alerts = sent.get("alerts", [])[:10]
 
     if not sent_alerts:
@@ -2767,7 +2798,7 @@ def render_alert_review_queue():
                         disabled=not reason or not operator_name,
                     ):
                         call_api(
-                            f"/alerts/pending/{alert['id']}/cancel",
+                            f"/v1/alerts/pending/{alert['id']}/cancel",
                             "POST",
                             {"reviewed_by": operator_name, "reason": reason},
                             include_approval_key=True,
@@ -2823,6 +2854,93 @@ def render_alert_review_queue():
                     f"→ outcome: **{pred['outcome']}** "
                     f"(source: {pred.get('outcome_source', 'unknown')}, "
                     f"checked {pred.get('outcome_recorded_at', '?')[:10]})"
+                )
+
+    st.divider()
+
+    # GET /v1/community-reports (src/api/v1/community_reports.py) - real
+    # citizen reports arriving via the Telegram/WhatsApp webhooks, but
+    # until this section (added 2026-09-27) nothing surfaced an individual
+    # report for an operator to see or validate - only an aggregate count
+    # ever reached the dashboard, via /situation's total_reports.
+    st.markdown("### 📷 Community Reports")
+    st.caption(
+        "Real citizen flood reports submitted via Telegram/WhatsApp. "
+        "Validating one matters beyond a badge - only validated reports "
+        "count toward this platform's automated outcome-verification "
+        "dataset (src/verification/outcome_verifier.py)."
+    )
+    with st.expander("View community reports", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            report_district_filter = st.selectbox(
+                "Filter by district",
+                ["All"] + ALL_TRACKED_DISTRICTS,
+                key="community_report_district_filter",
+            )
+        with col2:
+            validated_only = st.checkbox("Validated only", key="community_report_validated_only")
+
+        params = f"?limit=20{'&validated_only=true' if validated_only else ''}"
+        if report_district_filter != "All":
+            params += f"&district={quote(report_district_filter)}"
+        reports_data = call_api(f"/v1/community-reports{params}", "GET")
+
+        if "error" in reports_data:
+            st.caption(f"Could not reach the community reports endpoint: {reports_data['error']}")
+        elif not reports_data.get("reports"):
+            st.caption("No community reports recorded yet.")
+        else:
+            for report in reports_data["reports"]:
+                validated_badge = "✅ Validated" if report["validated"] else "⏳ Unvalidated"
+                st.markdown(
+                    f"**{report['community']}, {report['district']}** - "
+                    f"{report['report_type']} ({report['urgency']}) - {validated_badge}"
+                )
+                if report.get("description"):
+                    st.caption(report["description"])
+                st.caption(
+                    f"Reported {report['report_time'][:19]} "
+                    f"by {report.get('reporter_name') or 'anonymous'}"
+                )
+                if not report["validated"]:
+                    if st.button(
+                        "Validate this report",
+                        key=f"validate_report_{report['id']}",
+                    ):
+                        result = call_api(
+                            f"/v1/community-reports/{report['report_id']}/validate",
+                            "POST",
+                            {"confidence": 0.9},
+                        )
+                        if "error" not in result:
+                            st.success("Report validated.")
+                            st.rerun()
+                        else:
+                            st.error(f"Validation failed: {result['error']}")
+                st.divider()
+
+    # GET /v1/alert-subscriptions (src/database/channel_subscriptions_db.py)
+    # - real WhatsApp/Telegram opt-ins from "ALERTS ON <district>" text
+    # commands (src/community/alert_subscription_commands.py), but until
+    # this section (added 2026-09-27) an operator had no way to see who
+    # had actually subscribed.
+    st.markdown("### 🔔 Alert Subscribers")
+    st.caption("Real citizens who have opted in to receive alerts via WhatsApp/Telegram.")
+    with st.expander("View alert subscribers", expanded=False):
+        subs_data = call_api("/v1/alert-subscriptions?active_only=true", "GET")
+        if "error" in subs_data:
+            st.caption(f"Could not reach the alert-subscriptions endpoint: {subs_data['error']}")
+        elif not subs_data.get("subscriptions"):
+            st.caption("No active subscriptions yet.")
+        else:
+            st.caption(f"{subs_data['count']} active subscription(s)")
+            for sub in subs_data["subscriptions"]:
+                district_label = sub["district"] or "All districts"
+                st.markdown(
+                    f"📱 **{sub['channel']}** - {district_label} - "
+                    f"min tier: {sub['min_risk_tier']} "
+                    f"(subscribed {sub['subscribed_at'][:10]})"
                 )
 
 
