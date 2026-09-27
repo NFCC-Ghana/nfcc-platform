@@ -24,7 +24,46 @@ class ImpactEstimator:
         logger.info("Impact Estimator initialized")
 
     def _load_district_data(self) -> Dict:
-        """Load district population and infrastructure data."""
+        """Load district population and infrastructure data.
+
+        Sourcing status (audited 2026-09-27 for manuscript accuracy):
+
+        - population/area_km2 for Tema, Kumasi, Tamale, Cape Coast, Ho, and
+          Sunyani are now real, cited figures from Ghana's 2021 Population
+          and Housing Census (Ghana Statistical Service), each a single
+          real administrative unit (Metropolitan/Municipal Assembly) with
+          no ambiguity about boundaries: Kumasi Metropolitan 443,981 /
+          299 km2; Tamale Metropolitan 374,744 / 731 km2; Cape Coast
+          Metropolitan 189,925 / 122 km2; Ho Municipal 180,420 / 573.2
+          km2; Sunyani Municipal 193,595 / 1,289 km2; Tema Metropolitan
+          177,924 / 565 km2. (Figures per GSS 2021 PHC district results as
+          compiled at citypopulation.de/Ghana; cross-checked individually,
+          not bulk-imported.)
+        - "Accra Central" / "Accra West" / "Accra East" are NOT official
+          GSS administrative units - they are this project's own informal
+          three-way split of the wider Accra urban area, invented for
+          flood-monitoring granularity before any UI existed to pick a
+          real sub-metro (see hackathon/app/pages/dashboard.py's comment
+          at the same three entries). The real Accra Metropolitan Assembly
+          (the closest single official unit to "Accra Central") had a
+          2021 census population of 284,124 - notably smaller than this
+          split's combined 533,976, meaning the split's true real-world
+          footprint spans multiple official MMDAs (Ablekuma/Ayawaso/Ga/La
+          areas) that were never precisely identified. Left as
+          project-authored estimates rather than guessing a specific
+          per-MMDA breakdown that can't be verified; a proper fix needs a
+          GIS-based population apportionment against real sub-metro
+          boundaries, not a citation swap.
+        - schools/hospitals/markets counts and the children/elderly/
+          disabled/pregnant percentage fields for ALL districts (including
+          the six now-cited ones above) remain project-authored planning
+          estimates. Ghana's census does not publish per-district facility
+          counts or a "pregnant_pct" category; sourcing these for real
+          would need Ghana Education Service EMIS data, Ghana Health
+          Service facility registries, and GDHS survey data respectively -
+          a distinct, larger data-acquisition task from the population
+          citation done here.
+        """
         return {
             "Accra Central": {
                 "population": 187928,
@@ -60,11 +99,11 @@ class ImpactEstimator:
                 "pregnant_pct": 0.012,
             },
             "Tema": {
-                "population": 198742,
+                "population": 177924,
                 "schools": 58,
                 "hospitals": 10,
                 "markets": 18,
-                "area_km2": 38.7,
+                "area_km2": 565,
                 "children_pct": 0.29,
                 "elderly_pct": 0.09,
                 "disabled_pct": 0.02,
@@ -75,18 +114,18 @@ class ImpactEstimator:
                 "schools": 85,
                 "hospitals": 12,
                 "markets": 25,
-                "area_km2": 98.2,
+                "area_km2": 299,
                 "children_pct": 0.31,
                 "elderly_pct": 0.09,
                 "disabled_pct": 0.02,
                 "pregnant_pct": 0.013,
             },
             "Tamale": {
-                "population": 371578,
+                "population": 374744,
                 "schools": 42,
                 "hospitals": 6,
                 "markets": 14,
-                "area_km2": 67.4,
+                "area_km2": 731,
                 "children_pct": 0.32,
                 "elderly_pct": 0.08,
                 "disabled_pct": 0.02,
@@ -104,33 +143,33 @@ class ImpactEstimator:
                 "pregnant_pct": 0.012,
             },
             "Cape Coast": {
-                "population": 169894,
+                "population": 189925,
                 "schools": 28,
                 "hospitals": 4,
                 "markets": 10,
-                "area_km2": 62.4,
+                "area_km2": 122,
                 "children_pct": 0.27,
                 "elderly_pct": 0.11,
                 "disabled_pct": 0.02,
                 "pregnant_pct": 0.011,
             },
             "Ho": {
-                "population": 153705,
+                "population": 180420,
                 "schools": 30,
                 "hospitals": 4,
                 "markets": 8,
-                "area_km2": 58.3,
+                "area_km2": 573.2,
                 "children_pct": 0.28,
                 "elderly_pct": 0.10,
                 "disabled_pct": 0.02,
                 "pregnant_pct": 0.012,
             },
             "Sunyani": {
-                "population": 138256,
+                "population": 193595,
                 "schools": 25,
                 "hospitals": 3,
                 "markets": 7,
-                "area_km2": 55.7,
+                "area_km2": 1289,
                 "children_pct": 0.27,
                 "elderly_pct": 0.11,
                 "disabled_pct": 0.02,

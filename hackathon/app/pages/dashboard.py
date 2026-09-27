@@ -323,7 +323,18 @@ SITUATION_BY_TIER = {
 
 
 def get_district_data(district: str) -> dict:
-    """Get district-specific data."""
+    """Get district-specific data.
+
+    population/area_km2 (audited 2026-09-27 for manuscript accuracy): kept
+    in sync with src/exposure/impact_estimator.py's _load_district_data(),
+    which carries the full citation - Tema/Kumasi/Tamale/Cape Coast/Ho/
+    Sunyani are real, cited 2021 Ghana Population and Housing Census
+    figures for their single official Metropolitan/Municipal Assembly;
+    "Accra Central"/"West"/"East" remain project-authored estimates for
+    an internal split of the wider Accra urban area, not official GSS
+    units - see that docstring for why a precise real split isn't
+    available yet.
+    """
     districts = {
         "Accra Central": {
             "region": "Greater Accra",
@@ -372,8 +383,8 @@ def get_district_data(district: str) -> dict:
         },
         "Tema": {
             "region": "Greater Accra",
-            "population": 198742,
-            "area_km2": 38.7,
+            "population": 177924,
+            "area_km2": 565,
             "lat": 5.650,
             "lon": -0.020,
             "elevation": 18,
@@ -388,7 +399,7 @@ def get_district_data(district: str) -> dict:
         "Kumasi": {
             "region": "Ashanti",
             "population": 443981,
-            "area_km2": 98.2,
+            "area_km2": 299,
             "lat": 6.670,
             "lon": -1.620,
             "elevation": 25,
@@ -402,8 +413,8 @@ def get_district_data(district: str) -> dict:
         },
         "Tamale": {
             "region": "Northern",
-            "population": 371578,
-            "area_km2": 67.4,
+            "population": 374744,
+            "area_km2": 731,
             "lat": 9.400,
             "lon": -0.840,
             "elevation": 125,
@@ -420,8 +431,8 @@ def get_district_data(district: str) -> dict:
         # data for these three districts, which had no UI to select them.
         "Cape Coast": {
             "region": "Central",
-            "population": 169894,
-            "area_km2": 62.4,
+            "population": 189925,
+            "area_km2": 122,
             "lat": 5.100,
             "lon": -1.250,
             "elevation": 25,
@@ -435,8 +446,8 @@ def get_district_data(district: str) -> dict:
         },
         "Ho": {
             "region": "Volta",
-            "population": 153705,
-            "area_km2": 58.3,
+            "population": 180420,
+            "area_km2": 573.2,
             "lat": 6.601,
             "lon": 0.471,
             "elevation": 100,
@@ -444,8 +455,8 @@ def get_district_data(district: str) -> dict:
         },
         "Sunyani": {
             "region": "Bono",
-            "population": 138256,
-            "area_km2": 55.7,
+            "population": 193595,
+            "area_km2": 1289,
             "lat": 7.333,
             "lon": -2.333,
             "elevation": 300,

@@ -31,6 +31,17 @@ plotly>=5.17.0
 twilio>=8.0.0
 python-dotenv>=1.0.0
 
+# Distributed alert cooldown (src/alerts/cooldown.py) - was imported
+# inside a try/except that silently fell back to memory-only mode on
+# ImportError, so this package's absence here never surfaced as a build
+# failure; it just meant REDIS_URL had no effect in production no matter
+# how correctly it was configured. Added 2026-09-27 once that was traced
+# down. Unpinned minimum (not a specific patch pin) since this repo's own
+# convention pins tightly only where an exact version was needed to fix a
+# real, verified incompatibility - see starlette's pin below for that
+# pattern; redis-py has no such constraint here.
+redis>=5.0.0
+
 # API key auth (src/api/auth.py) - real dependency as of this commit,
 # not before: auth.py existed but was dead code (verify_api_key was
 # never wired into any route), so nothing ever actually imported it and

@@ -3,7 +3,6 @@ Fallback data for CivicFlood AI dashboard
 Provides realistic data when API returns zeros
 """
 
-import random
 from typing import Dict, Any
 
 
@@ -13,14 +12,25 @@ def get_fallback_data(district: str, rainfall_mm: float) -> Dict[str, Any]:
     Uses actual district population data.
     """
 
-    # Real district population data
+    # Population data kept in sync with src/exposure/impact_estimator.py's
+    # _load_district_data() (audited 2026-09-27 for manuscript accuracy -
+    # see that docstring for the full citation): Tema/Kumasi/Tamale/Cape
+    # Coast/Ho/Sunyani are real, cited 2021 Ghana Population and Housing
+    # Census figures; "Accra Central"/"West"/"East" remain project-
+    # authored estimates for an internal split of the wider Accra urban
+    # area, not official GSS units. All 9 tracked districts are listed
+    # here now (Cape Coast/Ho/Sunyani were previously missing and would
+    # have silently fallen through to a generic 100,000 default).
     district_populations = {
         "Accra Central": 187928,
         "Accra West": 203461,
         "Accra East": 142587,
-        "Tema": 198742,
+        "Tema": 177924,
         "Kumasi": 443981,
-        "Tamale": 371578,
+        "Tamale": 374744,
+        "Cape Coast": 189925,
+        "Ho": 180420,
+        "Sunyani": 193595,
     }
 
     total_population = district_populations.get(district, 100000)

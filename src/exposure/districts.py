@@ -31,9 +31,17 @@ from src.exposure.community_names import get_affected_communities
 
 # Real region/lat/lon/elevation (cross-checked against
 # weather_forecast.py's district_coords and sentinel_processor.py's
-# _load_districts(), which already agree on lat/lon for all 9) and real
-# population/area_km2 (from impact_estimator.py's _load_district_data(),
-# excluding "Sekondi-Takoradi" - see module docstring).
+# _load_districts(), which already agree on lat/lon for all 9).
+#
+# population/area_km2 (audited 2026-09-27 for manuscript accuracy): Tema,
+# Kumasi, Tamale, Cape Coast, Ho, and Sunyani are now real, cited 2021
+# Ghana Population and Housing Census figures for their single,
+# unambiguous official administrative unit (Metropolitan/Municipal
+# Assembly) - see the full citation and per-district source note in
+# src/exposure/impact_estimator.py's _load_district_data() docstring,
+# which this registry stays in sync with. "Accra Central"/"West"/"East"
+# remain project-authored estimates, NOT official GSS units - see the
+# same docstring for why a precise real split isn't available yet.
 _BASE_DISTRICTS: Dict[str, dict] = {
     "Accra Central": {
         "region": "Greater Accra",
@@ -64,8 +72,8 @@ _BASE_DISTRICTS: Dict[str, dict] = {
         "lat": 5.650,
         "lon": -0.020,
         "elevation_m": 18,
-        "population": 198742,
-        "area_km2": 38.7,
+        "population": 177924,
+        "area_km2": 565,
     },
     "Kumasi": {
         "region": "Ashanti",
@@ -73,39 +81,39 @@ _BASE_DISTRICTS: Dict[str, dict] = {
         "lon": -1.620,
         "elevation_m": 25,
         "population": 443981,
-        "area_km2": 98.2,
+        "area_km2": 299,
     },
     "Tamale": {
         "region": "Northern",
         "lat": 9.400,
         "lon": -0.840,
         "elevation_m": 125,
-        "population": 371578,
-        "area_km2": 67.4,
+        "population": 374744,
+        "area_km2": 731,
     },
     "Cape Coast": {
         "region": "Central",
         "lat": 5.100,
         "lon": -1.250,
         "elevation_m": 25,
-        "population": 169894,
-        "area_km2": 62.4,
+        "population": 189925,
+        "area_km2": 122,
     },
     "Ho": {
         "region": "Volta",
         "lat": 6.601,
         "lon": 0.471,
         "elevation_m": 100,
-        "population": 153705,
-        "area_km2": 58.3,
+        "population": 180420,
+        "area_km2": 573.2,
     },
     "Sunyani": {
         "region": "Bono",
         "lat": 7.333,
         "lon": -2.333,
         "elevation_m": 300,
-        "population": 138256,
-        "area_km2": 55.7,
+        "population": 193595,
+        "area_km2": 1289,
     },
 }
 
