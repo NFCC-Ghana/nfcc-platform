@@ -9,3 +9,11 @@ steps:
       - "."
 images:
   - "gcr.io/$PROJECT_ID/nfcc-platform"
+options:
+  # Required once a trigger specifies a user-managed service account
+  # (manual-deploy-build uses nfcc-cloudrun-deployer) - Cloud Build
+  # refuses to run otherwise ("if build.service_account is specified,
+  # the build must also specify a compatible logging option"), and the
+  # trigger console UI doesn't expose a control for this, only the
+  # build config does.
+  logging: CLOUD_LOGGING_ONLY
