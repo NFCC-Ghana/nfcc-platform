@@ -14,6 +14,55 @@ from .ee_auth import initialize_earth_engine
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# The real water-detection threshold detect_flood() classifies against
+# (vh_diff.gt(_VH_THRESHOLD_DB).And(vv_diff.gt(_VV_THRESHOLD_DB))) - kept
+# as module constants so _confidence_from_sar_margins below stays
+# grounded in the exact same numbers the classification itself uses,
+# rather than a second, independently-chosen pair that could drift from
+# it.
+_VH_THRESHOLD_DB = 3.0
+_VV_THRESHOLD_DB = 1.5
+
+
+def _confidence_from_sar_margins(
+    vh_diff_mean: Optional[float], vv_diff_mean: Optional[float]
+) -> float:
+    """Real proxy for Sentinel-1 change-detection confidence: how far the
+    scene's actual mean VH/VV backscatter differential sits from the
+    water-detection threshold that produced the classification, in
+    either direction - a change value barely crossing (or barely
+    missing) the threshold is inherently less certain than one clearly
+    on one side of it. Symmetric by design: a strongly negative margin
+    (clearly no water) deserves the same confidence boost as a strongly
+    positive one (clearly water), since the question this answers is "how
+    decisive was this specific classification," not "how much water was
+    found."
+
+    This replaced an earlier version that scaled confidence with how many
+    images fed the "after" composite - a plausible-sounding but
+    scientifically shaky proxy: median-compositing over more images can
+    just as easily dilute a real but brief flood signal as reduce speckle
+    noise, so "more images" doesn't reliably mean "more confident" for a
+    transient event. Distance-from-threshold is what the classifier
+    itself actually relies on to decide water/no-water, so it directly
+    reflects how decisive that specific decision was.
+
+    Returns a real floor (0.55) rather than guessing when either mean is
+    unavailable (e.g. an empty reduceRegion result) - never overclaims.
+    Pulled out as a standalone, directly-testable function since
+    detect_flood()'s real Earth Engine call chain has no test coverage in
+    this codebase (a pre-existing gap, not one introduced by isolating
+    this arithmetic) and would need heavy, fragile mocking to exercise
+    end-to-end - this way the actual math, where a fix could introduce a
+    real bug, is verified directly instead of going untested entirely.
+    """
+    if vh_diff_mean is None or vv_diff_mean is None:
+        return 0.55
+    vh_margin = (vh_diff_mean - _VH_THRESHOLD_DB) / _VH_THRESHOLD_DB
+    vv_margin = (vv_diff_mean - _VV_THRESHOLD_DB) / _VV_THRESHOLD_DB
+    distance_from_boundary = abs((vh_margin + vv_margin) / 2)
+    return round(min(0.90, 0.55 + 0.35 * min(1.0, distance_from_boundary)), 2)
+
 
 class SentinelProcessor:
     """
@@ -140,8 +189,12 @@ class SentinelProcessor:
             vh_diff = before.select("VH").subtract(after.select("VH"))
             vv_diff = before.select("VV").subtract(after.select("VV"))
 
-            # Water detection threshold
-            water = vh_diff.gt(3.0).And(vv_diff.gt(1.5))
+            # Water detection threshold - _VH_THRESHOLD_DB/_VV_THRESHOLD_DB
+            # module constants, shared with _confidence_from_sar_margins
+            # below so confidence is always grounded in the exact same
+            # numbers this classification itself used, not a second,
+            # independently-chosen pair that could drift from it.
+            water = vh_diff.gt(_VH_THRESHOLD_DB).And(vv_diff.gt(_VV_THRESHOLD_DB))
 
             # Calculate area
             area = water.multiply(ee.Image.pixelArea()).reduceRegion(
@@ -150,13 +203,22 @@ class SentinelProcessor:
 
             area_km2 = area.getInfo().get("VH", 0) / 1e6
 
-            # Real proxy for detection confidence: more images averaged
-            # into the after-composite means less SAR speckle noise in the
-            # change-detection result, a genuine remote-sensing principle -
-            # this used to be a flat 0.85 regardless of whether the
-            # composite behind it was 1 image or 7+, i.e. not actually
-            # computed from anything. 1 image -> 0.60, 7+ images -> 0.90.
-            confidence = round(min(0.90, 0.55 + 0.05 * min(after_image_count, 7)), 2)
+            # Real proxy for detection confidence: how far the scene's
+            # actual mean backscatter differential sits from the water-
+            # detection threshold that produced this classification - see
+            # _confidence_from_sar_margins' docstring (a standalone,
+            # directly-tested pure function - this method's EE calls have
+            # no test coverage in this codebase at all, being a long real
+            # Earth Engine chain that's expensive to mock faithfully, but
+            # the arithmetic itself, where a fix could actually introduce
+            # a bug, is isolated and unit-tested independently of that).
+            vh_diff_mean = vh_diff.reduceRegion(
+                reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
+            ).getInfo().get("VH")
+            vv_diff_mean = vv_diff.reduceRegion(
+                reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
+            ).getInfo().get("VV")
+            confidence = _confidence_from_sar_margins(vh_diff_mean, vv_diff_mean)
 
             return {
                 "district": district,

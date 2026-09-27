@@ -182,3 +182,28 @@ def test_normalize_risk_missing_thresholds_returns_none():
 
 def test_haversine_zero_distance():
     assert fh._haversine_km(5.56, -0.21, 5.56, -0.21) == pytest.approx(0.0)
+
+
+def test_situation_includes_flood_hub_field(api_client, monkeypatch):
+    """End-to-end check that src/api/routes/situation.py actually wires
+    this module into the real /situation response - a unit test of
+    flood_hub_forecast.py in isolation (the tests above) doesn't confirm
+    the wiring itself works, only that the module's own logic is correct
+    in isolation."""
+    monkeypatch.delenv("FLOOD_HUB_API_KEY", raising=False)
+    resp = api_client.post("/situation", json={"location": "Tamale", "precipitation": 60})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "flood_hub" in data
+    # Honest state of production today: no pilot API key exists yet.
+    assert data["flood_hub"]["available"] is False
+    assert "FLOOD_HUB_API_KEY not configured" in data["flood_hub"]["reason"]
+
+
+def test_situation_flood_hub_field_for_untracked_district(api_client, monkeypatch):
+    monkeypatch.delenv("FLOOD_HUB_API_KEY", raising=False)
+    resp = api_client.post(
+        "/situation", json={"location": "Not A Real District", "precipitation": 10}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["flood_hub"]["available"] is False

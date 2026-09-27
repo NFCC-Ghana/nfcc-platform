@@ -228,15 +228,21 @@ def _fetch_latest_forecast_value(gauge_id: str) -> Optional[float]:
     forecasts = entry.get("forecasts", [])
     if not forecasts:
         return None
-    # Most recently issued forecast's first (nearest-term) range - the
+    # Most recently issued forecast, then its nearest-term range - the
     # "right now" reading this platform's other per-source evidence
     # values (rainfall/river/soil/satellite) each already represent, not
-    # a full multi-day series.
+    # a full multi-day series. Explicitly selects by earliest
+    # forecastStartTime rather than assuming index [0] is soonest -
+    # Google's documented schema never states forecastRanges is ordered,
+    # so trusting array order would be an unverified assumption about a
+    # real API's behavior, exactly the kind of guess this module
+    # otherwise avoids.
     latest = max(forecasts, key=lambda f: f.get("issuedTime", ""))
     ranges = latest.get("forecastRanges", [])
     if not ranges:
         return None
-    return ranges[0].get("value")
+    nearest_range = min(ranges, key=lambda r: r.get("forecastStartTime", ""))
+    return nearest_range.get("value")
 
 
 def _normalize_risk(value: float, thresholds: Dict[str, float]) -> Optional[float]:

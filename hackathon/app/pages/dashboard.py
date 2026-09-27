@@ -8,6 +8,7 @@ International-standard professional dashboard
 # IMPORTS - ALL AT THE TOP (E402 fixed)
 # ============================================================
 
+import math
 import os
 import sys
 import time
@@ -322,6 +323,17 @@ SITUATION_BY_TIER = {
 }
 
 
+class _DistrictFetchFailed(Exception):
+    """Internal signal only - never surfaces past get_district_data()
+    below. Raised instead of returning {} on failure specifically so
+    Streamlit's @st.cache_data (which never caches a raised exception,
+    only a genuine return value) doesn't memoize a transient API hiccup
+    as if it were a stable "no data" result for the full TTL - an earlier
+    version of this function returned {} on failure, which meant one bad
+    request could lock the app onto the fallback dict for up to an hour
+    after the real API had already recovered."""
+
+
 @st.cache_data(ttl=3600)
 def _fetch_districts_from_api() -> dict:
     """Real district registry from GET /v1/districts (src/exposure/
@@ -336,14 +348,15 @@ def _fetch_districts_from_api() -> dict:
 
     Cached for an hour since district metadata (population/area/
     coordinates/communities) is effectively static - no reason to hit the
-    API on every widget interaction. Returns {} on any failure (API
-    unreachable, unexpected shape) so get_district_data() below can fall
-    back to _DISTRICT_FALLBACK rather than breaking the district
-    selector entirely.
+    API on every widget interaction. Raises _DistrictFetchFailed on any
+    failure (API unreachable, unexpected shape) rather than returning {} -
+    see that exception's docstring for why this matters for caching
+    correctness. get_district_data() below catches it and falls back to
+    _DISTRICT_FALLBACK.
     """
     result = call_api("/v1/districts", "GET")
     if not isinstance(result, list):
-        return {}
+        raise _DistrictFetchFailed(f"unexpected /v1/districts response: {result!r}")
     try:
         return {
             d["name"]: {
@@ -357,8 +370,8 @@ def _fetch_districts_from_api() -> dict:
             }
             for d in result
         }
-    except (KeyError, TypeError):
-        return {}
+    except (KeyError, TypeError) as e:
+        raise _DistrictFetchFailed(f"malformed /v1/districts entry: {e}") from e
 
 
 # Last-resort fallback only, used when GET /v1/districts is unreachable -
@@ -507,11 +520,14 @@ _DISTRICT_FALLBACK = {
 def get_district_data(district: str) -> dict:
     """Get district-specific data - real, from GET /v1/districts, falling
     back to the frozen _DISTRICT_FALLBACK snapshot only if that call
-    fails. See _fetch_districts_from_api's docstring for why this
-    replaced a hardcoded dict that used to live directly in this
-    function."""
-    districts = _fetch_districts_from_api() or _DISTRICT_FALLBACK
-    return districts.get(district, {})
+    fails. See _fetch_districts_from_api's docstring for why a failure
+    there is an exception, not an empty-dict return value - it's what
+    lets Streamlit's cache correctly avoid memoizing a transient failure
+    for the full TTL."""
+    try:
+        return _fetch_districts_from_api().get(district, {})
+    except _DistrictFetchFailed:
+        return _DISTRICT_FALLBACK.get(district, {})
 
 
 # ============================================================
@@ -1661,8 +1677,18 @@ def fetch_situation_state(district: str, rainfall_mm: float):
     # Scales with real citizen-report volume instead of a flat number - no
     # reporting channel has meaningful real traffic yet, so this is
     # honestly low most of the time today rather than a static 65
-    # regardless of whether any report exists.
-    state.evidence_citizen_confidence = min(65.0, 20.0 + state.total_reports * 9.0)
+    # regardless of whether any report exists. Exponential-approach curve
+    # (not linear with an arbitrary floor, an earlier version of this
+    # line) for two reasons: diminishing returns are more realistic (the
+    # difference between 0 and 1 corroborating reports should matter far
+    # more than between 8 and 9), and zero reports genuinely means zero
+    # corroborating evidence from this pathway - the same "no real signal,
+    # so no floor to invent" treatment already applied to river/soil
+    # confidence when their real data sources are unavailable, rather
+    # than assuming a baseline of trust with nothing behind it.
+    state.evidence_citizen_confidence = round(
+        65.0 * (1 - math.exp(-state.total_reports / 3.0)), 1
+    )
 
     state.district = district
     state.rainfall_mm = rainfall_mm
