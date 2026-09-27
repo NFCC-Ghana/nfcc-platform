@@ -21,6 +21,7 @@ reading is unremarkable but a "72 hours old" SMAP reading is a real
 problem.
 """
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter
@@ -37,6 +38,7 @@ from src.hydrology.smap_soil_moisture import get_soil_moisture_for_district
 from src.hydrology.weather_forecast import weather_forecast
 
 router = APIRouter(prefix="/data-quality", tags=["v1"])
+logger = logging.getLogger("nfcc.api.v1.data_quality")
 
 # Real, documented per-source thresholds - see module docstring for why
 # these differ per source rather than sharing one generic value.
@@ -156,13 +158,23 @@ async def get_data_quality() -> dict:
             }
         )
     except Exception as e:
+        # Logged server-side, never returned to the client - a CodeQL
+        # scan (py/stack-trace-exposure) correctly flagged the previous
+        # version of this block, which put the raw exception's text
+        # (str(e)) directly into this public, unauthenticated endpoint's
+        # response body. This is a GET /v1/data-quality-wide risk, not
+        # specific to Open-Meteo: any exception's message can carry
+        # internal detail (file paths, library internals) with no real
+        # value to a legitimate caller and real value to an attacker
+        # doing reconnaissance.
+        logger.warning(f"Open-Meteo forecast quality check failed: {e}")
         reports.append(
             {
                 "source": "open_meteo_forecast",
                 "overall": QCFlag.MISSING.value,
                 "completeness_percent": None,
                 "tests": [],
-                "reason": str(e),
+                "reason": "Open-Meteo forecast request failed",
             }
         )
 

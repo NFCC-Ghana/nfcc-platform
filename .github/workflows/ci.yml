@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Least-privilege default (CodeQL flagged its absence): every job here
+# only checks out code and runs tests/lint/scanners - none of them push
+# commits, open PRs, or write anything back to the repo, so read-only
+# is the real requirement, not an omission to work around.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

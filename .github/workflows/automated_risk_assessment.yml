@@ -8,6 +8,12 @@ on:
     - cron: "0 */3 * * *"
   workflow_dispatch:
 
+# Least-privilege default (CodeQL flagged its absence): this workflow
+# calls the live API to queue assessments for review, not the git repo -
+# never pushes commits or opens PRs.
+permissions:
+  contents: read
+
 jobs:
   automated-risk-assessment:
     runs-on: ubuntu-latest

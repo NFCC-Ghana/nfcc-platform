@@ -9,6 +9,12 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
 
+# Least-privilege default (CodeQL flagged its absence): this workflow
+# calls the live API and writes to the app's own database via that API,
+# not to the git repo - never pushes commits or opens PRs.
+permissions:
+  contents: read
+
 jobs:
   verify-predictions:
     runs-on: ubuntu-latest

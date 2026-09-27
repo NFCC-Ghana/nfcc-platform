@@ -6,6 +6,13 @@ on:
     - cron: "0 8 * * *"
   workflow_dispatch:
 
+# Least-privilege default (CodeQL flagged its absence): this workflow
+# checks out code, runs the ingestion script, and uploads a build
+# artifact (a separate mechanism from repo contents) - never pushes
+# commits or opens PRs.
+permissions:
+  contents: read
+
 jobs:
   daily-chirps-ingestion:
     runs-on: ubuntu-latest

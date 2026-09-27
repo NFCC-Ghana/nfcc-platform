@@ -67,3 +67,25 @@ def test_system_status_degraded_when_any_source_fails(api_client):
     ):
         resp = api_client.get("/v1/data-quality")
     assert resp.json()["system_status"] == "degraded"
+
+
+def test_open_meteo_exception_never_leaks_raw_exception_text(api_client):
+    """A CodeQL scan (py/stack-trace-exposure) flagged this exact path:
+    the Open-Meteo forecast quality check's exception handler used to put
+    str(e) directly into this public, unauthenticated endpoint's response
+    body. A real exception's message can carry internal detail (file
+    paths, library internals) with no value to a legitimate caller and
+    real value to an attacker doing reconnaissance."""
+    secret_looking_detail = "/internal/path/config.py line 42: db_password=hunter2"
+    with patch(
+        "src.api.v1.data_quality.weather_forecast.get_forecast_for_district",
+        side_effect=RuntimeError(secret_looking_detail),
+    ):
+        resp = api_client.get("/v1/data-quality")
+    assert resp.status_code == 200
+    forecast_source = next(
+        s for s in resp.json()["sources"] if s["source"] == "open_meteo_forecast"
+    )
+    assert forecast_source["overall"] == "missing"
+    assert forecast_source["reason"] == "Open-Meteo forecast request failed"
+    assert secret_looking_detail not in forecast_source["reason"]

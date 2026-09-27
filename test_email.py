@@ -18,7 +18,14 @@ print("Testing Gmail SMTP with New App Password")
 print("=" * 50)
 print(f"From: {SMTP_USER}")
 print(f"To: {RECIPIENT}")
-print(f"Password: {'*' * 8}{SMTP_PASSWORD[-4:] if SMTP_PASSWORD else 'NOT SET'}")
+# CodeQL (py/clear-text-logging-sensitive-data) correctly flagged the
+# previous version of this line: it printed the real password's last 4
+# characters, not just asterisks - a real (if small) reduction in how
+# much of a genuine Gmail app password an attacker with access to this
+# script's output (a CI log, a terminal history, a shared screen) would
+# need to guess. A presence check is all a diagnostic script like this
+# one actually needs.
+print(f"Password: {'SET' if SMTP_PASSWORD else 'NOT SET'}")
 print("")
 
 # Create message

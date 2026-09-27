@@ -9,6 +9,11 @@ on:
     - cron: '0 2 * * *'  # Daily at 2 AM
   workflow_dispatch:  # Manual trigger
 
+# Least-privilege default (CodeQL flagged its absence): this workflow
+# only checks out code and runs pytest, never writes back to the repo.
+permissions:
+  contents: read
+
 jobs:
   resilience:
     runs-on: ubuntu-latest
