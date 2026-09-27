@@ -8,15 +8,15 @@ adds no new scoring behavior, it gives the existing one a clean,
 independently-fetchable, versioned contract.
 
 Scoring is currently district-agnostic (a pure function of
-precipitation): src/alerts/district_risk.py has a real
-calculate_adjusted_score()/should_alert_for_district() pair that DOES
-adjust per district, but it is not called anywhere in the live pipeline
-(confirmed by grep before writing this file - the only reference to it
-outside its own module is a comment in src/api/main.py). This endpoint
-deliberately does not wire that in either, to avoid silently changing
-computed risk values as a side effect of adding a contract; that's a
-separate decision for whoever wants district-adjusted thresholds live,
-not something to slip in here.
+precipitation): src/alerts/district_risk.py used to have a real
+calculate_adjusted_score()/should_alert_for_district() pair that DID
+adjust per district, but it was never called anywhere in the live
+pipeline and carried its own uncited, since-diverged 7-district list;
+deleted 2026-09-27 along with the equally-dead GET /districts route that
+was its only other reference. District-adjusted thresholds remain a
+separate, real feature to build properly (against the canonical 9-
+district registry, src/exposure/districts.py) if wanted later, not
+something worth resurrecting the old module for.
 """
 
 from datetime import datetime, timezone

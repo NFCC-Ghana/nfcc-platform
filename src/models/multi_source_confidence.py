@@ -6,9 +6,15 @@ evidence in the number itself, despite claiming to).
 This generalizes src/models/forecast_fusion.py + confidence_scoring.py's
 already-tested masked-weighted-mean fusion and coverage/agreement
 confidence formula (kept as-is - a disconnected chirps/glofas/flood_hub
-demo with its own tests) to the REAL named sources this platform
-actually has per district: rainfall, a real river gauge, a real dam
-level, real Sentinel-1 SAR, and real verified citizen reports.
+demo with its own tests; its flood_hub leg gained a real, honestly-
+unconfigured-in-production fetch path 2026-09-27, see
+src/hydrology/flood_hub_forecast.py, but the demo endpoint itself still
+takes caller-supplied numbers rather than fetching per-district) to the
+REAL named sources this platform actually has per district: rainfall, a
+real river gauge, a real dam level, real Sentinel-1 SAR, and real
+verified citizen reports. Folding a real Flood Hub signal into THIS
+fusion (not just the demo) is a natural next step once Flood Hub API
+access is granted and validated - not done in this pass.
 
 Grounded in how operational agencies worldwide actually do this -
 researched specifically for this redesign, not assumed:

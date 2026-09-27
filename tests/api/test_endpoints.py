@@ -37,11 +37,13 @@ class TestAPIEndpoints:
         assert response.status_code == 422
 
     def test_districts_endpoint(self, api_client: TestClient):
-        """Test districts endpoint."""
-        response = api_client.get("/districts")
+        """The real, canonical districts endpoint - the old unversioned
+        /districts (a second, uncited, since-diverged 7-district list) was
+        removed 2026-09-27; this is the one thing that was ever meant."""
+        response = api_client.get("/v1/districts")
         assert response.status_code == 200
         data = response.json()
-        assert "districts" in data
+        assert isinstance(data, list) and len(data) == 9
 
     def test_alerts_endpoint(self, api_client: TestClient):
         """Test alerts endpoint."""

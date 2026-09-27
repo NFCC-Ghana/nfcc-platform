@@ -163,10 +163,13 @@ class DashboardState:
     # ============================================================
     # EVIDENCE CONFIDENCE SCORES
     # ============================================================
-    # Per-source values below remain fixed priors (fetch_situation_state
-    # in dashboard.py doesn't yet map them to real per-source data -
-    # a disclosed limitation, see src/models/multi_source_confidence.py's
-    # own docstring for the same honesty standard applied there).
+    # Class-level values below are just dataclass defaults -
+    # fetch_situation_state in dashboard.py overwrites rainfall/satellite/
+    # citizen confidence with real per-source values derived from
+    # state.forecast_source/satellite_source/total_reports, and
+    # render_evidence_panel zeroes out river/soil confidence at render
+    # time when no real gauge/SMAP reading exists for the district. None
+    # of the 5 are still flat regardless of input.
     # evidence_overall_confidence, risk_confidence, confidence_explanation
     # and confidence_degraded (below) ARE real: fetch_situation_state
     # overwrites them from GET /v1/districts/{district}/evidence's real

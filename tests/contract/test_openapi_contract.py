@@ -252,11 +252,14 @@ class TestLegacyContract:
         assert "detail" in data
 
     def test_districts_response_schema(self, api_client: TestClient):
-        """Test districts endpoint response schema."""
-        response = api_client.get("/districts")
+        """The old unversioned /districts (a second, uncited district
+        list) was removed 2026-09-27 - see test_districts_list_schema
+        above for the real /v1/districts schema check, already covered
+        there."""
+        response = api_client.get("/v1/districts")
         assert response.status_code == 200
         data = response.json()
-        assert "districts" in data or "count" in data
+        assert isinstance(data, list)
 
     def test_score_response_schema(self, api_client: TestClient):
         """Test score endpoint response schema."""

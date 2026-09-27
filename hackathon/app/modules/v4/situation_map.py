@@ -168,36 +168,40 @@ def render_situation_map(state):
         st.dataframe(risk_df, use_container_width=True)
 
 
-def render_map_fallback():
-    """Fallback function when map fails to load."""
-    st.warning("⚠️ Map unavailable - showing data instead")
+def render_map_fallback(state=None):
+    """Outer-layer fallback, used only when render_situation_map() itself
+    raises before/outside its own internal try/except (line ~50-168 above,
+    which already handles ordinary map-render failures with real
+    per-district data). This used to show a fixed Alajo/Kaneshie/Circle/
+    Nima/Mamobi Accra-only table with fabricated populations, unconditionally,
+    for whatever district was actually selected - undisclosed as fake and
+    wrong-city for 8 of the platform's 9 tracked districts. Now uses the
+    same real state.affected_communities/risk_category the inner fallback
+    uses, with an honest disclosure when even that isn't available.
+    """
+    st.warning("⚠️ Map unavailable - showing a list view instead")
     st.markdown("### 📍 Affected Areas")
-    risk_data = [
-        {"name": "Alajo", "lat": 5.565, "lon": -0.218, "risk": "EXTREME", "pop": 18750},
-        {
-            "name": "Kaneshie",
-            "lat": 5.555,
-            "lon": -0.228,
-            "risk": "EXTREME",
-            "pop": 22340,
-        },
-        {"name": "Circle", "lat": 5.575, "lon": -0.225, "risk": "HIGH", "pop": 15620},
-        {"name": "Nima", "lat": 5.555, "lon": -0.215, "risk": "HIGH", "pop": 48230},
-        {
-            "name": "Mamobi",
-            "lat": 5.545,
-            "lon": -0.212,
-            "risk": "MODERATE",
-            "pop": 34320,
-        },
+
+    if state is None:
+        st.caption(
+            "No district data was available to this fallback either - "
+            "unable to show even a list view. Try reloading."
+        )
+        return
+
+    communities = getattr(state, "affected_communities", None) or [
+        getattr(state, "district", "This district")
     ]
+    risk_category = getattr(state, "risk_category", "MODERATE")
+    st.caption(
+        f"Showing the real communities for {getattr(state, 'district', 'the selected district')} "
+        "(district-level risk only - no per-community risk data exists)."
+    )
+
     import pandas as pd
 
     risk_df = pd.DataFrame(
-        [
-            {"Community": r["name"], "Risk": r["risk"], "Population": f"{r['pop']:,}"}
-            for r in risk_data
-        ]
+        [{"Community": name, "District Risk": risk_category} for name in communities[:5]]
     )
     st.dataframe(risk_df, use_container_width=True)
 

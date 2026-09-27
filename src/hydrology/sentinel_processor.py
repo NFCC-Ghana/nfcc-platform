@@ -126,7 +126,8 @@ class SentinelProcessor:
             # getInfo() call below before failing. size().getInfo() is a
             # real, immediate check, same pattern already used correctly
             # in scripts/daily_chirps_pull.py.
-            if after_collection.size().getInfo() == 0:
+            after_image_count = after_collection.size().getInfo()
+            if after_image_count == 0:
                 logger.info(
                     f"No Sentinel-1 imagery for {district} in "
                     f"{after_start} to {after_end}"
@@ -149,6 +150,14 @@ class SentinelProcessor:
 
             area_km2 = area.getInfo().get("VH", 0) / 1e6
 
+            # Real proxy for detection confidence: more images averaged
+            # into the after-composite means less SAR speckle noise in the
+            # change-detection result, a genuine remote-sensing principle -
+            # this used to be a flat 0.85 regardless of whether the
+            # composite behind it was 1 image or 7+, i.e. not actually
+            # computed from anything. 1 image -> 0.60, 7+ images -> 0.90.
+            confidence = round(min(0.90, 0.55 + 0.05 * min(after_image_count, 7)), 2)
+
             return {
                 "district": district,
                 "water_detected": area_km2 > 0.1,
@@ -156,7 +165,7 @@ class SentinelProcessor:
                 "acquisition_date": f"{after_start} to {after_end}",
                 "baseline_date": f"{baseline_start} to {baseline_end}",
                 "source": "Sentinel-1 SAR",
-                "confidence": 0.85,
+                "confidence": confidence,
             }
 
         except Exception as e:

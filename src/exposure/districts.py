@@ -6,12 +6,10 @@ agree between) four separate files:
 - src/hydrology/weather_forecast.py's district_coords (lat/lon)
 - src/hydrology/sentinel_processor.py's _load_districts() (lat/lon/radius)
 - src/exposure/impact_estimator.py's _load_district_data() (population/
-  schools/hospitals/markets/area_km2/demographics) - which also includes
-  a 10th entry, "Sekondi-Takoradi", not present in any of the other three
-  lists. That entry is left untouched there (out of scope to remove, and
-  something might call estimate_impact() with that name directly) but is
-  deliberately excluded from this registry, which reflects the real 9
-  districts every other tracked-district list already agrees on.
+  schools/hospitals/markets/area_km2/demographics) - previously also
+  included a 10th entry, "Sekondi-Takoradi", not present in any of the
+  other three lists and confirmed to have zero real callers anywhere;
+  removed 2026-09-27 rather than left as a permanent citation gray area.
 - src/exposure/community_names.py's DISTRICT_COMMUNITIES (named
   neighborhoods)
 - hackathon/app/pages/dashboard.py's get_district_data() (region,

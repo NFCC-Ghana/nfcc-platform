@@ -12,11 +12,19 @@ second hardcoded 30/50/70/85. Now calls the same canonical function
 everything else does - there is exactly one place this platform
 computes a risk score, not two."""
 
+from datetime import datetime
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Dict, Any
 
 from src.alerts.formatter import calculate_score, get_risk_tier
+
+# Ghana's real rainy-season months (same list already used for the
+# Sentinel-1 simulated-detection fallback's seasonal likelihood in
+# src/hydrology/sentinel_processor.py) - used below for an honestly
+# computed seasonal_factor instead of a flat "normal" regardless of date.
+_GHANA_RAINY_SEASON_MONTHS = {5, 6, 7, 9, 10}
 
 router = APIRouter(prefix="/explain", tags=["Explainability"])
 
@@ -50,6 +58,17 @@ async def explain_prediction(request: ExplainRequest) -> Dict[str, Any]:
     else:
         explanation = "Extreme rainfall, critical flood risk"
 
+    # Real, from the current calendar month against Ghana's actual rainy
+    # season - this used to be a flat "normal" regardless of when the
+    # request was made. location_factor was dropped rather than left as a
+    # fake "standard" for every input: this endpoint deliberately doesn't
+    # take a district (see this function's docstring), so there is no real
+    # per-location adjustment to report here - src/hydrology/urban_
+    # drainage.py's real per-district factor only applies via /situation.
+    seasonal_factor = (
+        "rainy season" if datetime.now().month in _GHANA_RAINY_SEASON_MONTHS else "dry season"
+    )
+
     return {
         "location": request.location,
         "precipitation": rainfall,
@@ -58,8 +77,7 @@ async def explain_prediction(request: ExplainRequest) -> Dict[str, Any]:
         "explanation": explanation,
         "factors": {
             "precipitation_contribution": round(score, 1),
-            "location_factor": "standard",
-            "seasonal_factor": "normal",
+            "seasonal_factor": seasonal_factor,
         },
     }
 

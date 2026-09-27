@@ -27,7 +27,6 @@ from src.api.routes.telegram_webhook import router as telegram_webhook_router
 from src.api.routes.whatsapp_webhook import router as whatsapp_webhook_router
 from src.api.v1 import router as v1_router
 from src.alerts.formatter import calculate_score, get_risk_tier
-from src.alerts.district_risk import DISTRICT_PROFILES
 from src.alerts.logger_config import setup_logging
 from src.config.settings import settings
 from src.database.alert_db import get_alert_history, get_total_alerts_count, init_db
@@ -178,25 +177,14 @@ async def alerts_root(limit: int = 50):
     }
 
 
-# Districts endpoint - exposes the district risk profiles already used
-# internally by src/alerts/district_risk.py (calculate_adjusted_score,
-# should_alert_for_district) to adjust scores/thresholds per district, but
-# which had no API surface of its own until now.
-@app.get("/districts")
-async def districts():
-    return {
-        "count": len(DISTRICT_PROFILES),
-        "districts": [
-            {
-                "name": profile.name,
-                "base_risk_factor": profile.base_risk_factor,
-                "vulnerability_score": profile.vulnerability_score,
-                "historical_flood_probability": profile.historical_flood_probability,
-                "effective_threshold": profile.effective_threshold,
-            }
-            for profile in DISTRICT_PROFILES.values()
-        ],
-    }
+# GET /districts removed 2026-09-27: it served src/alerts/district_risk.py's
+# DISTRICT_PROFILES, a second, uncited, since-diverged district list (7
+# districts including a stray "Takoradi" not matching any of the 9 real
+# tracked districts anywhere else in the codebase) whose own adjustment
+# functions (calculate_adjusted_score, should_alert_for_district) were
+# confirmed to have zero real callers - this route was the only thing
+# keeping that whole module alive. The real, canonical, live district
+# registry is GET /v1/districts (src/exposure/districts.py).
 
 
 def _score_one(request: ScoreRequest) -> ScoreResponse:

@@ -322,20 +322,53 @@ SITUATION_BY_TIER = {
 }
 
 
-def get_district_data(district: str) -> dict:
-    """Get district-specific data.
+@st.cache_data(ttl=3600)
+def _fetch_districts_from_api() -> dict:
+    """Real district registry from GET /v1/districts (src/exposure/
+    districts.py, the platform's actual canonical source) - replaces this
+    function's own hardcoded dict as the primary source. That hardcoded
+    copy was one of 5+ independently-maintained district datasets found
+    scattered across this codebase during a 2026-09-27 audit (this file,
+    the backend's now-deleted stale /districts route, the real /v1/
+    districts, and internal copies in weather_forecast.py/
+    sentinel_processor.py) - this is the one meant to be authoritative,
+    and the frontend simply never called it before now.
 
-    population/area_km2 (audited 2026-09-27 for manuscript accuracy): kept
-    in sync with src/exposure/impact_estimator.py's _load_district_data(),
-    which carries the full citation - Tema/Kumasi/Tamale/Cape Coast/Ho/
-    Sunyani are real, cited 2021 Ghana Population and Housing Census
-    figures for their single official Metropolitan/Municipal Assembly;
-    "Accra Central"/"West"/"East" remain project-authored estimates for
-    an internal split of the wider Accra urban area, not official GSS
-    units - see that docstring for why a precise real split isn't
-    available yet.
+    Cached for an hour since district metadata (population/area/
+    coordinates/communities) is effectively static - no reason to hit the
+    API on every widget interaction. Returns {} on any failure (API
+    unreachable, unexpected shape) so get_district_data() below can fall
+    back to _DISTRICT_FALLBACK rather than breaking the district
+    selector entirely.
     """
-    districts = {
+    result = call_api("/v1/districts", "GET")
+    if not isinstance(result, list):
+        return {}
+    try:
+        return {
+            d["name"]: {
+                "region": d["region"],
+                "population": d["population"],
+                "area_km2": d["area_km2"],
+                "lat": d["lat"],
+                "lon": d["lon"],
+                "elevation": d["elevation_m"],
+                "affected_communities": d["communities"],
+            }
+            for d in result
+        }
+    except (KeyError, TypeError):
+        return {}
+
+
+# Last-resort fallback only, used when GET /v1/districts is unreachable -
+# not a second source of truth to keep hand-synced with the real one
+# (that duplication is exactly what was fixed by wiring in the API call
+# above), the same degrade-path role state_fallback.py's
+# get_fallback_data() plays for impact figures. Values here matched the
+# real registry as of 2026-09-27 but are frozen from that point on -
+# update src/exposure/districts.py for any real change, not this dict.
+_DISTRICT_FALLBACK = {
         "Accra Central": {
             "region": "Greater Accra",
             "population": 187928,
@@ -469,6 +502,15 @@ def get_district_data(district: str) -> dict:
             ],
         },
     }
+
+
+def get_district_data(district: str) -> dict:
+    """Get district-specific data - real, from GET /v1/districts, falling
+    back to the frozen _DISTRICT_FALLBACK snapshot only if that call
+    fails. See _fetch_districts_from_api's docstring for why this
+    replaced a hardcoded dict that used to live directly in this
+    function."""
+    districts = _fetch_districts_from_api() or _DISTRICT_FALLBACK
     return districts.get(district, {})
 
 
@@ -813,7 +855,7 @@ def render_national_map(state):
         render_situation_map(map_state)
     except Exception as e:
         st.error(f"❌ Map error: {str(e)}")
-        render_map_fallback()
+        render_map_fallback(map_state)
 
     st.divider()
 
@@ -825,7 +867,11 @@ def render_evidence_panel(state):
 
     evidence_items = [
         {
-            "name": "Rainfall Intensity",
+            "name": (
+                "Rainfall Intensity"
+                if state.forecast_source not in ("fallback", "unknown")
+                else "Rainfall Intensity (seasonal estimate)"
+            ),
             "score": min(100, state.rainfall_mm * 1.2),
             "stars": (
                 "★★★★★"
@@ -970,6 +1016,14 @@ def render_impact_panel(state, district_data):
     # Get fallback data if API returns zeros
     population_exposed = getattr(state, "population_exposed", 0)
     if population_exposed == 0:
+        st.warning(
+            "⚠️ The platform's real impact estimate is unavailable right now "
+            "(API unreachable or returned no data for this district), so "
+            "every figure below is a formula-based illustrative estimate "
+            "(population × rainfall% × fixed ratios), not the platform's "
+            "real impact calculation. Do not use these numbers for real "
+            "operational decisions until this banner clears."
+        )
         fallback = get_fallback_data(
             district=getattr(state, "district", "Accra Central"),
             rainfall_mm=getattr(state, "rainfall_mm", 75),
@@ -1592,6 +1646,24 @@ def fetch_situation_state(district: str, rainfall_mm: float):
 
     state = create_state_from_api(api_data)
 
+    # Real per-source evidence confidence, replacing 3 of DashboardState's
+    # 5 fixed priors (85/78/72/80/65 - previously disclosed only in a code
+    # comment, never varying regardless of input). River/soil confidence
+    # already correctly zero out at render time when no real gauge/SMAP
+    # reading exists for this district (render_evidence_panel) - rainfall,
+    # satellite, and citizen confidence never varied at all before this:
+    state.evidence_rainfall_confidence = (
+        85.0 if state.forecast_source not in ("fallback", "unknown") else 35.0
+    )
+    state.evidence_satellite_confidence = (
+        80.0 if state.satellite_source == "Sentinel-1 SAR" else 30.0
+    )
+    # Scales with real citizen-report volume instead of a flat number - no
+    # reporting channel has meaningful real traffic yet, so this is
+    # honestly low most of the time today rather than a static 65
+    # regardless of whether any report exists.
+    state.evidence_citizen_confidence = min(65.0, 20.0 + state.total_reports * 9.0)
+
     state.district = district
     state.rainfall_mm = rainfall_mm
     state.population = district_data.get("population", 187928)
@@ -2159,6 +2231,10 @@ _KIOSK_I18N = {
             "🔄 Refreshes every {seconds}s • NFCC Platform • real-time "
             "satellite and weather data, not a recording"
         ),
+        "language_fallback_notice": (
+            "ℹ️ This screen is showing English - the language you selected "
+            "does not have a reviewed translation yet."
+        ),
     },
     "tw": {},
     "ga": {},
@@ -2250,6 +2326,12 @@ def render_kiosk_view(district_param: str, lang: str = "en") -> None:
     software."""
     if lang not in _KIOSK_SUPPORTED_LANGUAGES:
         lang = "en"
+    # True whenever the requested language has no reviewed translation yet
+    # (every non-English entry today - see _KIOSK_I18N's comment) - this
+    # used to be disclosed only in the sidebar's language-selector caption,
+    # which nobody standing in front of an actual unattended kiosk screen
+    # (no sidebar there at all) would ever see.
+    lang_is_fallback = lang != "en" and not _KIOSK_I18N.get(lang)
 
     st.markdown(
         """<style>
@@ -2317,6 +2399,14 @@ def render_kiosk_view(district_param: str, lang: str = "en") -> None:
             f"<div style='background:#78350f;color:#fff;padding:12px 20px;"
             f"border-radius:8px;text-align:center;font-size:18px;"
             f"margin-bottom:16px;'>{_kiosk_text('stale_banner', lang)}</div>",
+            unsafe_allow_html=True,
+        )
+
+    if lang_is_fallback:
+        st.markdown(
+            f"<div style='background:#1e3a5f;color:#fff;padding:12px 20px;"
+            f"border-radius:8px;text-align:center;font-size:16px;"
+            f"margin-bottom:16px;'>{_kiosk_text('language_fallback_notice', lang)}</div>",
             unsafe_allow_html=True,
         )
 

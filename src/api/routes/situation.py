@@ -24,7 +24,9 @@ from src.alerts.formatter import calculate_score, get_risk_tier
 from src.community.community_memory import community_memory
 from src.exposure.impact_estimator import impact_estimator
 from src.exposure.shelter_candidates import get_shelter_names
+from src.exposure.districts import get_district
 from src.hydrology.dam_intelligence import get_dam_intelligence_for_district
+from src.hydrology.flood_hub_forecast import get_flood_hub_forecast_for_district
 from src.hydrology.river_level_intelligence import get_river_level_for_district
 from src.hydrology.sentinel_processor import sentinel_processor
 from src.hydrology.smap_soil_moisture import get_soil_moisture_for_district
@@ -327,6 +329,24 @@ async def _build_situation_response(body: SituationRequest) -> dict:
         "source": "Sentinel-1 (unavailable)",
         "confidence": 0,
     }
+
+    # Real Google Flood Hub river forecast (src/hydrology/
+    # flood_hub_forecast.py), added 2026-09-27 - previously "flood_hub"
+    # only existed as a named-but-never-fetched third leg of the
+    # disconnected src/models/forecast_fusion.py demo. Honestly
+    # available=False in production today (no FLOOD_HUB_API_KEY - real
+    # API access requires a pilot-program application Google can take
+    # months to approve, not something fixable in code) rather than ever
+    # fabricated - see that module's docstring for the full picture.
+    # Additive only: not yet folded into multi_source_confidence.py's
+    # fusion weights, a separate decision once this can be validated
+    # against a real key.
+    district = get_district(body.location)
+    response["flood_hub"] = (
+        get_flood_hub_forecast_for_district(district.lat, district.lon)
+        if district is not None
+        else {"available": False, "reason": f"'{body.location}' is not a tracked district"}
+    )
 
     # Risk timeline: real Open-Meteo forecast rainfall (see
     # src/hydrology/weather_forecast.py), layered on top of the current

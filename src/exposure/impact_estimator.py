@@ -63,6 +63,14 @@ class ImpactEstimator:
           Service facility registries, and GDHS survey data respectively -
           a distinct, larger data-acquisition task from the population
           citation done here.
+        - A 10th entry, "Sekondi-Takoradi", previously existed here with no
+          citation and wasn't one of the platform's 9 tracked districts
+          anywhere else (weather_forecast.py/sentinel_processor.py/
+          districts.py all agree on 9, excluding it) - a real gap this
+          2026-09-27 audit itself introduced by citing the other 9 while
+          missing this one. Confirmed dead in practice (nothing anywhere
+          in the codebase ever calls estimate_impact("Sekondi-Takoradi"))
+          and removed outright rather than left in a citation gray zone.
         """
         return {
             "Accra Central": {
@@ -130,17 +138,6 @@ class ImpactEstimator:
                 "elderly_pct": 0.08,
                 "disabled_pct": 0.02,
                 "pregnant_pct": 0.016,
-            },
-            "Sekondi-Takoradi": {
-                "population": 245567,
-                "schools": 35,
-                "hospitals": 5,
-                "markets": 12,
-                "area_km2": 85.2,
-                "children_pct": 0.28,
-                "elderly_pct": 0.10,
-                "disabled_pct": 0.02,
-                "pregnant_pct": 0.012,
             },
             "Cape Coast": {
                 "population": 189925,
