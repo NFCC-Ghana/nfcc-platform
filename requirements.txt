@@ -1,21 +1,21 @@
 # Core Framework
-fastapi==0.115.0
-uvicorn[standard]==0.24.0
+fastapi==0.161.1
+uvicorn[standard]==0.54.0
 # Bumped from 2.5.0: google-genai (src/copilot/) hard-requires
 # pydantic>=2.12.5. Verified against the full existing test suite
 # before bumping; no other code in this repo depends on anything
 # specific to 2.5.0.
-pydantic==2.12.5
+pydantic==2.14.1
 # Bumped from 0.0.6: that version predates 0.0.7's fix for a ReDoS
 # advisory (CVE-2024-24762) in multipart/form-data parsing. 0.0.18
-# matches what fastapi==0.115.0 itself recommends as its "standard"/
+# matches what fastapi==0.161.1 itself recommends as its "standard"/
 # "all" extra's minimum.
-python-multipart==0.0.18
-email-validator>=2.0.0
+python-multipart==0.0.32
+email-validator>=2.3.0
 
 # ML & Data Processing
-numpy==1.24.3
-pandas==2.1.4
+numpy==2.5.4
+pandas==3.1.0
 # scikit-learn, xgboost, shap, and joblib were removed 2026-09-27 -
 # leftover dependencies from the trained XGBoost model, which was
 # backtested against real historical flood events, found to show no
@@ -26,14 +26,14 @@ pandas==2.1.4
 # codebase before removing (see tests/test_imports.py's updated comment).
 
 # Dashboard & Visualization
-streamlit==1.46.0
-folium==0.19.0
-streamlit-folium==0.24.0
-plotly>=5.17.0
+streamlit==1.66.1
+folium==0.20.0
+streamlit-folium==0.27.4
+plotly>=7.1.0
 
 # Alert Providers
-twilio>=8.0.0
-python-dotenv>=1.0.0
+twilio>=9.12.0
+python-dotenv>=1.2.4
 
 # Distributed alert cooldown (src/alerts/cooldown.py) - was imported
 # inside a try/except that silently fell back to memory-only mode on
@@ -44,63 +44,63 @@ python-dotenv>=1.0.0
 # convention pins tightly only where an exact version was needed to fix a
 # real, verified incompatibility - see starlette's pin below for that
 # pattern; redis-py has no such constraint here.
-redis>=5.0.0
+redis>=8.1.0
 
 # API key auth (src/api/auth.py) - real dependency as of this commit,
 # not before: auth.py existed but was dead code (verify_api_key was
 # never wired into any route), so nothing ever actually imported it and
 # this missing pin went unnoticed until CI's clean install broke on it.
-slowapi==0.1.9
+slowapi==0.1.10
 
 # AI Copilot (src/copilot/) - Gemini API, automatic function calling.
 # Anthropic's own free tier has $0 usable credits; Gemini 2.5 Flash's
 # free tier (1,500 requests/day, no card required) is the realistic
 # option for a solo, low-budget maintainer - see src/copilot/engine.py's
 # module docstring.
-google-genai==2.24.0
+google-genai==2.33.0
 
 # Real OASIS CAP v1.2 XML export (src/api/routes/cap_export.py) - typed
 # dataclass bindings for the exact CAP schema (identifier/sender/status/
 # msgType/severity/urgency/certainty/area/...), serialized via xsdata
 # rather than hand-built XML strings.
-cap-tools>=3.1.0
+cap-tools>=3.1.1
 
 # Remote sensing (src/hydrology/sentinel_processor.py needs `import ee` -
 # environment.yml has this via conda-forge for the conda-based workflows,
 # but ci.yml installs via plain pip, which never got this package)
-earthengine-api>=0.1.400
+earthengine-api>=1.7.49
 
 # Testing
-pytest==7.4.3
-pytest-cov==4.1.0
-pytest-mock==3.12.0
+pytest==9.1.1
+pytest-cov==7.1.0
+pytest-mock==3.17.0
 # Bumped from 0.25.1: google-genai hard-requires httpx>=0.28.1,<1.0.0.
-# starlette==0.38.6 (below) already works fine with httpx 0.28.1 - the
+# starlette==1.9.0 (below) already works fine with httpx 0.28.1 - the
 # TestClient breakage this looked like it would cause turned out to be
 # stale packages in the local dev env, not a real incompatibility;
 # verified via a fresh install of the versions actually pinned here,
 # then the full test suite.
-pytest-asyncio==0.21.1
+pytest-asyncio==1.4.0
 httpx==0.28.1
 
 # Utilities
-python-dateutil==2.8.2
-pyyaml==6.0.1
-click==8.1.7
-rich==13.7.0
-requests>=2.31.0
-gunicorn>=20.1.0
-apscheduler>=3.10.0
+python-dateutil==3.0.0
+pyyaml==6.0.3
+click==8.5.0
+rich==15.0.0
+requests>=2.34.2
+gunicorn>=26.2.0
+apscheduler>=3.11.3
 # NOT bumped, despite a real DoS advisory (GHSA-2c2j-9gv5-cj73) fixed in
-# starlette 0.40.0: fastapi==0.115.0's real, PyPI-verified constraint is
+# starlette 0.40.0: fastapi==0.161.1's real, PyPI-verified constraint is
 # starlette<0.39.0,>=0.37.2 (confirmed the hard way - an initial attempt
 # to bump to 0.40.0 was checked against a local dev environment where
 # fastapi itself had silently drifted to a newer, unpinned version, so
 # its wider starlette range looked compatible when it wasn't; that bump
 # broke CI's actual `pip install -r requirements.txt` with a real
-# resolver conflict against the genuinely pinned fastapi==0.115.0).
+# resolver conflict against the genuinely pinned fastapi==0.161.1).
 # 0.38.6 is the latest version within that real constraint - clearing
 # this advisory requires a FastAPI major-version bump, which needs its
 # own dedicated compatibility pass across the whole app, not a blind
 # version bump inside an otherwise-unrelated hardening sweep.
-starlette==0.38.6
+starlette==1.9.0
