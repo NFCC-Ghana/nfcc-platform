@@ -6,11 +6,11 @@
 # workflow broke (pytest 9.x pulled in under pytest-asyncio 0.21.1).
 
 # Test runner and plugins - pytest is pinned; plugins are capped to
-# releases that still support pytest 7.x.
-pytest==7.4.3
-pytest-asyncio==0.21.1
+# releases that support pytest 8.x (pytest-asyncio 1.x needs pytest>=8.2).
+pytest==8.4.2
+pytest-asyncio==1.4.1
 pytest-cov==4.1.0
-pytest-mock==3.12.0
+pytest-mock==3.17.0
 pytest-xdist>=3.8.0,<4
 pytest-timeout>=2.0.0,<3
 pytest-randomly>=3.12.0,<4
