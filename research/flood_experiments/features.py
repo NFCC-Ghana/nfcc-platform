@@ -1,0 +1,68 @@
+"""Turn the raw district-week panel into model inputs and the onset target.
+
+Target: flood ONSET - the district is flooded this week and was not
+flooded last week. Global Flood Database events span several weeks, so
+the plain weekly label is dominated by "still flooded" weeks that any
+persistence rule predicts trivially. Every week that follows a flooded
+week (flood still under way, or just receding) is dropped from training
+and scoring, so every model is judged on predicting a new flood.
+
+Every input is known by the end of the target week: rainfall and runoff
+for that week (a perfect-forecast proxy, the standard hindcast setup)
+plus antecedent state from earlier weeks. No input uses labels.
+"""
+
+import numpy as np
+import pandas as pd
+
+from research.flood_experiments import config as C
+
+# Discharge climatology comes only from 2000-2007, before the first
+# forward-chaining test year (2008), so q_ratio never sees test years.
+_Q_CLIMATOLOGY_END = "2007-12-31"
+
+
+def build_features(panel: pd.DataFrame) -> pd.DataFrame:
+    df = panel.copy()
+    df["week"] = pd.to_datetime(df["week"])
+    df = df.sort_values(["district_code", "week"]).reset_index(drop=True)
+    df["year"] = df["week"].dt.year
+    woy = df["week"].dt.isocalendar().week.astype(float)
+    df["woy_sin"] = np.sin(2 * np.pi * woy / 52.18)
+    df["woy_cos"] = np.cos(2 * np.pi * woy / 52.18)
+
+    g = df.groupby("district_code", sort=False)
+    for k in range(1, 5):
+        df[f"rain_lag{k}"] = g["rain_week_sum"].shift(k)
+    df["rain_prev4w_sum"] = df[[f"rain_lag{k}" for k in range(1, 5)]].sum(
+        axis=1, min_count=4
+    )
+    df["sm_start"] = g["sm_week_mean"].shift(1)
+    df["runoff_prev4w_sum"] = sum(g["runoff_week_sum"].shift(k) for k in range(1, 5))
+
+    df["q_week_max"] = df["q_week_max"].clip(lower=0)
+    df["q_week_max_log"] = np.log1p(df["q_week_max"])
+    early = df[df["week"] <= _Q_CLIMATOLOGY_END]
+    q_median = early.groupby("district_code")["q_week_max"].median()
+    df["q_ratio"] = df["q_week_max"] / (
+        df["district_code"].map(q_median).replace(0, np.nan) + 1e-3
+    )
+
+    df["log_pop_density"] = np.log1p(df["population"] / df["area_km2"])
+
+    df["flood_prev"] = g["flood"].shift(1).fillna(0).astype(int)
+    df["flood_recent8"] = (
+        sum(g["flood"].shift(k).fillna(0) for k in range(2, 9)) > 0
+    ).astype(int)
+    df["onset"] = ((df["flood"] == 1) & (df["flood_prev"] == 0)).astype(int)
+
+    # First 4 weeks per district lack full lags; continuing-flood weeks
+    # are not onset candidates.
+    df = df[df["rain_lag4"].notna() & (df["flood_prev"] == 0)].copy()
+    return df.reset_index(drop=True)
+
+
+def all_features():
+    return (
+        C.SEASON + C.RAIN + C.RAIN_LAGS + C.SOIL + C.RIVER + C.GEOGRAPHIC + C.EXPOSURE
+    )

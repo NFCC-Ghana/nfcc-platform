@@ -1,0 +1,9 @@
+# Research experiments (research/flood_experiments/) - install on top of
+# the runtime pins, in one command:
+#   pip install -r requirements.txt -r requirements-research.txt
+# Not used by the API or the dashboard.
+scikit-learn>=1.5,<2
+xgboost>=2.1,<4
+shap>=0.46,<1
+scipy>=1.11
+matplotlib>=3.8
