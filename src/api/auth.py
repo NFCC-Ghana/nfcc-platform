@@ -19,7 +19,16 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-limiter = Limiter(key_func=get_remote_address)
+# Counts go to Redis when REDIS_URL is set, so the limits hold across all
+# 4 uvicorn workers instead of each worker counting its own quota. If
+# Redis is unreachable, slowapi falls back to per-process memory counts
+# rather than failing requests.
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=settings.REDIS_URL or "memory://",
+    in_memory_fallback_enabled=True,
+    key_prefix="nfcc",
+)
 
 api_key_header = APIKeyHeader(name=settings.API_KEY_HEADER, auto_error=False)
 approval_key_header = APIKeyHeader(

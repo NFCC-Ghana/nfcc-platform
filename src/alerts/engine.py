@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional, Union
 from src.alerts.models import AlertPayload
 from src.alerts.rate_limit import RateLimiter
 from src.alerts.provider_factory import ProviderFactory
-from src.alerts.cooldown import should_send_alert
+from src.alerts.cooldown import get_redis_client, should_send_alert
 from src.alerts.providers.base import BaseAlertProvider
 from src.config.settings import settings
 from src.database.alert_db import save_alert
@@ -40,7 +40,12 @@ class AlertEngine:
     ):
         """Initialize alert engine with providers (accepts both names and instances)."""
         self.alerts_per_hour = alerts_per_hour or settings.ALERTS_PER_HOUR
-        self.rate_limiter = RateLimiter(limit=self.alerts_per_hour)
+        # Shared across workers via Redis when REDIS_URL is set; see
+        # src/alerts/rate_limit.py.
+        self.rate_limiter = RateLimiter(
+            limit=self.alerts_per_hour,
+            redis_client=get_redis_client() if settings.REDIS_URL else None,
+        )
 
         # Handle providers that are instances vs names
         self.providers = self._resolve_providers(providers)
