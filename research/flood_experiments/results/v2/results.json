@@ -1,0 +1,1510 @@
+{
+  "dataset": {
+    "study": "v2",
+    "news_events_in_ghana": 2686,
+    "news_events_placed": 2527,
+    "news_events_too_large_to_place": 159,
+    "flood_weeks_by_label": {
+      "news": 1149
+    },
+    "districts": 216,
+    "regions": 10,
+    "weeks": 573,
+    "rows_raw": 123768,
+    "flood_weeks": 1149,
+    "rows_scored": 121755,
+    "onset_events": 898,
+    "districts_with_onset": 167,
+    "onsets_by_region": {
+      "Ashanti": 107,
+      "Brong Ahafo": 22,
+      "Central": 103,
+      "Eastern": 67,
+      "Greater Accra": 251,
+      "Northern": 90,
+      "Upper East": 63,
+      "Upper West": 27,
+      "Volta": 103,
+      "Western": 65
+    },
+    "onsets_by_year": {
+      "2015": 40,
+      "2016": 41,
+      "2017": 67,
+      "2018": 91,
+      "2019": 83,
+      "2020": 78,
+      "2021": 80,
+      "2022": 117,
+      "2023": 135,
+      "2024": 68,
+      "2025": 98
+    },
+    "label_sources": {
+      "news": 1141,
+      "news|curated": 6,
+      "curated": 2
+    }
+  },
+  "E1_E3_hierarchy_temporal": [
+    {
+      "model": "Climatology",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7641028949095766,
+      "pr_auc": 0.047505961192197466,
+      "brier": 0.008214644054133873,
+      "ece": 0.0028421755065053374,
+      "hits": 99,
+      "misses": 651,
+      "false_alarms": 888,
+      "correct_negatives": 87474,
+      "precision": 0.10030395136778116,
+      "recall_pod": 0.132,
+      "f1": 0.11398963730569948,
+      "false_alarm_ratio": 0.8996960486322189,
+      "missed_event_rate": 0.868,
+      "pofd": 0.010049568819175663,
+      "sedi": 0.3994094890014872,
+      "tol_pod": 0.14933333333333335,
+      "tol_far": 0.8166160081053698,
+      "pr_auc_90ci": [
+        0.03776714731491213,
+        0.058694862649248516
+      ],
+      "sedi_90ci": [
+        0.36438805497552956,
+        0.4409984855275084
+      ]
+    },
+    {
+      "model": "Persistence",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.608838550508137,
+      "pr_auc": 0.018156321551273648,
+      "brier": 0.0534383696920729,
+      "ece": 0.0528099470329473,
+      "hits": 199,
+      "misses": 551,
+      "false_alarms": 4211,
+      "correct_negatives": 84151,
+      "precision": 0.04512471655328798,
+      "recall_pod": 0.2653333333333333,
+      "f1": 0.07713178294573643,
+      "false_alarm_ratio": 0.954875283446712,
+      "missed_event_rate": 0.7346666666666667,
+      "pofd": 0.04765623231705937,
+      "sedi": 0.41806627533430063,
+      "tol_pod": 0.268,
+      "tol_far": 0.9224489795918367,
+      "pr_auc_90ci": [
+        0.012850107638666269,
+        0.02393812740615342
+      ],
+      "sedi_90ci": [
+        0.3371042475423401,
+        0.47938521392086075
+      ]
+    },
+    {
+      "model": "Rainfall threshold (live rule)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7748555110416997,
+      "pr_auc": 0.030381865529364026,
+      "brier": 0.1486695180899559,
+      "ece": 0.2891211021626168,
+      "hits": 85,
+      "misses": 665,
+      "false_alarms": 1995,
+      "correct_negatives": 86367,
+      "precision": 0.040865384615384616,
+      "recall_pod": 0.11333333333333333,
+      "f1": 0.060070671378091876,
+      "false_alarm_ratio": 0.9591346153846154,
+      "missed_event_rate": 0.8866666666666667,
+      "pofd": 0.022577578597134516,
+      "sedi": 0.2799427200527585,
+      "tol_pod": 0.14933333333333335,
+      "tol_far": 0.9375,
+      "pr_auc_90ci": [
+        0.022449519502300792,
+        0.03776807762551211
+      ],
+      "sedi_90ci": [
+        0.2039785156557625,
+        0.33416137868073886
+      ]
+    },
+    {
+      "model": "River percentile (GloFAS-style)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7395795175905178,
+      "pr_auc": 0.024517237306016033,
+      "brier": 0.3286678424638533,
+      "ece": 0.49038126571496987,
+      "hits": 133,
+      "misses": 617,
+      "false_alarms": 3360,
+      "correct_negatives": 85002,
+      "precision": 0.03807615230460922,
+      "recall_pod": 0.17733333333333334,
+      "f1": 0.06269149186896064,
+      "false_alarm_ratio": 0.9619238476953907,
+      "missed_event_rate": 0.8226666666666667,
+      "pofd": 0.038025395532016025,
+      "sedi": 0.32412578184771584,
+      "tol_pod": 0.2,
+      "tol_far": 0.9410249069567707,
+      "pr_auc_90ci": [
+        0.019705889071398166,
+        0.03100193095015712
+      ],
+      "sedi_90ci": [
+        0.22356665633433612,
+        0.4097622252520201
+      ]
+    },
+    {
+      "model": "Logistic regression (rainfall)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.765435579396875,
+      "pr_auc": 0.04278133743187737,
+      "brier": 0.008249730479443312,
+      "ece": 0.0021049057935640597,
+      "hits": 175,
+      "misses": 575,
+      "false_alarms": 7094,
+      "correct_negatives": 81268,
+      "precision": 0.02407483835465676,
+      "recall_pod": 0.23333333333333334,
+      "f1": 0.04364633994263624,
+      "false_alarm_ratio": 0.9759251616453433,
+      "missed_event_rate": 0.7666666666666667,
+      "pofd": 0.08028337973336955,
+      "sedi": 0.288642395798571,
+      "tol_pod": 0.2826666666666667,
+      "tol_far": 0.9603796945934792,
+      "pr_auc_90ci": [
+        0.026441545696112737,
+        0.06096712991490853
+      ],
+      "sedi_90ci": [
+        0.21053007168524013,
+        0.4120698250459471
+      ]
+    },
+    {
+      "model": "Random forest (rainfall)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7472899285514889,
+      "pr_auc": 0.028352728550401513,
+      "brier": 0.008305653478343068,
+      "ece": 0.0037008440867433764,
+      "hits": 109,
+      "misses": 641,
+      "false_alarms": 3131,
+      "correct_negatives": 85231,
+      "precision": 0.03364197530864198,
+      "recall_pod": 0.14533333333333334,
+      "f1": 0.054636591478696754,
+      "false_alarm_ratio": 0.966358024691358,
+      "missed_event_rate": 0.8546666666666667,
+      "pofd": 0.03543378375319708,
+      "sedi": 0.28054729265765577,
+      "tol_pod": 0.2,
+      "tol_far": 0.9432098765432099,
+      "pr_auc_90ci": [
+        0.019331271012629676,
+        0.03861969397412973
+      ],
+      "sedi_90ci": [
+        0.15324261081040355,
+        0.38818884872701576
+      ]
+    },
+    {
+      "model": "XGBoost (rainfall)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.744577593686577,
+      "pr_auc": 0.025030191920869766,
+      "brier": 0.008303520020050801,
+      "ece": 0.0032176562436640075,
+      "hits": 156,
+      "misses": 594,
+      "false_alarms": 4215,
+      "correct_negatives": 84147,
+      "precision": 0.03568977350720659,
+      "recall_pod": 0.208,
+      "f1": 0.06092560046865847,
+      "false_alarm_ratio": 0.9643102264927934,
+      "missed_event_rate": 0.792,
+      "pofd": 0.047701500645073676,
+      "sedi": 0.33848114446785316,
+      "tol_pod": 0.2826666666666667,
+      "tol_far": 0.9416609471516816,
+      "pr_auc_90ci": [
+        0.01945244638559461,
+        0.03246729079079593
+      ],
+      "sedi_90ci": [
+        0.23510128895326676,
+        0.43313449538944143
+      ]
+    },
+    {
+      "model": "Temporal XGBoost (rain lags + soil state)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7244006548818118,
+      "pr_auc": 0.022226711947375376,
+      "brier": 0.008311606520240843,
+      "ece": 0.0031607284255493,
+      "hits": 116,
+      "misses": 634,
+      "false_alarms": 3798,
+      "correct_negatives": 84564,
+      "precision": 0.02963719979560552,
+      "recall_pod": 0.15466666666666667,
+      "f1": 0.04974271012006861,
+      "false_alarm_ratio": 0.9703628002043945,
+      "missed_event_rate": 0.8453333333333334,
+      "pofd": 0.0429822774495824,
+      "sedi": 0.26879724195374155,
+      "tol_pod": 0.20533333333333334,
+      "tol_far": 0.9542667347981605,
+      "pr_auc_90ci": [
+        0.01758208262377003,
+        0.02814299691313801
+      ],
+      "sedi_90ci": [
+        0.17417866118148417,
+        0.3664334942766316
+      ]
+    },
+    {
+      "model": "Multi-source XGBoost",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8342001539123153,
+      "pr_auc": 0.07232823361224468,
+      "brier": 0.008092244652181864,
+      "ece": 0.002977193832402189,
+      "hits": 119,
+      "misses": 631,
+      "false_alarms": 789,
+      "correct_negatives": 87573,
+      "precision": 0.13105726872246695,
+      "recall_pod": 0.15866666666666668,
+      "f1": 0.14354644149577803,
+      "false_alarm_ratio": 0.8689427312775331,
+      "missed_event_rate": 0.8413333333333334,
+      "pofd": 0.00892917770082162,
+      "sedi": 0.4511535966515082,
+      "tol_pod": 0.18266666666666667,
+      "tol_far": 0.8083700440528634,
+      "pr_auc_90ci": [
+        0.05841020486918883,
+        0.09087037372924348
+      ],
+      "sedi_90ci": [
+        0.40506663634126727,
+        0.4987242904690472
+      ]
+    }
+  ],
+  "E3b_forecast": [
+    {
+      "model": "Nowcast multi-source XGBoost",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8342001539123153,
+      "pr_auc": 0.07232823361224468,
+      "brier": 0.008092244652181864,
+      "ece": 0.002977193832402189,
+      "hits": 119,
+      "misses": 631,
+      "false_alarms": 789,
+      "correct_negatives": 87573,
+      "precision": 0.13105726872246695,
+      "recall_pod": 0.15866666666666668,
+      "f1": 0.14354644149577803,
+      "false_alarm_ratio": 0.8689427312775331,
+      "missed_event_rate": 0.8413333333333334,
+      "pofd": 0.00892917770082162,
+      "sedi": 0.4511535966515082,
+      "tol_pod": 0.18266666666666667,
+      "tol_far": 0.8083700440528634,
+      "pr_auc_90ci": [
+        0.05841020486918883,
+        0.09087037372924348
+      ],
+      "sedi_90ci": [
+        0.40506663634126727,
+        0.4987242904690472
+      ]
+    },
+    {
+      "model": "Forecast logistic regression",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8112542948326203,
+      "pr_auc": 0.0443321310989003,
+      "brier": 0.00827903574961826,
+      "ece": 0.002318570824836013,
+      "hits": 94,
+      "misses": 656,
+      "false_alarms": 1101,
+      "correct_negatives": 87261,
+      "precision": 0.07866108786610879,
+      "recall_pod": 0.12533333333333332,
+      "f1": 0.09665809768637532,
+      "false_alarm_ratio": 0.9213389121338912,
+      "missed_event_rate": 0.8746666666666667,
+      "pofd": 0.012460107285937393,
+      "sedi": 0.36768347906767906,
+      "tol_pod": 0.14933333333333335,
+      "tol_far": 0.8485355648535565,
+      "pr_auc_90ci": [
+        0.03781736441334894,
+        0.0530156021157886
+      ],
+      "sedi_90ci": [
+        0.31205068622833526,
+        0.41967229053605365
+      ]
+    },
+    {
+      "model": "Forecast multi-source XGBoost",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7913830756810998,
+      "pr_auc": 0.047185048074460466,
+      "brier": 0.008205808083502217,
+      "ece": 0.0031357305096230896,
+      "hits": 129,
+      "misses": 621,
+      "false_alarms": 1623,
+      "correct_negatives": 86739,
+      "precision": 0.07363013698630137,
+      "recall_pod": 0.172,
+      "f1": 0.10311750599520383,
+      "false_alarm_ratio": 0.9263698630136986,
+      "missed_event_rate": 0.828,
+      "pofd": 0.018367624091804167,
+      "sedi": 0.4035585690158353,
+      "tol_pod": 0.212,
+      "tol_far": 0.8544520547945206,
+      "pr_auc_90ci": [
+        0.03508131937896088,
+        0.06528935528143953
+      ],
+      "sedi_90ci": [
+        0.33372312013666483,
+        0.46725530116517144
+      ]
+    }
+  ],
+  "E2_ablation": [
+    {
+      "model": "Baseline (rainfall + season)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7168991270757414,
+      "pr_auc": 0.023145972477885773,
+      "brier": 0.008309627154189803,
+      "ece": 0.003209890799768315,
+      "hits": 108,
+      "misses": 642,
+      "false_alarms": 3596,
+      "correct_negatives": 84766,
+      "precision": 0.029157667386609073,
+      "recall_pod": 0.144,
+      "f1": 0.048495734171531205,
+      "false_alarm_ratio": 0.9708423326133909,
+      "missed_event_rate": 0.856,
+      "pofd": 0.04069622688486001,
+      "sedi": 0.25814503697720115,
+      "tol_pod": 0.196,
+      "tol_far": 0.9551835853131749,
+      "pr_auc_90ci": [
+        0.017203710787354366,
+        0.029383362195326453
+      ],
+      "sedi_90ci": [
+        0.17179179137457878,
+        0.35896740128359317
+      ],
+      "delta_pr_auc": null
+    },
+    {
+      "model": "+ Soil moisture",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7244006548818118,
+      "pr_auc": 0.022226711947375376,
+      "brier": 0.008311606520240843,
+      "ece": 0.0031607284255493,
+      "hits": 116,
+      "misses": 634,
+      "false_alarms": 3798,
+      "correct_negatives": 84564,
+      "precision": 0.02963719979560552,
+      "recall_pod": 0.15466666666666667,
+      "f1": 0.04974271012006861,
+      "false_alarm_ratio": 0.9703628002043945,
+      "missed_event_rate": 0.8453333333333334,
+      "pofd": 0.0429822774495824,
+      "sedi": 0.26879724195374155,
+      "tol_pod": 0.20533333333333334,
+      "tol_far": 0.9542667347981605,
+      "pr_auc_90ci": [
+        0.01758208262377003,
+        0.02814299691313801
+      ],
+      "sedi_90ci": [
+        0.17417866118148417,
+        0.3664334942766316
+      ],
+      "delta_pr_auc": -0.0009192605305103976
+    },
+    {
+      "model": "+ River (runoff, discharge)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7455466452396582,
+      "pr_auc": 0.03347385158739778,
+      "brier": 0.008267000719701417,
+      "ece": 0.003517005067345092,
+      "hits": 172,
+      "misses": 578,
+      "false_alarms": 4260,
+      "correct_negatives": 84102,
+      "precision": 0.0388086642599278,
+      "recall_pod": 0.22933333333333333,
+      "f1": 0.06638363566190661,
+      "false_alarm_ratio": 0.9611913357400722,
+      "missed_event_rate": 0.7706666666666667,
+      "pofd": 0.048210769335234605,
+      "sedi": 0.367768616053051,
+      "tol_pod": 0.2946666666666667,
+      "tol_far": 0.940658844765343,
+      "pr_auc_90ci": [
+        0.02049033753234552,
+        0.04943425461276762
+      ],
+      "sedi_90ci": [
+        0.2714317436009986,
+        0.46118950779683776
+      ],
+      "delta_pr_auc": 0.011247139640022406
+    },
+    {
+      "model": "+ Dam",
+      "not_run": "No historical dam release or reservoir record exists for Ghana (VRA data never obtained); DAHITI levels start after most labelled events."
+    },
+    {
+      "model": "+ Geographic",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8415092611454396,
+      "pr_auc": 0.07874071569907366,
+      "brier": 0.008061834375935713,
+      "ece": 0.002630203899825091,
+      "hits": 129,
+      "misses": 621,
+      "false_alarms": 830,
+      "correct_negatives": 87532,
+      "precision": 0.13451511991657977,
+      "recall_pod": 0.172,
+      "f1": 0.15096547688706846,
+      "false_alarm_ratio": 0.8654848800834203,
+      "missed_event_rate": 0.828,
+      "pofd": 0.009393178062968244,
+      "sedi": 0.4658491607927049,
+      "tol_pod": 0.19866666666666666,
+      "tol_far": 0.8070907194994786,
+      "pr_auc_90ci": [
+        0.06291777638751347,
+        0.09888821645632856
+      ],
+      "sedi_90ci": [
+        0.41401803612517113,
+        0.510672398288811
+      ],
+      "delta_pr_auc": 0.04526686411167588
+    },
+    {
+      "model": "+ Exposure",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8342001539123153,
+      "pr_auc": 0.07232823361224468,
+      "brier": 0.008092244652181864,
+      "ece": 0.002977193832402189,
+      "hits": 119,
+      "misses": 631,
+      "false_alarms": 789,
+      "correct_negatives": 87573,
+      "precision": 0.13105726872246695,
+      "recall_pod": 0.15866666666666668,
+      "f1": 0.14354644149577803,
+      "false_alarm_ratio": 0.8689427312775331,
+      "missed_event_rate": 0.8413333333333334,
+      "pofd": 0.00892917770082162,
+      "sedi": 0.4511535966515082,
+      "tol_pod": 0.18266666666666667,
+      "tol_far": 0.8083700440528634,
+      "pr_auc_90ci": [
+        0.05841020486918883,
+        0.09087037372924348
+      ],
+      "sedi_90ci": [
+        0.40506663634126727,
+        0.4987242904690472
+      ],
+      "delta_pr_auc": -0.006412482086828986
+    }
+  ],
+  "E4_spatial": {
+    "pooled": [
+      {
+        "model": "Climatology",
+        "n": 89112,
+        "events": 750,
+        "base_rate": 0.008416374899003501,
+        "roc_auc": 0.6428646929675653,
+        "pr_auc": 0.012266256708116478,
+        "brier": 0.00836562553076599,
+        "ece": 0.0050610691396419496,
+        "hits": 0,
+        "misses": 750,
+        "false_alarms": 0,
+        "correct_negatives": 88362,
+        "precision": 0.0,
+        "recall_pod": 0.0,
+        "f1": 0.0,
+        "false_alarm_ratio": NaN,
+        "missed_event_rate": 1.0,
+        "pofd": 0.0,
+        "sedi": -0.0,
+        "tol_pod": 0.0,
+        "tol_far": NaN,
+        "pr_auc_90ci": [
+          0.00979009072373012,
+          0.014950311166630743
+        ],
+        "sedi_90ci": [
+          -0.0,
+          0.0
+        ]
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "n": 89112,
+        "events": 750,
+        "base_rate": 0.008416374899003501,
+        "roc_auc": 0.7748555110416997,
+        "pr_auc": 0.030381865529364026,
+        "brier": 0.1486695180899559,
+        "ece": 0.2891659894954115,
+        "hits": 83,
+        "misses": 667,
+        "false_alarms": 2820,
+        "correct_negatives": 85542,
+        "precision": 0.028591112642094386,
+        "recall_pod": 0.11066666666666666,
+        "f1": 0.04544210238160416,
+        "false_alarm_ratio": 0.9714088873579056,
+        "missed_event_rate": 0.8893333333333333,
+        "pofd": 0.03191417125008488,
+        "sedi": 0.22919257008408025,
+        "tol_pod": 0.132,
+        "tol_far": 0.9565966241818809,
+        "pr_auc_90ci": [
+          0.022449519502300792,
+          0.03776807762551211
+        ],
+        "sedi_90ci": [
+          0.16169613234777955,
+          0.280928868546747
+        ]
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "n": 89112,
+        "events": 750,
+        "base_rate": 0.008416374899003501,
+        "roc_auc": 0.7112861184672145,
+        "pr_auc": 0.0379541867746806,
+        "brier": 0.008285801288694014,
+        "ece": 0.004482491827656516,
+        "hits": 169,
+        "misses": 581,
+        "false_alarms": 6620,
+        "correct_negatives": 81742,
+        "precision": 0.024893209603770807,
+        "recall_pod": 0.22533333333333333,
+        "f1": 0.04483353229871337,
+        "false_alarm_ratio": 0.9751067903962292,
+        "missed_event_rate": 0.7746666666666666,
+        "pofd": 0.07491908286367444,
+        "sedi": 0.28962679715538414,
+        "tol_pod": 0.31333333333333335,
+        "tol_far": 0.9591987037855354,
+        "pr_auc_90ci": [
+          0.021286244378956688,
+          0.05496743990589345
+        ],
+        "sedi_90ci": [
+          0.20777131306943533,
+          0.3606206609001195
+        ]
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "n": 89112,
+        "events": 750,
+        "base_rate": 0.008416374899003501,
+        "roc_auc": 0.694634043291611,
+        "pr_auc": 0.020849221580124477,
+        "brier": 0.008335508687190286,
+        "ece": 0.004549188482526986,
+        "hits": 136,
+        "misses": 614,
+        "false_alarms": 4486,
+        "correct_negatives": 83876,
+        "precision": 0.02942449156209433,
+        "recall_pod": 0.18133333333333335,
+        "f1": 0.050632911392405056,
+        "false_alarm_ratio": 0.9705755084379056,
+        "missed_event_rate": 0.8186666666666667,
+        "pofd": 0.05076842986804282,
+        "sedi": 0.2876548828698711,
+        "tol_pod": 0.22533333333333333,
+        "tol_far": 0.9558632626568585,
+        "pr_auc_90ci": [
+          0.01554918709785701,
+          0.029641998815869007
+        ],
+        "sedi_90ci": [
+          0.19775716195052556,
+          0.3506081887918974
+        ]
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "n": 89112,
+        "events": 750,
+        "base_rate": 0.008416374899003501,
+        "roc_auc": 0.7862801053243098,
+        "pr_auc": 0.05270911402372451,
+        "brier": 0.008285834506424384,
+        "ece": 0.004986594440641232,
+        "hits": 67,
+        "misses": 683,
+        "false_alarms": 830,
+        "correct_negatives": 87532,
+        "precision": 0.07469342251950947,
+        "recall_pod": 0.08933333333333333,
+        "f1": 0.08136004857316331,
+        "false_alarm_ratio": 0.9253065774804905,
+        "missed_event_rate": 0.9106666666666666,
+        "pofd": 0.009393178062968244,
+        "sedi": 0.3251429339142981,
+        "tol_pod": 0.104,
+        "tol_far": 0.8940914158305463,
+        "pr_auc_90ci": [
+          0.04291449547412505,
+          0.06428864026457645
+        ],
+        "sedi_90ci": [
+          0.2855652815722339,
+          0.36804487053263363
+        ]
+      }
+    ],
+    "per_region": [
+      {
+        "model": "Climatology",
+        "region": "Ashanti",
+        "events": 76,
+        "pr_auc": 0.015154402453319012,
+        "base_rate": 0.006118669994364383
+      },
+      {
+        "model": "Climatology",
+        "region": "Brong Ahafo",
+        "events": 20,
+        "pr_auc": 0.002674955513062779,
+        "base_rate": 0.00177999288002848
+      },
+      {
+        "model": "Climatology",
+        "region": "Central",
+        "events": 86,
+        "pr_auc": 0.02866938556011481,
+        "base_rate": 0.010440694427582858
+      },
+      {
+        "model": "Climatology",
+        "region": "Eastern",
+        "events": 56,
+        "pr_auc": 0.0077437844229481315,
+        "base_rate": 0.005195769159398776
+      },
+      {
+        "model": "Climatology",
+        "region": "Greater Accra",
+        "events": 206,
+        "pr_auc": 0.0512268613933785,
+        "base_rate": 0.032232827413550304
+      },
+      {
+        "model": "Climatology",
+        "region": "Northern",
+        "events": 77,
+        "pr_auc": 0.011536663339128773,
+        "base_rate": 0.007167457879549474
+      },
+      {
+        "model": "Climatology",
+        "region": "Upper East",
+        "events": 54,
+        "pr_auc": 0.015921684192687423,
+        "base_rate": 0.010121836925960637
+      },
+      {
+        "model": "Climatology",
+        "region": "Upper West",
+        "events": 27,
+        "pr_auc": 0.008568447198264505,
+        "base_rate": 0.005923650724001755
+      },
+      {
+        "model": "Climatology",
+        "region": "Volta",
+        "events": 94,
+        "pr_auc": 0.01474872983953753,
+        "base_rate": 0.009120015523430678
+      },
+      {
+        "model": "Climatology",
+        "region": "Western",
+        "events": 54,
+        "pr_auc": 0.01927488466658617,
+        "base_rate": 0.0059301559411377115
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Ashanti",
+        "events": 76,
+        "pr_auc": 0.024234805427399444,
+        "base_rate": 0.006118669994364383
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Brong Ahafo",
+        "events": 20,
+        "pr_auc": 0.0033769197903689907,
+        "base_rate": 0.00177999288002848
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Central",
+        "events": 86,
+        "pr_auc": 0.03315894478252623,
+        "base_rate": 0.010440694427582858
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Eastern",
+        "events": 56,
+        "pr_auc": 0.010754031313781543,
+        "base_rate": 0.005195769159398776
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Greater Accra",
+        "events": 206,
+        "pr_auc": 0.10730474464569245,
+        "base_rate": 0.032232827413550304
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Northern",
+        "events": 77,
+        "pr_auc": 0.03221105149449563,
+        "base_rate": 0.007167457879549474
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Upper East",
+        "events": 54,
+        "pr_auc": 0.07461612772113689,
+        "base_rate": 0.010121836925960637
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Upper West",
+        "events": 27,
+        "pr_auc": 0.039268963880043785,
+        "base_rate": 0.005923650724001755
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Volta",
+        "events": 94,
+        "pr_auc": 0.020826600765144247,
+        "base_rate": 0.009120015523430678
+      },
+      {
+        "model": "Rainfall threshold (live rule)",
+        "region": "Western",
+        "events": 54,
+        "pr_auc": 0.07002927448044789,
+        "base_rate": 0.0059301559411377115
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Ashanti",
+        "events": 76,
+        "pr_auc": 0.10601625292528664,
+        "base_rate": 0.006118669994364383
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Brong Ahafo",
+        "events": 20,
+        "pr_auc": 0.004120538806730203,
+        "base_rate": 0.00177999288002848
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Central",
+        "events": 86,
+        "pr_auc": 0.029731994914191564,
+        "base_rate": 0.010440694427582858
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Eastern",
+        "events": 56,
+        "pr_auc": 0.02874921025941721,
+        "base_rate": 0.005195769159398776
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Greater Accra",
+        "events": 206,
+        "pr_auc": 0.09697242532742761,
+        "base_rate": 0.032232827413550304
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Northern",
+        "events": 77,
+        "pr_auc": 0.030921963637970114,
+        "base_rate": 0.007167457879549474
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Upper East",
+        "events": 54,
+        "pr_auc": 0.08071771971296077,
+        "base_rate": 0.010121836925960637
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Upper West",
+        "events": 27,
+        "pr_auc": 0.03209548690068359,
+        "base_rate": 0.005923650724001755
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Volta",
+        "events": 94,
+        "pr_auc": 0.015300678270004373,
+        "base_rate": 0.009120015523430678
+      },
+      {
+        "model": "Logistic regression (rainfall)",
+        "region": "Western",
+        "events": 54,
+        "pr_auc": 0.1456469794673825,
+        "base_rate": 0.0059301559411377115
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Ashanti",
+        "events": 76,
+        "pr_auc": 0.02333611195749752,
+        "base_rate": 0.006118669994364383
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Brong Ahafo",
+        "events": 20,
+        "pr_auc": 0.0036184187445608,
+        "base_rate": 0.00177999288002848
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Central",
+        "events": 86,
+        "pr_auc": 0.029947405977959793,
+        "base_rate": 0.010440694427582858
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Eastern",
+        "events": 56,
+        "pr_auc": 0.010221664873016468,
+        "base_rate": 0.005195769159398776
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Greater Accra",
+        "events": 206,
+        "pr_auc": 0.10491917791522949,
+        "base_rate": 0.032232827413550304
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Northern",
+        "events": 77,
+        "pr_auc": 0.027964665738794914,
+        "base_rate": 0.007167457879549474
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Upper East",
+        "events": 54,
+        "pr_auc": 0.07746888142519795,
+        "base_rate": 0.010121836925960637
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Upper West",
+        "events": 27,
+        "pr_auc": 0.032577806379411656,
+        "base_rate": 0.005923650724001755
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Volta",
+        "events": 94,
+        "pr_auc": 0.021733501921228186,
+        "base_rate": 0.009120015523430678
+      },
+      {
+        "model": "XGBoost (rainfall)",
+        "region": "Western",
+        "events": 54,
+        "pr_auc": 0.047977018084198624,
+        "base_rate": 0.0059301559411377115
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Ashanti",
+        "events": 76,
+        "pr_auc": 0.11536044183415667,
+        "base_rate": 0.006118669994364383
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Brong Ahafo",
+        "events": 20,
+        "pr_auc": 0.003986141845730273,
+        "base_rate": 0.00177999288002848
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Central",
+        "events": 86,
+        "pr_auc": 0.050045241191558835,
+        "base_rate": 0.010440694427582858
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Eastern",
+        "events": 56,
+        "pr_auc": 0.020425729116410427,
+        "base_rate": 0.005195769159398776
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Greater Accra",
+        "events": 206,
+        "pr_auc": 0.1158743400231821,
+        "base_rate": 0.032232827413550304
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Northern",
+        "events": 77,
+        "pr_auc": 0.03651593341325433,
+        "base_rate": 0.007167457879549474
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Upper East",
+        "events": 54,
+        "pr_auc": 0.060587366275101,
+        "base_rate": 0.010121836925960637
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Upper West",
+        "events": 27,
+        "pr_auc": 0.030665615004797853,
+        "base_rate": 0.005923650724001755
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Volta",
+        "events": 94,
+        "pr_auc": 0.03575484852481735,
+        "base_rate": 0.009120015523430678
+      },
+      {
+        "model": "Multi-source XGBoost",
+        "region": "Western",
+        "events": 54,
+        "pr_auc": 0.08138405217744649,
+        "base_rate": 0.0059301559411377115
+      }
+    ]
+  },
+  "E5_fusion": [
+    {
+      "model": "Early fusion (multi-source XGBoost)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8342001539123153,
+      "pr_auc": 0.07232823361224468,
+      "brier": 0.008092244652181864,
+      "ece": 0.002977193832402189,
+      "hits": 119,
+      "misses": 631,
+      "false_alarms": 789,
+      "correct_negatives": 87573,
+      "precision": 0.13105726872246695,
+      "recall_pod": 0.15866666666666668,
+      "f1": 0.14354644149577803,
+      "false_alarm_ratio": 0.8689427312775331,
+      "missed_event_rate": 0.8413333333333334,
+      "pofd": 0.00892917770082162,
+      "sedi": 0.4511535966515082,
+      "tol_pod": 0.18266666666666667,
+      "tol_far": 0.8083700440528634,
+      "pr_auc_90ci": [
+        0.05841020486918883,
+        0.09087037372924348
+      ],
+      "sedi_90ci": [
+        0.40506663634126727,
+        0.4987242904690472
+      ]
+    },
+    {
+      "model": "Late fusion (mean)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.7924831639543394,
+      "pr_auc": 0.050623044183312746,
+      "brier": 0.008235881782615804,
+      "ece": 0.0030938904413889195,
+      "hits": 144,
+      "misses": 606,
+      "false_alarms": 2010,
+      "correct_negatives": 86352,
+      "precision": 0.06685236768802229,
+      "recall_pod": 0.192,
+      "f1": 0.09917355371900827,
+      "false_alarm_ratio": 0.9331476323119777,
+      "missed_event_rate": 0.808,
+      "pofd": 0.02274733482718816,
+      "sedi": 0.40975742695133105,
+      "tol_pod": 0.24266666666666667,
+      "tol_far": 0.8909006499535748,
+      "pr_auc_90ci": [
+        0.03723843970859588,
+        0.06547332048506511
+      ],
+      "sedi_90ci": [
+        0.35001522145790587,
+        0.46825563359753397
+      ]
+    },
+    {
+      "model": "Stacking (logistic meta-model)",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.5424263371132387,
+      "pr_auc": 0.019177324960817643,
+      "brier": 0.008325090341414322,
+      "ece": 0.001868437383512518,
+      "hits": 81,
+      "misses": 669,
+      "false_alarms": 1148,
+      "correct_negatives": 87214,
+      "precision": 0.06590724165988608,
+      "recall_pod": 0.108,
+      "f1": 0.08185952501263263,
+      "false_alarm_ratio": 0.934092758340114,
+      "missed_event_rate": 0.892,
+      "pofd": 0.012992010140105476,
+      "sedi": 0.3313728273210312,
+      "tol_pod": 0.12666666666666668,
+      "tol_far": 0.8950366151342555,
+      "pr_auc_90ci": [
+        0.010490173020181242,
+        0.03527440930642857
+      ],
+      "sedi_90ci": [
+        0.2931749030540756,
+        0.35901095630220964
+      ]
+    },
+    {
+      "model": "Platform hand-set weights",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.775570599729899,
+      "pr_auc": 0.032322861317438036,
+      "brier": 0.1876837199382253,
+      "ece": 0.2885977880591667,
+      "hits": 133,
+      "misses": 617,
+      "false_alarms": 3451,
+      "correct_negatives": 84911,
+      "precision": 0.037109375,
+      "recall_pod": 0.17733333333333334,
+      "f1": 0.06137517305029996,
+      "false_alarm_ratio": 0.962890625,
+      "missed_event_rate": 0.8226666666666667,
+      "pofd": 0.03905524999434146,
+      "sedi": 0.3203851026747975,
+      "tol_pod": 0.228,
+      "tol_far": 0.9416852678571429,
+      "pr_auc_90ci": [
+        0.02513249125282235,
+        0.0398111036249507
+      ],
+      "sedi_90ci": [
+        0.2706079992591341,
+        0.37357599998537555
+      ]
+    }
+  ],
+  "E6_degradation": [
+    {
+      "condition": "All sources",
+      "pr_auc": 0.07232823361224468,
+      "delta_pr_auc": 0.0
+    },
+    {
+      "condition": "Rainfall missing",
+      "pr_auc": 0.04834546249230352,
+      "delta_pr_auc": -0.023982771119941154
+    },
+    {
+      "condition": "Rainfall one week stale",
+      "pr_auc": 0.038342784560135554,
+      "delta_pr_auc": -0.033985449052109123
+    },
+    {
+      "condition": "Soil moisture missing",
+      "pr_auc": 0.07301602201973617,
+      "delta_pr_auc": 0.0006877884074914936
+    },
+    {
+      "condition": "Soil moisture one week stale",
+      "pr_auc": 0.07247117152473331,
+      "delta_pr_auc": 0.00014293791248863597
+    },
+    {
+      "condition": "River (runoff, discharge) missing",
+      "pr_auc": 0.07434672375532324,
+      "delta_pr_auc": 0.0020184901430785607
+    },
+    {
+      "condition": "River (runoff, discharge) one week stale",
+      "pr_auc": 0.06676469795236621,
+      "delta_pr_auc": -0.005563535659878466
+    },
+    {
+      "condition": "Geographic + exposure missing",
+      "pr_auc": 0.02235008474147861,
+      "delta_pr_auc": -0.04997814887076607
+    }
+  ],
+  "E7_calibration": [
+    {
+      "method": "Raw",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8342001539123153,
+      "pr_auc": 0.07232823361224468,
+      "brier": 0.008092244652181864,
+      "ece": 0.002977193832402189,
+      "reliability": [
+        {
+          "mean_predicted": 0.0003201445890677416,
+          "observed_rate": 0.00033662477558348296,
+          "n": 8912
+        },
+        {
+          "mean_predicted": 0.0007907062897748038,
+          "observed_rate": 0.0015709156193895871,
+          "n": 8912
+        },
+        {
+          "mean_predicted": 0.0014961803300982824,
+          "observed_rate": 0.0015710919088766694,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.001902771304325883,
+          "observed_rate": 0.0013466502076085736,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.0024198907154290654,
+          "observed_rate": 0.003927729772191673,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.0031636077957954197,
+          "observed_rate": 0.004039950622825721,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.004126668640590796,
+          "observed_rate": 0.0028055212658511953,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.004967132271182295,
+          "observed_rate": 0.0061721467848726294,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.007890178220085912,
+          "observed_rate": 0.016159802491302885,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.031070163570998288,
+          "observed_rate": 0.0462349904612277,
+          "n": 8911
+        }
+      ]
+    },
+    {
+      "method": "Platt scaling",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8452022890684533,
+      "pr_auc": 0.0761921586683674,
+      "brier": 0.008058652951260932,
+      "ece": 0.0006323207368583688,
+      "reliability": [
+        {
+          "mean_predicted": 0.0006448596365626341,
+          "observed_rate": 0.00033662477558348296,
+          "n": 8912
+        },
+        {
+          "mean_predicted": 0.0010213523779560906,
+          "observed_rate": 0.0005610412926391383,
+          "n": 8912
+        },
+        {
+          "mean_predicted": 0.0014067131487658722,
+          "observed_rate": 0.0013466502076085736,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.001872949256066719,
+          "observed_rate": 0.0019077544607788127,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.002538874512381543,
+          "observed_rate": 0.0028055212658511953,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.0029635049579916943,
+          "observed_rate": 0.002917742116485243,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.004177147033208909,
+          "observed_rate": 0.005274379979800247,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.006519677437070162,
+          "observed_rate": 0.007967680395017395,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.012142665070831615,
+          "observed_rate": 0.014139827179890024,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.04630327422492479,
+          "observed_rate": 0.046908315565031986,
+          "n": 8911
+        }
+      ]
+    },
+    {
+      "method": "Isotonic",
+      "n": 89112,
+      "events": 750,
+      "base_rate": 0.008416374899003501,
+      "roc_auc": 0.8419209539545657,
+      "pr_auc": 0.06869806351688736,
+      "brier": 0.008134309555408172,
+      "ece": 0.0011518941526529227,
+      "reliability": [
+        {
+          "mean_predicted": 0.0,
+          "observed_rate": 0.0002244165170556553,
+          "n": 8912
+        },
+        {
+          "mean_predicted": 0.0003139076628109003,
+          "observed_rate": 0.0004488330341113106,
+          "n": 8912
+        },
+        {
+          "mean_predicted": 0.0007138198261109408,
+          "observed_rate": 0.001122208506340478,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.0014670719999692278,
+          "observed_rate": 0.002917742116485243,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.0019456483749923604,
+          "observed_rate": 0.001795533610144765,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.002570664473472663,
+          "observed_rate": 0.004039950622825721,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.0037181706988661245,
+          "observed_rate": 0.0056110425317023906,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.006139891750279878,
+          "observed_rate": 0.00662103018740882,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.012943274589221381,
+          "observed_rate": 0.01481315228369431,
+          "n": 8911
+        },
+        {
+          "mean_predicted": 0.05000912318334958,
+          "observed_rate": 0.04657165301312984,
+          "n": 8911
+        }
+      ]
+    }
+  ],
+  "E9_shap": {
+    "global_mean_abs_shap": {
+      "built_frac": 0.41337934136390686,
+      "rain_week_sum": 0.2835742235183716,
+      "slope_mean": 0.22962985932826996,
+      "runoff_week_sum": 0.20631787180900574,
+      "rain_week_sum_p95": 0.20363862812519073,
+      "log_pop_density": 0.17644786834716797,
+      "q_ratio": 0.16905361413955688,
+      "rain_week_max": 0.13716928660869598,
+      "rain_prev4w_sum": 0.13591164350509644,
+      "woy_cos": 0.1108211800456047,
+      "rain_lag1": 0.0812155157327652,
+      "rain_lag4": 0.07607690989971161,
+      "rain_lag2": 0.062322333455085754,
+      "rain_week_max_p95": 0.02606523409485817,
+      "q_week_max_log": 0.022840270772576332,
+      "elev_mean": 0.020428920164704323,
+      "perm_water_frac": 0.018198560923337936,
+      "woy_sin": 0.012149552814662457,
+      "sm_week_mean": 0.008839725516736507,
+      "rain_lag3": 0.007827858440577984,
+      "sm_start": 0.0034925828222185373,
+      "runoff_prev4w_sum": 0.002545769326388836
+    },
+    "fidelity_deletion": [
+      {
+        "k": 1,
+        "mean_abs_change_top_shap": 0.05043940991163254,
+        "mean_abs_change_random": 0.00849222019314766
+      },
+      {
+        "k": 3,
+        "mean_abs_change_top_shap": 0.06044219806790352,
+        "mean_abs_change_random": 0.028921477496623993
+      },
+      {
+        "k": 5,
+        "mean_abs_change_top_shap": 0.06223856657743454,
+        "mean_abs_change_random": 0.03840385749936104
+      }
+    ],
+    "stability_spearman": {
+      "mean": 0.8138904573687183,
+      "min": 0.6883116883116884,
+      "pairs": 10
+    },
+    "test_period": "2023-2025"
+  },
+  "E8_impact": {
+    "not_run": "Needs NADMO incident records with people affected per district (requested; see nadmo_data_request.md). 0 usable records found."
+  }
+}

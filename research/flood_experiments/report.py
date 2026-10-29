@@ -77,13 +77,19 @@ def main():
         "",
     ]
     if "flood_weeks_by_label" in d:
+        sar = (
+            f" Sentinel-1 observed {d['sar_observed_share']:.0%} of district-weeks."
+            if "sar_observed_share" in d
+            else " Sentinel-1 labels pending."
+        )
         md += [
             f"Groundsource events in Ghana: {d['news_events_in_ghana']}; placed in a "
             f"district: {d['news_events_placed']}; dropped as region- or "
             f"country-level: {d['news_events_too_large_to_place']}. Flood weeks by "
             "label: "
             + ", ".join(f"{k} {v}" for k, v in d["flood_weeks_by_label"].items())
-            + f". Sentinel-1 observed {d['sar_observed_share']:.0%} of district-weeks.",
+            + "."
+            + sar,
             "",
         ]
     md += [
@@ -137,7 +143,8 @@ def main():
     s = R["E9_shap"]
     md += [
         "",
-        f"## E9. SHAP fidelity and stability (train ≤ 2012, test {s['test_period']})",
+        f"## E9. SHAP fidelity and stability (train ≤ "
+        f"{int(s['test_period'][:4]) - 2}, test {s['test_period']})",
         "",
         "| Feature | Mean abs SHAP |",
         "| --- | --- |",

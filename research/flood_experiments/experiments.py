@@ -530,7 +530,7 @@ def e9_shap(df, n_bootstrap=5):
 def dataset_summary(raw, df):
     flooded = raw[raw["flood"] == 1]
     extra = {}
-    if "flood_sar" in raw.columns:
+    if "flood_news" in raw.columns:
         news = pd.read_csv(C.DATA_DIR / "raw" / "groundsource_events.csv")
         extra = {
             "news_events_in_ghana": int(len(news)),
@@ -539,10 +539,13 @@ def dataset_summary(raw, df):
                 (news["area_km2"] > C.NEWS_MAX_AREA_KM2).sum()
             ),
             "flood_weeks_by_label": {
-                k: int(raw[f"flood_{k}"].sum()) for k in C.S["labels"]
+                k: int(raw[f"flood_{k}"].sum())
+                for k in C.S["labels"]
+                if f"flood_{k}" in raw.columns
             },
-            "sar_observed_share": float(raw["sar_observed"].mean()),
         }
+    if "flood_sar" in raw.columns:
+        extra["sar_observed_share"] = float(raw["sar_observed"].mean())
     return {
         "study": C.STUDY,
         **extra,
@@ -580,6 +583,17 @@ def main(only=None):
         "E7": ("E7_calibration", e7_calibration),
         "E9": ("E9_shap", e9_shap),
     }
+    if only == "labels":
+        # After the Sentinel-1 exports land: add the label checks to an
+        # existing run without repeating the main experiments.
+        results = json.loads(out.read_text())
+        results["dataset"] = dataset_summary(raw, df)
+        results["E10_labels"] = e10_labels(raw)
+        results["label_agreement"] = label_agreement(raw)
+        results["E8_impact"] = e8_impact(raw)
+        out.write_text(json.dumps(results, indent=2, default=str))
+        logger.info(f"updated label checks in {out}")
+        return
     if only:
         key, fn = single[only]
         results = json.loads(out.read_text())
@@ -600,6 +614,7 @@ def main(only=None):
     if "flood_sar" in raw.columns:
         results["E10_labels"] = e10_labels(raw)
         results["label_agreement"] = label_agreement(raw)
+    if C.STUDY != "v1_gfd":
         results["E8_impact"] = e8_impact(raw)
     else:
         results["E8_impact"] = {

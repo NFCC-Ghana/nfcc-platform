@@ -65,7 +65,7 @@ WORLDPOP = "WorldPop/GP/100m/pop"
 # Accra Metropolis) still contain enough resampled CHIRPS/ERA5 cells.
 DYNAMIC_SCALE_M = 2000
 STATIC_SCALE_M = 250
-SAR_SCALE_M = 200
+SAR_SCALE_M = 100
 
 OPEN_METEO_FLOOD_URL = "https://flood-api.open-meteo.com/v1/flood"
 

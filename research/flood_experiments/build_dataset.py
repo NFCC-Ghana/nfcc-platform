@@ -468,6 +468,8 @@ def build_labels_v2(panel, static, news, sar):
     for ev in nadmo.load_incidents(static).itertuples():
         day = pd.Timestamp(ev.date)
         _mark(panel, "flood_news", ev.district_code, day, day, "nadmo")
+    if sar is None:  # Sentinel-1 exports not finished: news label only
+        return panel
 
     sar = sar.assign(sar_flag=sar_flags(sar))
     panel = panel.merge(
@@ -490,8 +492,9 @@ def build_labels_v2(panel, static, news, sar):
 def main(stage: str = "all"):
     """stage: all | discharge | dynamic | news. The discharge and Earth
     Engine pulls are independent, so they can run as separate processes
-    at once; `all` then merges from the caches. In v2 the Sentinel-1
-    export tasks (sar_labels.py start) must have finished first."""
+    at once; `all` then merges from the caches. In v2, if the Sentinel-1
+    export tasks (sar_labels.py start) have not finished, the panel is
+    built with the news label only; re-run once they have."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     RAW.mkdir(parents=True, exist_ok=True)
     ee = _init_ee()
@@ -519,7 +522,11 @@ def main(stage: str = "all"):
         from research.flood_experiments import sar_labels
 
         news = fetch_news_events(ee)
-        sar = sar_labels.fetch(ee, sar_labels.years())
+        try:
+            sar = sar_labels.fetch(ee, sar_labels.years())
+        except Exception as e:
+            logger.warning(f"Sentinel-1 labels not available yet ({e}); news only")
+            sar = None
         panel = build_labels_v2(panel, static, news, sar)
         panel["flood"] = panel["flood_news"]
     panel = panel.sort_values(["district_code", "week"]).reset_index(drop=True)
