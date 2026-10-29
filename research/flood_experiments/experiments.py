@@ -52,14 +52,20 @@ def temporal_folds(df):
         )
 
 
-def spatial_folds(df, seed=C.RANDOM_SEED):
-    rng = np.random.default_rng(seed)
+def spatial_folds(df):
+    """Leave one region out AND separate it in time. One Global Flood
+    Database event floods several regions in the same weeks, so a purely
+    spatial split trains on the very event it tests (the model learns the
+    date). Train on other regions <= 2006, validate on them in 2007, test
+    the held-out region in 2008-2018."""
     for region in sorted(df["region"].unique()):
         rest = df[df["region"] != region]
-        codes = rest["district_code"].unique()
-        val_codes = set(rng.choice(codes, max(1, len(codes) // 7), replace=False))
-        is_val = rest["district_code"].isin(val_codes)
-        yield region, rest[~is_val], rest[is_val], df[df["region"] == region]
+        yield (
+            region,
+            rest[rest["year"] <= TEST_YEARS[0] - 2],
+            rest[rest["year"] == TEST_YEARS[0] - 1],
+            df[(df["region"] == region) & (df["year"] >= TEST_YEARS[0])],
+        )
 
 
 def cross_validate(df, factory, folds):
@@ -422,11 +428,30 @@ def dataset_summary(raw, df):
     }
 
 
-def main():
+def main(only=None):
+    """only: re-run a single experiment (e.g. "E4") and update it in the
+    existing results.json instead of re-running everything."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     C.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     raw = pd.read_parquet(C.DATA_DIR / "panel.parquet")
     df = build_features(raw)
+    out = C.RESULTS_DIR / "results.json"
+    single = {
+        "E1": ("E1_E3_hierarchy_temporal", e1_e3_hierarchy),
+        "E2": ("E2_ablation", e2_ablation),
+        "E4": ("E4_spatial", e4_spatial),
+        "E5": ("E5_fusion", e5_fusion),
+        "E6": ("E6_degradation", e6_degradation),
+        "E7": ("E7_calibration", e7_calibration),
+        "E9": ("E9_shap", e9_shap),
+    }
+    if only:
+        key, fn = single[only]
+        results = json.loads(out.read_text())
+        results[key] = fn(df)
+        out.write_text(json.dumps(results, indent=2, default=str))
+        logger.info(f"updated {key} in {out}")
+        return
     results = {"dataset": dataset_summary(raw, df)}
     logger.info(json.dumps(results["dataset"], default=str))
     results["E1_E3_hierarchy_temporal"] = e1_e3_hierarchy(df)
@@ -441,10 +466,11 @@ def main():
         "sources (DFO, EM-DAT, ReliefWeb) report them per event or per "
         "country only."
     }
-    out = C.RESULTS_DIR / "results.json"
     out.write_text(json.dumps(results, indent=2, default=str))
     logger.info(f"wrote {out}")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(sys.argv[1] if len(sys.argv) > 1 else None)

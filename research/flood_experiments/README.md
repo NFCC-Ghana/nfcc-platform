@@ -50,7 +50,7 @@ with simulated values.
 | E1 | Model hierarchy: climatology, persistence, live rainfall rule, logistic regression, random forest, XGBoost (rainfall only), temporal XGBoost (rain lags + soil state), multi-source XGBoost | Temporal (E3) |
 | E2 | Cumulative ablation: Baseline → +Soil → +River → +Dam → +Geographic → +Exposure | Temporal |
 | E3 | Forward chaining: for each test year *y* in 2008–2018, train on ≤ *y*−2, validate on *y*−1 | — |
-| E4 | Leave-one-region-out, with 1/7 of training districts held out for validation | — |
+| E4 | Leave-one-region-out *and* separated in time: train on other regions ≤ 2006, validate on them in 2007, test the held-out region 2008–2018. A purely spatial split leaks, because one flood event covers several regions in the same weeks (PR-AUC 0.31 leaky vs 0.001 clean). | — |
 | E5 | Early fusion vs late fusion (mean of per-source models) vs stacking vs the platform's hand-set weights | Temporal |
 | E6 | One source missing (training median) or one week stale, at prediction time only | Temporal |
 | E7 | Raw vs Platt scaling vs isotonic regression, fitted on each validation year | Temporal |
@@ -73,6 +73,10 @@ years.
 - **Incomplete labels.** MODIS (250 m, cloud-limited) misses most short
   urban flash floods, so "no flood" weeks include unrecorded floods. This
   biases precision and FAR toward looking worse, never better.
+- **Few events.** 203 onsets in 19 years. The Global Flood Database
+  has no Ghana event in 2012–2014 or 2016–2017, so test years 2008–2018
+  hold about 106 onsets, mostly in 2009, 2010 and 2018. Confidence
+  intervals are wide.
 - **Coarse event timing.** A Global Flood Database event's dates span its
   whole observed period, so onset week can be off by the event's
   detection lag.

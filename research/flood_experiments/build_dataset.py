@@ -204,17 +204,25 @@ def _fetch_discharge_file(row, out) -> bool:
     its length, so about 100 of these use up the hourly quota; on HTTP 429
     wait for the quota to reset instead of skipping the district."""
     for attempt in range(12):
-        resp = requests.get(
-            C.OPEN_METEO_FLOOD_URL,
-            params={
-                "latitude": round(row.lat, 4),
-                "longitude": round(row.lon, 4),
-                "daily": "river_discharge",
-                "start_date": "2000-01-01",
-                "end_date": "2018-12-31",
-            },
-            timeout=60,
-        )
+        try:
+            resp = requests.get(
+                C.OPEN_METEO_FLOOD_URL,
+                params={
+                    "latitude": round(row.lat, 4),
+                    "longitude": round(row.lon, 4),
+                    "daily": "river_discharge",
+                    "start_date": "2000-01-01",
+                    "end_date": "2018-12-31",
+                },
+                timeout=60,
+            )
+        except requests.RequestException as e:  # DNS / connection drops
+            wait = 30 * (attempt + 1)
+            logger.info(
+                f"discharge {row.district}: {type(e).__name__}, retry in {wait}s"
+            )
+            time.sleep(wait)
+            continue
         if resp.status_code == 200:
             out.write_text(resp.text)
             time.sleep(0.5)
