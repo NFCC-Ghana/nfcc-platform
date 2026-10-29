@@ -7,7 +7,7 @@
 
 # Test runner and plugins - pytest is pinned; plugins are capped to
 # releases that support pytest 8.x (pytest-asyncio 1.x needs pytest>=8.2).
-pytest==8.4.2
+pytest==9.0.3
 pytest-asyncio==1.4.1
 pytest-cov==4.1.0
 pytest-mock==3.17.0
