@@ -10,7 +10,7 @@ live platform: nothing in `src/` imports it.
 
 | Study | Period | Flood labels | Role |
 | --- | --- | --- | --- |
-| `v2` (default) | 2015–2025 | Groundsource news events (Mayo et al. 2026), our documented events and NADMO records if supplied (`flood_news`). Sentinel-1 detections (`flood_sar`) as an independent second label. Their union (`flood_union`). | Main study |
+| `v2` (default) | 2015–2025 | Groundsource news events (Mayo et al. 2026), our documented events and NADMO records if supplied (`flood_news`). Audited with Sentinel-1 radar (case-control). | Main study |
 | `v1_gfd` | 2000–2018 | Global Flood Database (MODIS, Tellman et al. 2021) and documented events | Sensitivity analysis |
 
 v1 had 203 flood onsets in 19 years and no Ghana events at all in
@@ -21,11 +21,11 @@ change of labels can itself be reported.
 ```
 pip install -r requirements.txt -r requirements-research.txt
 earthengine authenticate                                       # once
-python -m research.flood_experiments.sar_labels start          # Sentinel-1 export tasks (v2)
 python -m research.flood_experiments.build_dataset dynamic     # these three can run in parallel
 python -m research.flood_experiments.build_dataset discharge
 python -m research.flood_experiments.build_dataset news
-python -m research.flood_experiments.build_dataset             # merge once the exports finish
+python -m research.flood_experiments.build_dataset             # merge into data/<study>/panel.parquet
+python -m research.flood_experiments.sar_labels                # v2: Sentinel-1 label audit (~30 min)
 python -m research.flood_experiments.experiments               # results/<study>/results.json
 python -m research.flood_experiments.report                    # results/<study>/summary.md + figures
 ```
@@ -41,7 +41,7 @@ single experiment, pass its ID: `python -m research.flood_experiments.experiment
 | Coverage | 216 districts in all 10 (2015) regions, January 2015 – December 2025 |
 | Target | Flood **onset**: flooded this week, not flooded last week. Weeks right after a flooded week are excluded. |
 | News label | A Groundsource event in the district overlapping the week. Events are placed by centroid. Events over 1,000 km² are region- or country-level mentions and are dropped. |
-| SAR label | Sentinel-1 VH change detection (UN-SPIDER recommended practice) with permanent-water and slope masks. A week counts only if the district was imaged, the new water is at least 1 km², and it is at least 3× the district's median detection. |
+| Label audit | Sentinel-1 VH change detection (UN-SPIDER recommended practice) over ±1 week at every news onset and at two matched no-flood controls per onset (another district in the same week; the same district in another year). Radar-confirmed = at least 1 km² of new water in a district at least half imaged. Mapping every district-week is tens of compute-hours on the free Earth Engine tier, so the labels are audited rather than replaced. |
 | Inputs | Nowcast: known by the end of the target week (perfect-forecast hindcast). Forecast (E3b): known when the week starts. No input uses labels. |
 | Test years | 2018–2025, forward-chaining (train ≤ y−2, validate y−1) |
 
@@ -55,7 +55,7 @@ single experiment, pass its ID: `python -m research.flood_experiments.experiment
 | Geographic | Mean elevation and slope; permanent-water share; built-up share | SRTM; JRC Global Surface Water; GHSL 2010 |
 | Exposure | Log population density, 2010 | WorldPop 100 m |
 | News labels | Flood events from news, geocoded and dated | Groundsource (Mayo et al. 2026), `projects/sat-io/open-datasets/groundsource_2026` |
-| SAR labels | Flooded and observed km² per district-week | Sentinel-1 GRD, `sar_labels.py` |
+| Label audit | New-water and imaged km² per sampled district-week | Sentinel-1 GRD, `sar_labels.py` |
 | NADMO labels | Incident date, district, deaths, people affected | Requested from NADMO; see `nadmo_data_request.md` |
 | Boundaries | Districts and regions | FAO GAUL 2015 level 2 |
 
@@ -77,8 +77,7 @@ runnable rather than filled with simulated values.
 | E7 | Raw vs Platt scaling vs isotonic regression |
 | E8 | Impact layers: Spearman ρ of NADMO people-affected counts with exposure. Runs only once NADMO records are supplied. |
 | E9 | SHAP fidelity (deletion test vs random) and stability (Spearman ρ across bootstrap retrainings) |
-| E10 | Label sensitivity: the same models trained and scored on news, SAR and union labels |
-| LA | Label agreement: the share of news onsets confirmed by Sentinel-1 when it imaged the district, and the share of SAR onsets that appear in the news |
+| LA | Label audit: radar detection rate at news onsets vs matched controls, overall and for urban vs rural districts, with odds ratios |
 
 The human-decision, warning-policy and "incorrect AI" studies need
 recruited participants and ethics approval, so they are not in code.
@@ -92,8 +91,8 @@ recruited participants and ethics approval, so they are not in code.
 
 ## Known limitations
 
-- **News labels follow media coverage.** Groundsource recall is lower where digital news is scarce (rural north). Reporting also grows over time: 124 Ghana events in 2015 vs 338 in 2022. Models may partly learn where and when floods get reported. E10 and LA measure this; they do not remove it.
-- **SAR labels miss and confuse things.** Sentinel-1 images each district every 6–12 days. It misses short floods, floods under dense vegetation and floods in built-up areas (double bounce). It can mistake newly flooded rice fields for floods. The anomaly rule reduces, but does not remove, these errors.
+- **News labels follow media coverage.** Groundsource recall is lower where digital news is scarce (rural north). Reporting also grows over time: 124 Ghana events in 2015 vs 338 in 2022. Models may partly learn where and when floods get reported. The label audit measures how often reported onsets are real; it does not remove the bias.
+- **Radar misses some floods.** Sentinel-1 images each district every 6–12 days. It misses short flash floods between passes, floods under dense vegetation and floods in built-up areas (buildings scatter the signal back). A news onset that radar does not confirm is therefore not necessarily false, especially in cities; the audit reports urban and rural districts separately for this reason.
 - **Coarse event timing.** A record's dates are when it was reported or imaged, not necessarily when the flood started.
 - **Perfect-forecast hindcast.** The nowcast uses observed rainfall for the target week. E3b shows the operational one-week-ahead case.
 - **GAUL 2015 districts.** Ghana has had 261 districts since 2018. Records for new districts map to their 2015 parent.

@@ -119,11 +119,9 @@ class TestOnsetTarget:
         assert first["rain_prev4w_sum"] == 3.0 + 2.0 + 1.0 + 0.0
 
     def test_label_argument_selects_the_flood_record(self):
-        panel = _panel([0] * 10).assign(
-            flood_news=[0] * 6 + [1] + [0] * 3, flood_sar=[0] * 10
-        )
+        panel = _panel([0] * 10).assign(flood_news=[0] * 6 + [1] + [0] * 3)
         assert build_features(panel, "news")["onset"].sum() == 1
-        assert build_features(panel, "sar")["onset"].sum() == 0
+        assert build_features(panel.drop(columns="flood_news"))["onset"].sum() == 0
 
     def test_forecast_inputs_are_lagged(self):
         panel = _panel([0] * 10).assign(q_week_max=np.arange(10, dtype=float))
@@ -177,20 +175,34 @@ class TestModels:
         assert np.all(np.diff(m.predict(grid)) >= -1e-9)
 
 
-class TestSarFlags:
-    def test_flags_need_observation_size_and_anomaly(self):
-        from research.flood_experiments.build_dataset import sar_flags
+class TestSarAudit:
+    def test_controls_are_matched_and_never_flooded(self):
+        from research.flood_experiments.sar_labels import audit_sample
 
-        sar = pd.DataFrame(
-            {
-                "district_code": [1] * 6,
-                "flood_km2": [0.5, 0.5, 0.5, 5.0, 1.2, 9.0],
-                "obs_km2": [100, 100, 100, 100, 100, 0],
-            }
+        weeks = pd.date_range("2016-01-04", periods=160, freq="7D")
+        rows = []
+        for code in (1, 2, 3):
+            for k, w in enumerate(weeks):
+                rows.append((code, w.strftime("%Y-%m-%d"), int(code == 1 and k == 80)))
+        panel = pd.DataFrame(rows, columns=["district_code", "week", "flood_news"])
+        panel = panel.assign(
+            region="R",
+            rain_week_sum=1.0,
+            rain_week_max=1.0,
+            sm_week_mean=0.3,
+            runoff_week_sum=0.1,
+            q_week_max=10.0,
+            population=1e3,
+            area_km2=10.0,
         )
-        # median of observed weeks is 0.5, so the floor is 1.5 km2: week 3
-        # is a flood, week 4 is under the anomaly floor, week 5 unobserved
-        assert sar_flags(sar).tolist() == [0, 0, 0, 1, 0, 0]
+        s = audit_sample(panel)
+        onset = s[s.kind == "onset"].iloc[0]
+        same_week = s[s.kind == "control_same_week"].iloc[0]
+        same_place = s[s.kind == "control_same_place"].iloc[0]
+        assert (onset.district_code, onset.week) == (1, weeks[80].strftime("%Y-%m-%d"))
+        assert same_week.week == onset.week and same_week.district_code != 1
+        assert same_place.district_code == 1 and same_place.week != onset.week
+        assert pd.Timestamp(same_place.week).weekday() == 0
 
 
 class TestNadmoMatching:

@@ -13,9 +13,8 @@ period in config.STUDY:
 - Labels: the district was flooded that week.
   v1: Global Flood Database (Tellman et al. 2021) + documented events.
   v2: flood_news = Groundsource news events (Mayo et al. 2026) +
-      documented events + NADMO incidents if supplied (nadmo.py);
-      flood_sar = Sentinel-1 detections (sar_labels.py);
-      flood_union = either.
+      documented events + NADMO incidents if supplied (nadmo.py).
+      Sentinel-1 audits these labels (sar_labels.py); it is not a label.
 
 Raw pulls are cached under data/<study>/raw/ so a re-run only fetches
 what is missing. Run: python -m research.flood_experiments.build_dataset
@@ -432,25 +431,9 @@ def build_labels(panel, static, gfd):
     return panel
 
 
-def sar_flags(sar: pd.DataFrame) -> pd.Series:
-    """A Sentinel-1 district-week is a flood when the new water is at
-    least SAR_MIN_KM2 and SAR_ANOMALY_FACTOR times the district's median
-    detection over observed weeks (seasonal wetlands and irrigated rice
-    flag every year; a real flood stands out from that)."""
-    observed = sar[sar["obs_km2"] > 0]
-    typical = observed.groupby("district_code")["flood_km2"].median()
-    floor = C.SAR_ANOMALY_FACTOR * sar["district_code"].map(typical).fillna(0)
-    return (
-        (sar["obs_km2"] > 0)
-        & (sar["flood_km2"] >= C.SAR_MIN_KM2)
-        & (sar["flood_km2"] >= floor)
-    ).astype(int)
-
-
-def build_labels_v2(panel, static, news, sar):
+def build_labels_v2(panel, static, news):
     """flood_news: a Groundsource event (or a documented / NADMO event)
-    overlaps the week in the district. flood_sar: a Sentinel-1 anomaly
-    (sar_flags). flood_union: either."""
+    overlaps the week in the district."""
     from research.flood_experiments import nadmo
 
     panel["flood_news"] = 0
@@ -468,33 +451,13 @@ def build_labels_v2(panel, static, news, sar):
     for ev in nadmo.load_incidents(static).itertuples():
         day = pd.Timestamp(ev.date)
         _mark(panel, "flood_news", ev.district_code, day, day, "nadmo")
-    if sar is None:  # Sentinel-1 exports not finished: news label only
-        return panel
-
-    sar = sar.assign(sar_flag=sar_flags(sar))
-    panel = panel.merge(
-        sar[["district_code", "week", "flood_km2", "obs_km2", "sar_flag"]].rename(
-            columns={"flood_km2": "sar_flood_km2", "obs_km2": "sar_obs_km2"}
-        ),
-        on=["district_code", "week"],
-        how="left",
-    )
-    panel["sar_observed"] = (panel["sar_obs_km2"].fillna(0) > 0).astype(int)
-    panel["flood_sar"] = panel["sar_flag"].fillna(0).astype(int)
-    is_sar = panel["flood_sar"] == 1
-    panel.loc[is_sar, "label_source"] = (
-        panel.loc[is_sar, "label_source"] + "|sar"
-    ).str.strip("|")
-    panel["flood_union"] = panel[["flood_news", "flood_sar"]].max(axis=1)
-    return panel.drop(columns="sar_flag")
+    return panel
 
 
 def main(stage: str = "all"):
     """stage: all | discharge | dynamic | news. The discharge and Earth
     Engine pulls are independent, so they can run as separate processes
-    at once; `all` then merges from the caches. In v2, if the Sentinel-1
-    export tasks (sar_labels.py start) have not finished, the panel is
-    built with the news label only; re-run once they have."""
+    at once; `all` then merges from the caches."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     RAW.mkdir(parents=True, exist_ok=True)
     ee = _init_ee()
@@ -519,15 +482,8 @@ def main(stage: str = "all"):
         logger.info(f"{len(gfd)} GFD district-event hits")
         panel = build_labels(panel, static, gfd)
     else:
-        from research.flood_experiments import sar_labels
-
         news = fetch_news_events(ee)
-        try:
-            sar = sar_labels.fetch(ee, sar_labels.years())
-        except Exception as e:
-            logger.warning(f"Sentinel-1 labels not available yet ({e}); news only")
-            sar = None
-        panel = build_labels_v2(panel, static, news, sar)
+        panel = build_labels_v2(panel, static, news)
         panel["flood"] = panel["flood_news"]
     panel = panel.sort_values(["district_code", "week"]).reset_index(drop=True)
     out = C.DATA_DIR / "panel.parquet"

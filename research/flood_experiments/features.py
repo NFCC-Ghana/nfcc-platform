@@ -24,8 +24,8 @@ from research.flood_experiments import config as C
 
 
 def build_features(panel: pd.DataFrame, label: str = "news") -> pd.DataFrame:
-    """label: which flood record defines the target - "news", "sar" or
-    "union" in v2 (columns flood_<label>); v1 has a single `flood`."""
+    """label: which flood record defines the target - "news" in v2
+    (column flood_news); v1 has a single `flood`."""
     df = panel.copy()
     col = f"flood_{label}"
     if col in df.columns:

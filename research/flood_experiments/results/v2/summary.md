@@ -6,7 +6,7 @@ Onsets by region: Ashanti 107, Brong Ahafo 22, Central 103, Eastern 67, Greater 
 
 Onsets by year: 2015 40, 2016 41, 2017 67, 2018 91, 2019 83, 2020 78, 2021 80, 2022 117, 2023 135, 2024 68, 2025 98
 
-Groundsource events in Ghana: 2686; placed in a district: 2527; dropped as region- or country-level: 159. Flood weeks by label: news 1149. Sentinel-1 labels pending.
+Groundsource events in Ghana: 2686; placed in a district: 2527; dropped as region- or country-level: 159. Flood weeks by label: news 1149.
 
 ## E1 + E3. Model hierarchy, temporal forward-chaining
 
@@ -170,6 +170,27 @@ POD/FAR ±1 wk count an alert one week early or late as a hit.
 | 5 | 0.0622 | 0.0384 |
 
 Global-importance rank stability across bootstrap retrainings: mean Spearman ρ 0.814 (min 0.688, 10 pairs).
+
+## Label audit: Sentinel-1 at news onsets vs matched controls (±1 week)
+
+A sampled district-week counts as radar-confirmed when at least 1 km² of new water is detected in a district that was at least half imaged.
+
+| Sample | Setting | Sampled | Imaged | Radar detection rate | Median new water (km²) |
+| --- | --- | --- | --- | --- | --- |
+| Control: same district, other year | all | 898 | 883 | 0.122 | 0.00 |
+| Control: other district, same week | all | 898 | 887 | 0.148 | 0.00 |
+| News flood onset | all | 898 | 895 | 0.182 | 0.00 |
+| Control: same district, other year | rural | 342 | 333 | 0.174 | 0.08 |
+| Control: other district, same week | rural | 686 | 678 | 0.164 | 0.00 |
+| News flood onset | rural | 342 | 342 | 0.325 | 0.17 |
+| Control: same district, other year | urban | 556 | 550 | 0.091 | 0.00 |
+| Control: other district, same week | urban | 212 | 209 | 0.096 | 0.00 |
+| News flood onset | urban | 556 | 553 | 0.094 | 0.00 |
+
+Odds of radar detection, onset vs control: other district, same week: 1.28 (90% CI 1.04–1.59).
+
+Odds of radar detection, onset vs control: same district, other year: 1.60 (90% CI 1.28–1.99).
+
 
 ## Not runnable
 

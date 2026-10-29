@@ -1506,5 +1506,80 @@
   },
   "E8_impact": {
     "not_run": "Needs NADMO incident records with people affected per district (requested; see nadmo_data_request.md). 0 usable records found."
+  },
+  "label_audit": {
+    "by_kind": {
+      "control_same_place": {
+        "sampled": 898,
+        "observed": 883,
+        "detection_rate": 0.12231030577576443,
+        "median_flood_km2": 0.0
+      },
+      "control_same_week": {
+        "sampled": 898,
+        "observed": 887,
+        "detection_rate": 0.14768883878241262,
+        "median_flood_km2": 0.0
+      },
+      "onset": {
+        "sampled": 898,
+        "observed": 895,
+        "detection_rate": 0.18212290502793296,
+        "median_flood_km2": 0.0
+      }
+    },
+    "by_setting": {
+      "rural": {
+        "control_same_place": {
+          "sampled": 342,
+          "observed": 333,
+          "detection_rate": 0.17417417417417416,
+          "median_flood_km2": 0.07698575827971813
+        },
+        "control_same_week": {
+          "sampled": 686,
+          "observed": 678,
+          "detection_rate": 0.16371681415929204,
+          "median_flood_km2": 0.0
+        },
+        "onset": {
+          "sampled": 342,
+          "observed": 342,
+          "detection_rate": 0.32456140350877194,
+          "median_flood_km2": 0.16726496728515627
+        }
+      },
+      "urban": {
+        "control_same_place": {
+          "sampled": 556,
+          "observed": 550,
+          "detection_rate": 0.09090909090909091,
+          "median_flood_km2": 0.0
+        },
+        "control_same_week": {
+          "sampled": 212,
+          "observed": 209,
+          "detection_rate": 0.09569377990430622,
+          "median_flood_km2": 0.0
+        },
+        "onset": {
+          "sampled": 556,
+          "observed": 553,
+          "detection_rate": 0.09403254972875226,
+          "median_flood_km2": 0.0
+        }
+      }
+    },
+    "odds_ratio_vs_control_same_week": [
+      1.284083624235975,
+      1.040115979017068,
+      1.5852758608604542
+    ],
+    "odds_ratio_vs_control_same_place": [
+      1.5953728315062676,
+      1.2795191470981035,
+      1.989196079856067
+    ],
+    "urban_built_frac_cut": 0.012155368966240997
   }
 }

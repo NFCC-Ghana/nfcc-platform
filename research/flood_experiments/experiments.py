@@ -16,9 +16,8 @@ E6  Source degradation: a source missing (filled with its training
 E7  Calibration: raw vs Platt scaling vs isotonic regression
 E8  Impact layers: only with NADMO incident records (nadmo.py)
 E9  SHAP fidelity (deletion test) and stability (bootstrap retraining)
-E10 Label sensitivity (v2): the same models scored against news, SAR and
-    union labels
-LA  Label agreement (v2): how often news reports and Sentinel-1 agree
+LA  Label audit (v2): Sentinel-1 radar checked at every news flood onset
+    and at matched no-flood controls (sar_labels.py)
 
 Run: python -m research.flood_experiments.experiments
 """
@@ -149,70 +148,68 @@ def e3b_forecast(df):
     return rows
 
 
-def e10_labels(panel):
-    """The same models trained and scored on each flood record. If a
-    conclusion flips between news and satellite labels, it is about the
-    labels, not about flood prediction."""
-    rows = []
-    for label in C.S["labels"]:
-        df = build_features(panel, label)
-        for factory in [
-            lambda: Mo.Climatology(),
-            lambda: Mo.RainfallThreshold(),
-            lambda: Mo.RiverPercentile(),
-            lambda: Mo.XGB(Mo.MULTI_SOURCE, "Multi-source XGBoost"),
-        ]:
-            r = score(cross_validate(df, factory, temporal_folds(df)), factory().name)
-            r["label"] = label
-            rows.append(r)
-            logger.info(f"E10 {label} {r['model']}: PR-AUC {r['pr_auc']:.3f}")
-    return rows
-
-
-def _keys(df, col):
-    hit = df[df[col] == 1]
-    return set(zip(hit["district_code"], hit["week"]))
-
-
-def label_agreement(panel, tol=1):
-    """News onsets vs Sentinel-1 flags, within +/- tol weeks. A news onset
-    can only be confirmed where the satellite looked, so the confirmation
-    rate is computed over news onsets with a SAR pass within the window."""
-    news = build_features(panel, "news")
-    sar = build_features(panel, "sar")
-    p = panel.assign(week=pd.to_datetime(panel["week"]))
-    observed, flagged, reported = (
-        _keys(p, "sar_observed"),
-        _keys(p, "flood_sar"),
-        _keys(p, "flood_news"),
+def label_audit(panel):
+    """Case-control audit of the news labels with Sentinel-1 (sar_labels).
+    If news onsets are real floods, radar should see new water at them
+    far more often than at matched weeks with no reported flood. Radar
+    misses floods in built-up areas (buildings scatter the signal back)
+    and short flash floods between passes, so the comparison is also
+    split by urban and rural districts."""
+    path = C.DATA_DIR / "raw" / "sar_audit.csv"
+    if not path.exists():
+        return {"not_run": "Sentinel-1 audit not run yet (sar_labels.py)."}
+    a = pd.read_csv(path).merge(
+        panel.drop_duplicates("district_code")[
+            ["district_code", "area_km2", "built_frac"]
+        ],
+        on="district_code",
     )
-    near = [pd.Timedelta(weeks=k) for k in range(-tol, tol + 1)]
+    urban_cut = panel.drop_duplicates("district_code")["built_frac"].quantile(0.75)
+    a["setting"] = np.where(a["built_frac"] >= urban_cut, "urban", "rural")
+    a["observed"] = (a["n_images"] > 0) & (
+        a["obs_km2"] >= C.SAR_MIN_OBSERVED * a["area_km2"]
+    )
+    a["detected"] = a["flood_km2"] >= C.SAR_MIN_KM2
+    seen = a[a["observed"]]
 
-    def any_in(keys, d, w):
-        return any((d, w + k) in keys for k in near)
+    def rates(g):
+        return {
+            "sampled": int(len(g)),
+            "observed": int(g["observed"].sum()),
+            "detection_rate": float(g.loc[g["observed"], "detected"].mean()),
+            "median_flood_km2": float(g.loc[g["observed"], "flood_km2"].median()),
+        }
 
-    n_on = news[news.onset == 1]
-    seen = [r for r in n_on.itertuples() if any_in(observed, r.district_code, r.week)]
-    confirmed = sum(any_in(flagged, r.district_code, r.week) for r in seen)
-    s_on = sar[sar.onset == 1]
-    in_news = sum(any_in(reported, r.district_code, r.week) for r in s_on.itertuples())
-    return {
-        "news_onsets": int(len(n_on)),
-        "news_onsets_with_sar_pass": len(seen),
-        "news_confirmed_by_sar": int(confirmed),
-        "news_confirmation_rate": confirmed / len(seen) if seen else float("nan"),
-        "sar_onsets": int(len(s_on)),
-        "sar_onsets_reported_in_news": int(in_news),
-        "sar_reporting_rate": in_news / len(s_on) if len(s_on) else float("nan"),
-        "tolerance_weeks": tol,
-    }
+    def odds_ratio(case, ctrl):
+        """Onset vs control odds of radar detection, Wald 90% interval
+        (0.5 added to each cell)."""
+        a1 = case["detected"].sum() + 0.5
+        b1 = (~case["detected"]).sum() + 0.5
+        a0 = ctrl["detected"].sum() + 0.5
+        b0 = (~ctrl["detected"]).sum() + 0.5
+        lor = np.log(a1 * b0 / (b1 * a0))
+        se = np.sqrt(1 / a1 + 1 / b1 + 1 / a0 + 1 / b0)
+        return [
+            float(np.exp(lor)),
+            float(np.exp(lor - 1.645 * se)),
+            float(np.exp(lor + 1.645 * se)),
+        ]
+
+    out = {"by_kind": {k: rates(g) for k, g in a.groupby("kind")}, "by_setting": {}}
+    for setting, g in a.groupby("setting"):
+        out["by_setting"][setting] = {k: rates(h) for k, h in g.groupby("kind")}
+    case = seen[seen["kind"] == "onset"]
+    for ctrl in ["control_same_week", "control_same_place"]:
+        out[f"odds_ratio_vs_{ctrl}"] = odds_ratio(case, seen[seen["kind"] == ctrl])
+    out["urban_built_frac_cut"] = float(urban_cut)
+    return out
 
 
 def e8_impact(panel):
     """E8 needs people affected per district per event (NADMO). It tests
     whether the exposure layer ranks impacts: Spearman correlation of
     affected counts with population density and with population x
-    Sentinel-1 flooded share in the incident week."""
+    built-up share."""
     from research.flood_experiments import nadmo
 
     static = panel.drop_duplicates("district_code")
@@ -229,12 +226,12 @@ def e8_impact(panel):
     inc = inc.assign(week=day - pd.to_timedelta(day.dt.weekday, unit="D"))
     m = inc.merge(p, on=["district_code", "week"], how="left")
     density = m["population"] / m["area_km2"]
-    exposed = m["population"] * (m["sar_flood_km2"].fillna(0) / m["area_km2"])
+    exposed = m["population"] * m["built_frac"]
     affected = m["affected"].astype(float)
     return {
         "records": int(len(m)),
         "spearman_affected_vs_density": float(spearmanr(affected, density).statistic),
-        "spearman_affected_vs_sar_exposure": float(
+        "spearman_affected_vs_built_exposure": float(
             spearmanr(affected, exposed).statistic
         ),
     }
@@ -544,8 +541,6 @@ def dataset_summary(raw, df):
                 if f"flood_{k}" in raw.columns
             },
         }
-    if "flood_sar" in raw.columns:
-        extra["sar_observed_share"] = float(raw["sar_observed"].mean())
     return {
         "study": C.STUDY,
         **extra,
@@ -584,12 +579,11 @@ def main(only=None):
         "E9": ("E9_shap", e9_shap),
     }
     if only == "labels":
-        # After the Sentinel-1 exports land: add the label checks to an
+        # After sar_labels.py has run: add the label audit to an
         # existing run without repeating the main experiments.
         results = json.loads(out.read_text())
         results["dataset"] = dataset_summary(raw, df)
-        results["E10_labels"] = e10_labels(raw)
-        results["label_agreement"] = label_agreement(raw)
+        results["label_audit"] = label_audit(raw)
         results["E8_impact"] = e8_impact(raw)
         out.write_text(json.dumps(results, indent=2, default=str))
         logger.info(f"updated label checks in {out}")
@@ -611,10 +605,8 @@ def main(only=None):
     results["E6_degradation"] = e6_degradation(df)
     results["E7_calibration"] = e7_calibration(df)
     results["E9_shap"] = e9_shap(df)
-    if "flood_sar" in raw.columns:
-        results["E10_labels"] = e10_labels(raw)
-        results["label_agreement"] = label_agreement(raw)
     if C.STUDY != "v1_gfd":
+        results["label_audit"] = label_audit(raw)
         results["E8_impact"] = e8_impact(raw)
     else:
         results["E8_impact"] = {

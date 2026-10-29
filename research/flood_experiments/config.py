@@ -35,7 +35,7 @@ STUDIES = {
         "test_years": list(range(2018, 2026)),
         "q_climatology_end": "2016-12-31",
         "shap_train_end": 2021,
-        "labels": ["news", "sar", "union"],
+        "labels": ["news"],
         "discharge_point": "river",
     },
 }
@@ -65,7 +65,6 @@ WORLDPOP = "WorldPop/GP/100m/pop"
 # Accra Metropolis) still contain enough resampled CHIRPS/ERA5 cells.
 DYNAMIC_SCALE_M = 2000
 STATIC_SCALE_M = 250
-SAR_SCALE_M = 100
 
 OPEN_METEO_FLOOD_URL = "https://flood-api.open-meteo.com/v1/flood"
 
@@ -82,12 +81,11 @@ LABEL_MIN_FLOODED_KM2 = 1.0
 # Smaller ones go to the district holding their centroid.
 NEWS_MAX_AREA_KM2 = 1000.0
 
-# Sentinel-1: a district-week is a SAR flood when the newly flooded area
-# is at least SAR_MIN_KM2 AND at least SAR_ANOMALY_FACTOR times that
-# district's median detection over observed weeks. The second test
-# suppresses seasonal wetlands and irrigated rice that flag every year.
+# Sentinel-1 audit (sar_labels.py): a sampled district-week counts as
+# radar-confirmed when at least SAR_MIN_KM2 of new water is detected and
+# at least SAR_MIN_OBSERVED of the district was imaged.
 SAR_MIN_KM2 = 1.0
-SAR_ANOMALY_FACTOR = 3.0
+SAR_MIN_OBSERVED = 0.5
 
 # Our own documented events (src/hydrology/flood_polygons.py) mapped to
 # GAUL 2015 district names, so urban floods the MODIS record misses are

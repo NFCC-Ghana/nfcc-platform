@@ -77,19 +77,13 @@ def main():
         "",
     ]
     if "flood_weeks_by_label" in d:
-        sar = (
-            f" Sentinel-1 observed {d['sar_observed_share']:.0%} of district-weeks."
-            if "sar_observed_share" in d
-            else " Sentinel-1 labels pending."
-        )
         md += [
             f"Groundsource events in Ghana: {d['news_events_in_ghana']}; placed in a "
             f"district: {d['news_events_placed']}; dropped as region- or "
             f"country-level: {d['news_events_too_large_to_place']}. Flood weeks by "
             "label: "
             + ", ".join(f"{k} {v}" for k, v in d["flood_weeks_by_label"].items())
-            + "."
-            + sar,
+            + ".",
             "",
         ]
     md += [
@@ -166,25 +160,42 @@ def main():
         f"Global-importance rank stability across bootstrap retrainings: mean "
         f"Spearman ρ {_f(st['mean'])} (min {_f(st['min'])}, {st['pairs']} pairs).",
     ]
-    if "E10_labels" in R:
-        md += ["", "## E10. Label sensitivity (temporal)", ""]
-        for label in dict.fromkeys(r["label"] for r in R["E10_labels"]):
-            md += [
-                f"**Label: {label}**",
-                "",
-                _skill_table([r for r in R["E10_labels"] if r["label"] == label]),
-            ]
-        a = R["label_agreement"]
+    la = R.get("label_audit")
+    if la and "not_run" not in la:
+        names = {
+            "onset": "News flood onset",
+            "control_same_week": "Control: other district, same week",
+            "control_same_place": "Control: same district, other year",
+        }
         md += [
-            "## Label agreement: news vs Sentinel-1 (±1 week)",
             "",
-            f"- News onsets: {a['news_onsets']}; with a Sentinel-1 pass in the window: "
-            f"{a['news_onsets_with_sar_pass']}; confirmed by SAR: "
-            f"{a['news_confirmed_by_sar']} ({_f(a['news_confirmation_rate'])}).",
-            f"- SAR onsets: {a['sar_onsets']}; also in the news: "
-            f"{a['sar_onsets_reported_in_news']} ({_f(a['sar_reporting_rate'])}).",
+            "## Label audit: Sentinel-1 at news onsets vs matched controls (±1 week)",
             "",
+            "A sampled district-week counts as radar-confirmed when at least "
+            "1 km² of new water is detected in a district that was at least half "
+            "imaged.",
+            "",
+            "| Sample | Setting | Sampled | Imaged | Radar detection rate | Median new water (km²) |",
+            "| --- | --- | --- | --- | --- | --- |",
         ]
+        for k, r in la["by_kind"].items():
+            md.append(
+                f"| {names[k]} | all | {r['sampled']} | {r['observed']} "
+                f"| {_f(r['detection_rate'])} | {_f(r['median_flood_km2'], 2)} |"
+            )
+        for setting, kinds in la["by_setting"].items():
+            for k, r in kinds.items():
+                md.append(
+                    f"| {names[k]} | {setting} | {r['sampled']} | {r['observed']} "
+                    f"| {_f(r['detection_rate'])} | {_f(r['median_flood_km2'], 2)} |"
+                )
+        for ctrl in ["control_same_week", "control_same_place"]:
+            o = la[f"odds_ratio_vs_{ctrl}"]
+            md.append(
+                f"\nOdds of radar detection, onset vs {names[ctrl].lower()}: "
+                f"{_f(o[0], 2)} (90% CI {_f(o[1], 2)}–{_f(o[2], 2)})."
+            )
+        md.append("")
     e8 = R["E8_impact"]
     if "not_run" not in e8:
         md += [
@@ -192,7 +203,7 @@ def main():
             "",
             f"{e8['records']} records. Spearman ρ of people affected with population "
             f"density {_f(e8['spearman_affected_vs_density'])}; with population × "
-            f"SAR flooded share {_f(e8['spearman_affected_vs_sar_exposure'])}.",
+            f"built-up share {_f(e8['spearman_affected_vs_built_exposure'])}.",
             "",
         ]
     md += [
