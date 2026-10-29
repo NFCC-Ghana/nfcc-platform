@@ -1,23 +1,32 @@
-pytest
-pytest-cov
-pytest-asyncio
-pytest-mock
-httpx
+# Development and CI tooling - install alongside the runtime pins:
+#   pip install -r requirements.txt -r requirements-dev.txt
+# Always install both files in ONE pip command. A separate, later
+# `pip install <plugin>` lets the resolver upgrade pytest past what the
+# pinned plugins support - that's exactly how the Elite Resilience
+# workflow broke (pytest 9.x pulled in under pytest-asyncio 0.21.1).
+
+# Test runner and plugins - pytest is pinned; plugins are capped to
+# releases that still support pytest 7.x.
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-xdist>=3.0.0,<4
+pytest-timeout>=2.0.0,<3
+pytest-randomly>=3.12.0,<4
+hypothesis>=6.0.0
+# tests/framework/stress/async_engine.py
+aiohttp>=3.8.0
+
+# Geospatial stack - only tests/test_imports.py touches these, and it
+# skips cleanly when they're missing.
 geopandas
 rasterio
 xarray
-black
+
+# Lint, format, security - same tools ci.yml's lint/security jobs run.
+black>=26.1,<27
 flake8
 bandit
 pip-audit
 pre-commit
-pytest-cov>=4.0.0
-pytest-xdist>=3.0.0
-pytest-timeout>=2.0.0
-pytest-randomly>=3.0.0
-jsonschema>=4.0.0
-httpx>=0.24.0
-aiohttp>=3.8.0
-uvloop>=0.17.0
-hypothesis>=6.0.0
-psutil>=5.9.0

@@ -46,7 +46,9 @@ class ScoreRequest(BaseModel):
 
 
 class BatchScoreRequest(BaseModel):
-    requests: List[ScoreRequest]
+    # Bounded - this route is public, and an unbounded list let one
+    # request make the server do arbitrarily much work.
+    requests: List[ScoreRequest] = Field(..., max_length=100)
 
 
 class ScoreResponse(BaseModel):
@@ -184,37 +186,22 @@ async def root():
 
 
 def _score_one(request: ScoreRequest) -> ScoreResponse:
+    """Pure scoring - never dispatches an alert.
+
+    This used to call alert_engine.process() for any score above 50, from
+    an endpoint with no authentication: anyone on the internet could POST
+    a high precipitation value and push a real WhatsApp/Telegram flood
+    alert to subscribers, bypassing the human review queue
+    (POST /v1/alerts/assess -> approve) and ALERT_APPROVAL_KEY entirely.
+    Real dissemination only ever happens via that reviewed path now.
+    alert_sent stays in the response (always False) so existing clients
+    of this contract don't break."""
     score_value = calculate_score(request.precipitation)
-    risk_tier = get_risk_tier(score_value)
-
-    # Send alert if risk is high enough
-    alert_sent = False
-    if alert_engine and score_value > 50:
-        try:
-            # Keyword args, not positional - process()'s signature is
-            # (location, score, force, precipitation, ...). A previous
-            # positional call here, process(score_value, request.location,
-            # request.precipitation), bound score_value to `location`,
-            # the location string to `score`, and precipitation to the
-            # `force` bool flag - every alert triggered from this endpoint
-            # was recorded under a numeric "location" with a location-name
-            # "score". alert_sent is also the engine's own real result now,
-            # not just "the call didn't raise" - a provider genuinely
-            # failing to send still reported alert_sent: true before this.
-            result = alert_engine.process(
-                location=request.location,
-                score=score_value,
-                precipitation=request.precipitation,
-            )
-            alert_sent = result.get("alert_sent", False)
-        except Exception as e:
-            logger.error(f"Alert failed: {e}")
-
     return ScoreResponse(
         location=request.location,
         score=round(score_value, 1),
-        risk_tier=risk_tier,
-        alert_sent=alert_sent,
+        risk_tier=get_risk_tier(score_value),
+        alert_sent=False,
         timestamp=datetime.now().isoformat(),
     )
 
@@ -225,11 +212,8 @@ async def score(request: ScoreRequest):
     return _score_one(request)
 
 
-# Batch score endpoint - BatchScoreRequest already existed as a model with
-# no route ever built for it. Scores each request the same way /score
-# does (same alert side effects per location), sequentially - the alert
-# engine's own rate limiter is what actually protects a real burst of
-# locations from over-alerting, not anything batch-specific here.
+# Batch score endpoint - scores each request the same way /score does
+# (pure computation, no alert side effects).
 @app.post("/score/batch", response_model=List[ScoreResponse])
 async def score_batch(request: BatchScoreRequest):
     return [_score_one(r) for r in request.requests]

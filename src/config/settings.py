@@ -5,6 +5,18 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 
+
+def _boot_print(message: str) -> None:
+    """print() that can't crash the import. These boot messages carry
+    emoji, and on a console whose encoding can't represent them (a default
+    Windows cp1252 terminal) a bare print() raised UnicodeEncodeError and
+    took down every `import src...` with it."""
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        print(message.encode("ascii", "replace").decode("ascii"))
+
+
 # ============================================================
 # EXPLICIT ENVIRONMENT SELECTION - NO AMBIGUITY
 # ============================================================
@@ -19,11 +31,11 @@ NFCC_ENV = os.getenv("NFCC_ENV", "")
 if NFCC_ENV:
     # NFCC_ENV takes highest priority
     ENVIRONMENT = NFCC_ENV
-    print(f"🔧 Using NFCC_ENV={NFCC_ENV} from environment")
+    _boot_print(f"🔧 Using NFCC_ENV={NFCC_ENV} from environment")
 else:
     # Fallback to ENVIRONMENT variable
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-    print(f"🔧 Using ENVIRONMENT={ENVIRONMENT} from config")
+    _boot_print(f"🔧 Using ENVIRONMENT={ENVIRONMENT} from config")
 
 # Select the correct env file based on explicit environment
 env_file_map = {
@@ -37,16 +49,16 @@ env_file = Path(env_file_name)
 
 if env_file.exists():
     load_dotenv(env_file)
-    print(f"✅ Loaded configuration from {env_file}")
+    _boot_print(f"✅ Loaded configuration from {env_file}")
 else:
-    print(f"⚠️ Environment file {env_file} not found")
+    _boot_print(f"⚠️ Environment file {env_file} not found")
 
 # Now reload environment variables after loading env file
 ENVIRONMENT = os.getenv("ENVIRONMENT", ENVIRONMENT)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "info")
 
-print(f"🌍 FINAL ENVIRONMENT: {ENVIRONMENT}")
-print(f"📋 LOG LEVEL: {LOG_LEVEL}")
+_boot_print(f"🌍 FINAL ENVIRONMENT: {ENVIRONMENT}")
+_boot_print(f"📋 LOG LEVEL: {LOG_LEVEL}")
 
 
 def get_env_int(key: str, default: int = None) -> Optional[int]:
@@ -280,14 +292,14 @@ if settings.is_production:
         errors.append("At least one WhatsApp recipient required")
 
     if errors:
-        print("⚠️ Production configuration warnings (non-fatal):")
+        _boot_print("⚠️ Production configuration warnings (non-fatal):")
         for error in errors:
-            print(f"   - {error}")
+            _boot_print(f"   - {error}")
     else:
-        print("✅ Production configuration validated")
+        _boot_print("✅ Production configuration validated")
 
-print(f"✅ Settings loaded for environment: {settings.ENVIRONMENT}")
-print(f"   Providers: {settings.get_provider_status()}")
+_boot_print(f"✅ Settings loaded for environment: {settings.ENVIRONMENT}")
+_boot_print(f"   Providers: {settings.get_provider_status()}")
 
 # ============================================================
 # DRY RUN MODE - Prevent accidental alerts during testing
@@ -306,4 +318,4 @@ ALERT_DRY_RUN: bool = get_env_bool("ALERT_DRY_RUN", False)
 settings.ALERT_DRY_RUN = ALERT_DRY_RUN
 
 if ALERT_DRY_RUN:
-    print("⚠️  ALERT_DRY_RUN is ENABLED - No real alerts will be sent")
+    _boot_print("⚠️  ALERT_DRY_RUN is ENABLED - No real alerts will be sent")

@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures for NFCC platform."""
 
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -10,7 +11,19 @@ import pytest
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import src.database.alert_db as alert_db
 from src.database.alert_db import init_db
+
+# Point every SQLite table (alert_db.get_db() reads DB_PATH at call time,
+# and the risk/observation/prediction/subscription modules all go through
+# it) at a throwaway file BEFORE any test module imports src.api.main,
+# whose import-time init_db() would otherwise touch the real one. The
+# session fixture below used to claim it used a temporary database while
+# actually running against data/alerts.db - and then deleting that file
+# at the end of every run, wiping a developer's local alert history (or
+# a deployment's, if tests were ever run inside the container).
+_TEST_DB_DIR = Path(tempfile.mkdtemp(prefix="nfcc-tests-"))
+alert_db.DB_PATH = _TEST_DB_DIR / "alerts.db"
 from src.alerts.engine import AlertEngine
 from src.alerts.providers.mock_provider import MockAlertProvider
 
@@ -29,15 +42,10 @@ from tests.fixtures import *  # noqa: F401,F403
 @pytest.fixture(scope="session", autouse=True)
 def initialize_database():
     """Initialize the database before any tests run."""
-    # Use a temporary database for testing
-    os.environ["NFCC_ENV"] = "testing"
     init_db()
-    print("✅ Test database initialized")
     yield
-    # Cleanup after tests
-    db_path = Path("data/alerts.db")
-    if db_path.exists():
-        db_path.unlink()
+    # Only ever the throwaway copy - see _TEST_DB_DIR above.
+    shutil.rmtree(_TEST_DB_DIR, ignore_errors=True)
 
 
 def _new_api_test_client():

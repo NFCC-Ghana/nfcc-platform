@@ -1,4 +1,4 @@
-"""SHAP-based explanation for forecast fusion (separate from /explain/)."""
+"""Exact Shapley (SHAP) explanation for forecast fusion (separate from /explain/)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,10 @@ class ExplainFusionRequest(BaseModel):
     glofas_risk: Optional[float] = Field(None, ge=0.0, le=100.0)
     flood_hub_risk: Optional[float] = Field(None, ge=0.0, le=100.0)
     nsamples: int = Field(
-        64, ge=8, le=400, description="KernelExplainer samples (latency vs fidelity)"
+        64,
+        ge=8,
+        le=400,
+        description="Ignored - kept for backward compatibility; attributions are exact",
     )
 
 

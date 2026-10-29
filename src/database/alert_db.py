@@ -385,19 +385,28 @@ def get_pending_alert(alert_id: int) -> Optional[Dict[str, Any]]:
         return _decode_pending_alert(dict(row)) if row else None
 
 
-def update_pending_alert_status(
-    alert_id: int, status: str, reviewed_by: str = None
-) -> None:
-    """Mark a pending alert as approved/dismissed with a review timestamp."""
+def transition_pending_alert_status(
+    alert_id: int, from_status: str, to_status: str, reviewed_by: str = None
+) -> bool:
+    """Atomically move a pending alert from from_status to to_status.
+
+    Returns True only for the one caller whose UPDATE actually matched -
+    a compare-and-set in a single SQL statement, so two concurrent
+    approve (or cancel) requests can't both pass a read-then-check and
+    both send a real alert. The container runs several uvicorn worker
+    processes against this same SQLite file (entrypoint.sh), so a
+    reviewer's double-click can genuinely land on two processes at once.
+    """
     now = datetime.now().isoformat()
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE pending_alerts SET status = ?, reviewed_at = ?, "
-            "reviewed_by = ? WHERE id = ?",
-            (status, now, reviewed_by, alert_id),
+            "reviewed_by = ? WHERE id = ? AND status = ?",
+            (to_status, now, reviewed_by, alert_id, from_status),
         )
         conn.commit()
+        return cursor.rowcount == 1
 
 
 def get_total_alerts_count(location_filter: Optional[str] = None) -> int:

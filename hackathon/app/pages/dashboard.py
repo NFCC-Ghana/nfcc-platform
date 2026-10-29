@@ -858,7 +858,7 @@ def render_national_map(state):
             self.shelters_available = 3
             self.verified_reports = 0
             self.district_count = TRACKED_DISTRICT_COUNT
-            self.active_flood_zones = 3
+            self.active_flood_zones = None
 
     map_state = MapState()
     map_state.lat = getattr(state, "lat", 5.560)
@@ -882,13 +882,13 @@ def render_national_map(state):
     # falling back to a hardcoded, non-district-aware community table.
     map_state.shelters_available = getattr(state, "shelters_available", 3)
     map_state.verified_reports = getattr(state, "verified_reports", 0)
-    # Real, from GET /national/summary (river-discharge-based) - falls
-    # back to the illustrative defaults above if that call failed.
+    # Real, from GET /national/summary (river-discharge-based) - if that
+    # call failed, active_flood_zones stays None and the map shows a dash.
     if "error" not in national:
         map_state.district_count = national.get(
             "district_count", TRACKED_DISTRICT_COUNT
         )
-        map_state.active_flood_zones = national.get("active_flood_zones", 3)
+        map_state.active_flood_zones = national.get("active_flood_zones")
 
     # Render the actual map. render_situation_map() already renders its own
     # Districts Monitored / Active Flood Zones / Shelters Available /
@@ -2566,6 +2566,74 @@ _BASIS_LABELS = {
 }
 
 
+_REVIEW_OUTCOME_KEY = "_review_last_outcome"
+
+
+def _remember_review_outcome(action: str, alert_id: int, result: dict) -> None:
+    """Keep an approve/dismiss/retract result across the st.rerun() that
+    follows every review button. Those buttons used to discard the API
+    response entirely, so a rejected approval key, an alert another
+    reviewer had already handled, or an approval where every provider
+    failed to deliver all looked identical to success - the item simply
+    left (or stayed in) the queue with no message."""
+    st.session_state[_REVIEW_OUTCOME_KEY] = {
+        "action": action,
+        "alert_id": alert_id,
+        "result": result,
+    }
+
+
+def _show_review_outcome() -> None:
+    outcome = st.session_state.pop(_REVIEW_OUTCOME_KEY, None)
+    if not outcome:
+        return
+    action, alert_id, result = (
+        outcome["action"],
+        outcome["alert_id"],
+        outcome["result"] or {},
+    )
+    if "error" in result:
+        status_code = result.get("status_code")
+        if status_code in (401, 403):
+            st.error(
+                f"Could not {action} alert #{alert_id}: the platform rejected "
+                "this app's credentials (API key or approval key). Nothing "
+                "was changed."
+            )
+        elif status_code == 409:
+            st.warning(
+                f"Alert #{alert_id} was already handled (likely by another "
+                "reviewer) - nothing was sent again."
+            )
+        else:
+            st.error(
+                f"Could not {action} alert #{alert_id} - the request failed "
+                f"({result['error']}). Check the queue before retrying."
+            )
+        return
+    if action == "dismiss":
+        st.info(f"Alert #{alert_id} dismissed - nothing was sent.")
+        return
+    send = result.get("send_result") or result.get("retraction_send_result") or {}
+    what = "Alert" if action == "approve" else "Retraction"
+    if send.get("simulated"):
+        st.info(f"{what} for #{alert_id} recorded - EXERCISE, nothing was sent.")
+    elif send.get("alert_sent"):
+        st.success(f"{what} for #{alert_id} was delivered.")
+    else:
+        failures = "; ".join(
+            f"{r.get('provider', '?')}: {r.get('message', 'failed')}"
+            for r in send.get("providers", [])
+        )
+        st.error(
+            f"{what} for #{alert_id} was recorded as "
+            f"{'approved' if action == 'approve' else 'retracted'}, but NO "
+            "message was delivered by any channel"
+            + (f" ({failures})" if failures else "")
+            + ". Use another channel to reach the affected communities."
+        )
+
+
 def render_alert_review_queue():
     """The human-in-the-loop screen: automated assessments wait here until
     a person explicitly approves or dismisses them - see
@@ -2599,6 +2667,8 @@ def render_alert_review_queue():
             "retract an alert - this is what gets recorded as who made "
             "the decision."
         )
+
+    _show_review_outcome()
 
     col1, col2 = st.columns([3, 1])
     with col2:
@@ -2720,12 +2790,13 @@ def render_alert_review_queue():
                         use_container_width=True,
                         disabled=not operator_name,
                     ):
-                        call_api(
+                        result = call_api(
                             f"/v1/alerts/pending/{alert['id']}/approve",
                             "POST",
                             {"reviewed_by": operator_name},
                             include_approval_key=True,
                         )
+                        _remember_review_outcome("approve", alert["id"], result)
                         st.rerun()
                     if st.button(
                         "❌ Dismiss",
@@ -2733,12 +2804,13 @@ def render_alert_review_queue():
                         use_container_width=True,
                         disabled=not operator_name,
                     ):
-                        call_api(
+                        result = call_api(
                             f"/v1/alerts/pending/{alert['id']}/dismiss",
                             "POST",
                             {"reviewed_by": operator_name},
                             include_approval_key=True,
                         )
+                        _remember_review_outcome("dismiss", alert["id"], result)
                         st.rerun()
                     # Real OASIS CAP v1.2 XML (src/api/routes/cap_export.py)
                     # for this exact alert - the same schema FEMA IPAWS/EU/
@@ -2797,12 +2869,13 @@ def render_alert_review_queue():
                         use_container_width=True,
                         disabled=not reason or not operator_name,
                     ):
-                        call_api(
+                        result = call_api(
                             f"/v1/alerts/pending/{alert['id']}/cancel",
                             "POST",
                             {"reviewed_by": operator_name, "reason": reason},
                             include_approval_key=True,
                         )
+                        _remember_review_outcome("retract", alert["id"], result)
                         st.rerun()
                     cap_xml = fetch_cap_xml(alert["id"])
                     if cap_xml:

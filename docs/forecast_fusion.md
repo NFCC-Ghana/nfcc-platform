@@ -41,7 +41,7 @@ Optional tuning: `FUSION_CONFIDENCE_MAX_SPREAD` (default `50.0`) scales how fast
 
 ## SHAP explanations
 
-`/explain/forecast` uses SHAP `KernelExplainer` on the same fusion function, with a reference vector defaulting to 50 per source. Values attribute how each **active** source moves the fused risk away from the baseline expectation.
+`/explain/forecast` returns exact Shapley values for the fusion function, against a reference vector defaulting to 50 per source. Because the fused risk is a weighted mean of the active sources (linear for a fixed availability mask), each source's Shapley value has the closed form `w_i * (x_i - ref_i) / sum(active w)` - no sampling, and the contributions sum exactly to `unified_risk - expected_value`. Missing sources get zero.
 
 ## Historical accuracy
 

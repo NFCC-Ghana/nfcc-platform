@@ -36,7 +36,7 @@ Fuse normalized multi-source risks and return a **unified risk** (0–100) plus 
 
 ## POST `/explain/forecast`
 
-SHAP attribution for the same fusion inputs.
+Exact Shapley (SHAP) attribution for the same fusion inputs.
 
 ### Request body (JSON)
 
@@ -44,12 +44,12 @@ Same three risk fields as above, plus:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `nsamples` | int | 64 | KernelExplainer sample count (8–400) |
+| `nsamples` | int | 64 | Accepted for backward compatibility and ignored - attributions are computed exactly, not sampled (8–400) |
 
 ### Response (success)
 
 - `unified_risk` — fused risk  
-- `expected_value` — baseline expectation from the explainer  
+- `expected_value` — fused risk at the baseline reference values  
 - `shap_values` — per-source SHAP contributions (`chirps`, `glofas`, `flood_hub`)  
 - `baseline` — reference values used for each source (default 50)  
 - `summary` — short text ranking contributions  

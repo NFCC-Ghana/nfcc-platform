@@ -134,10 +134,21 @@ def render_situation_map(state):
                 "Districts Monitored",
                 getattr(state, "district_count", TRACKED_DISTRICT_COUNT),
             )
+        # No invented fallbacks on an emergency screen: "Active Flood
+        # Zones" shows a dash when /national/summary failed rather than a
+        # placeholder 3, and the shelter card counts the district's real
+        # named shelters instead of a fixed, sourceless "3 available".
+        active_zones = getattr(state, "active_flood_zones", None)
         with col2:
-            st.metric("Active Flood Zones", getattr(state, "active_flood_zones", 3))
+            st.metric(
+                "Active Flood Zones", "—" if active_zones is None else active_zones
+            )
         with col3:
-            st.metric("Shelters Available", getattr(state, "shelters_available", 3))
+            st.metric(
+                "Named Shelters",
+                len(getattr(state, "shelter_names", None) or []),
+                help="Shelters on record for this district - not live capacity",
+            )
         with col4:
             st.metric("Verified Reports", getattr(state, "verified_reports", 0))
 

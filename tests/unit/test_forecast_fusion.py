@@ -72,3 +72,16 @@ def test_explain_fusion_shap_runs_small_nsamples():
     )
     s = sum(out.shap_values.values())
     assert s == pytest.approx(out.unified_risk - out.expected_value, rel=0.15, abs=0.15)
+
+
+def test_explain_fusion_shap_is_exact_and_masks_missing_sources():
+    """Exact Shapley values for the linear fusion: contributions sum to
+    unified_risk - expected_value with no sampling tolerance, and a
+    missing source gets exactly zero."""
+    inp = ForecastFusionInput(90.0, None, 30.0)
+    out = explain_fusion_shap(inp)
+    assert out.shap_values["glofas"] == 0.0
+    assert sum(out.shap_values.values()) == pytest.approx(
+        out.unified_risk - out.expected_value, abs=1e-9
+    )
+    assert out.shap_values["chirps"] > 0 > out.shap_values["flood_hub"]

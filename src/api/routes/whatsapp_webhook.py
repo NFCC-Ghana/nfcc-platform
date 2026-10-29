@@ -78,6 +78,11 @@ async def whatsapp_inbound(request: Request) -> Response:
         if not validator.validate(validation_url, form_dict, signature):
             logger.warning("Rejected WhatsApp webhook: invalid Twilio signature")
             raise HTTPException(status_code=403, detail="Invalid signature")
+    elif settings.is_production:
+        # Fail closed: without the token there's no way to tell a real
+        # Twilio callback from a forged citizen report.
+        logger.error("Rejected WhatsApp webhook: TWILIO_AUTH_TOKEN unset")
+        raise HTTPException(status_code=503, detail="Webhook not configured")
     else:
         logger.warning(
             "TWILIO_AUTH_TOKEN not configured - accepting WhatsApp webhook "

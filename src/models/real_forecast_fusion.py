@@ -138,12 +138,16 @@ def get_real_forecast_fusion(district: str) -> Dict:
 
     chirps = get_chirps_risk(district)
     glofas = get_glofas_risk(district_info.lat, district_info.lon)
-    flood_hub = get_flood_hub_forecast_for_district(district_info.lat, district_info.lon)
+    flood_hub = get_flood_hub_forecast_for_district(
+        district_info.lat, district_info.lon
+    )
 
     inp = ForecastFusionInput(
         chirps_risk=chirps["risk"] if chirps.get("available") else None,
         glofas_risk=glofas["risk"] if glofas.get("available") else None,
-        flood_hub_risk=flood_hub.get("flood_hub_risk") if flood_hub.get("available") else None,
+        flood_hub_risk=(
+            flood_hub.get("flood_hub_risk") if flood_hub.get("available") else None
+        ),
     )
     fusion = fuse_forecasts(inp)
     confidence = forecast_confidence(inp, fusion.unified_risk)
