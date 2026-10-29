@@ -29,6 +29,9 @@ pandas==2.1.4
 streamlit==1.66.1
 folium==0.20.0
 streamlit-folium==0.27.4
+# Pulled in by streamlit without a pin; pyarrow 26 needs numpy>=2 and
+# crashed the dashboard map on numpy 1.x (pandas 2.1.4 needs numpy<2).
+pyarrow==22.0.0
 plotly>=5.17.0
 
 # Alert Providers
