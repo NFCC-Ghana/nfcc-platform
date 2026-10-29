@@ -23,19 +23,20 @@ def _ci(ci):
 def _skill_table(rows, label="Model"):
     head = (
         f"| {label} | ROC-AUC | PR-AUC (90% CI) | Brier | Precision | Recall | F1 "
-        "| FAR | MER | SEDI (90% CI) |\n"
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        "| FAR | MER | SEDI (90% CI) | POD ±1 wk | FAR ±1 wk |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
     )
     body = ""
     for r in rows:
         if "not_run" in r:
-            body += f"| {r['model']} | not run: {r['not_run']} |" + " |" * 8 + "\n"
+            body += f"| {r['model']} | not run: {r['not_run']} |" + " |" * 10 + "\n"
             continue
         body += (
             f"| {r['model']} | {_f(r['roc_auc'])} | {_f(r['pr_auc'])} "
             f"{_ci(r['pr_auc_90ci'])} | {_f(r['brier'], 4)} | {_f(r['precision'])} "
             f"| {_f(r['recall_pod'])} | {_f(r['f1'])} | {_f(r['false_alarm_ratio'])} "
-            f"| {_f(r['missed_event_rate'])} | {_f(r['sedi'])} {_ci(r['sedi_90ci'])} |\n"
+            f"| {_f(r['missed_event_rate'])} | {_f(r['sedi'])} {_ci(r['sedi_90ci'])} "
+            f"| {_f(r.get('tol_pod'))} | {_f(r.get('tol_far'))} |\n"
         )
     return head + body
 
@@ -59,20 +60,41 @@ def _bar(ax, labels, values, errs=None, title="", ref=None):
 def main():
     R = json.loads((C.RESULTS_DIR / "results.json").read_text())
     d = R["dataset"]
+    years = f"{min(d['onsets_by_year'])}–{max(d['onsets_by_year'])}"
     md = [
-        "# NFCC flood-prediction experiments: results",
+        f"# NFCC flood-prediction experiments: results ({d.get('study', 'v1_gfd')})",
         "",
         f"{d['districts']} districts in {d['regions']} regions, {d['weeks']} weeks "
-        f"(2000–2018). {d['onset_events']} flood onsets in "
+        f"(onsets {years}). {d['onset_events']} flood onsets in "
         f"{d['districts_with_onset']} districts, out of {d['rows_scored']:,} scored "
         f"district-weeks (base rate {d['onset_events'] / d['rows_scored']:.4f}).",
         "",
         "Onsets by region: "
         + ", ".join(f"{k} {v}" for k, v in sorted(d["onsets_by_region"].items())),
         "",
-        "## E1 + E3. Model hierarchy, temporal forward-chaining (test 2008–2018)",
+        "Onsets by year: "
+        + ", ".join(f"{k} {v}" for k, v in sorted(d["onsets_by_year"].items())),
+        "",
+    ]
+    if "flood_weeks_by_label" in d:
+        md += [
+            f"Groundsource events in Ghana: {d['news_events_in_ghana']}; placed in a "
+            f"district: {d['news_events_placed']}; dropped as region- or "
+            f"country-level: {d['news_events_too_large_to_place']}. Flood weeks by "
+            "label: "
+            + ", ".join(f"{k} {v}" for k, v in d["flood_weeks_by_label"].items())
+            + f". Sentinel-1 observed {d['sar_observed_share']:.0%} of district-weeks.",
+            "",
+        ]
+    md += [
+        "## E1 + E3. Model hierarchy, temporal forward-chaining",
+        "",
+        "POD/FAR ±1 wk count an alert one week early or late as a hit.",
         "",
         _skill_table(R["E1_E3_hierarchy_temporal"]),
+        "## E3b. One week ahead (inputs known when the week starts)",
+        "",
+        _skill_table(R.get("E3b_forecast", [])),
         "## E2. Source ablation (XGBoost, temporal)",
         "",
         _skill_table(R["E2_ablation"], "Configuration"),
@@ -136,10 +158,44 @@ def main():
         "",
         f"Global-importance rank stability across bootstrap retrainings: mean "
         f"Spearman ρ {_f(st['mean'])} (min {_f(st['min'])}, {st['pairs']} pairs).",
+    ]
+    if "E10_labels" in R:
+        md += ["", "## E10. Label sensitivity (temporal)", ""]
+        for label in dict.fromkeys(r["label"] for r in R["E10_labels"]):
+            md += [
+                f"**Label: {label}**",
+                "",
+                _skill_table([r for r in R["E10_labels"] if r["label"] == label]),
+            ]
+        a = R["label_agreement"]
+        md += [
+            "## Label agreement: news vs Sentinel-1 (±1 week)",
+            "",
+            f"- News onsets: {a['news_onsets']}; with a Sentinel-1 pass in the window: "
+            f"{a['news_onsets_with_sar_pass']}; confirmed by SAR: "
+            f"{a['news_confirmed_by_sar']} ({_f(a['news_confirmation_rate'])}).",
+            f"- SAR onsets: {a['sar_onsets']}; also in the news: "
+            f"{a['sar_onsets_reported_in_news']} ({_f(a['sar_reporting_rate'])}).",
+            "",
+        ]
+    e8 = R["E8_impact"]
+    if "not_run" not in e8:
+        md += [
+            "## E8. Impact layers (NADMO)",
+            "",
+            f"{e8['records']} records. Spearman ρ of people affected with population "
+            f"density {_f(e8['spearman_affected_vs_density'])}; with population × "
+            f"SAR flooded share {_f(e8['spearman_affected_vs_sar_exposure'])}.",
+            "",
+        ]
+    md += [
         "",
         "## Not runnable",
         "",
-        f"- E8 impact layers: {R['E8_impact']['not_run']}",
+    ]
+    if "not_run" in e8:
+        md.append(f"- E8 impact layers: {e8['not_run']}")
+    md += [
         "- + Dam ablation step: no historical dam or reservoir record for Ghana.",
         "- Human decision, warning-policy and incorrect-AI studies: need recruited "
         "participants and ethics approval.",

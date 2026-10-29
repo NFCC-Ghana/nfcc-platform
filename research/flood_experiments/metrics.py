@@ -12,6 +12,7 @@ and weekly flood series are autocorrelated within a season.
 import math
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score
 
 _EPS = 1e-6
@@ -59,6 +60,26 @@ def categorical(y, yhat):
         "missed_event_rate": fn / (tp + fn) if tp + fn else float("nan"),
         "pofd": fp / (fp + tn) if fp + tn else float("nan"),
         "sedi": sedi(tp, fn, fp, tn),
+    }
+
+
+def tolerant(district, week, y, alert, tol=1):
+    """Event-based scores with a timing tolerance. A news report or a
+    satellite pass can date a flood a week early or late, so an onset
+    counts as hit if the district had an alert within +/- tol weeks, and
+    an alert is false only if no onset fell within +/- tol weeks of it.
+    Strict week-matching would score a one-week timing error as both a
+    miss and a false alarm."""
+    w = (pd.to_datetime(pd.Series(week)) - pd.Timestamp("2000-01-03")).dt.days // 7
+    d, w = np.asarray(district), w.to_numpy()
+    y, a = np.asarray(y).astype(bool), np.asarray(alert).astype(bool)
+    onsets, alerts = set(zip(d[y], w[y])), set(zip(d[a], w[a]))
+    near = range(-tol, tol + 1)
+    hits = sum(any((dd, ww + k) in alerts for k in near) for dd, ww in onsets)
+    false = sum(not any((dd, ww + k) in onsets for k in near) for dd, ww in alerts)
+    return {
+        "tol_pod": hits / len(onsets) if onsets else float("nan"),
+        "tol_far": false / len(alerts) if alerts else float("nan"),
     }
 
 

@@ -1,21 +1,24 @@
-"""Experiments E1-E7 and E9 from the Manuscript Writing Guide.
+"""Experiments from the Manuscript Writing Guide, plus the checks the
+guide does not list but a reviewer would ask for.
 
 E1  Model hierarchy and data configuration (rainfall-only vs multi-source)
 E2  Cumulative source ablation: Baseline -> +Soil -> +River -> +Dam ->
     +Geographic -> +Exposure
 E3  Temporal holdout: forward-chaining by year (train <= y-2, validate
-    y-1, test y), 2008-2018
-E4  Spatial holdout: leave-one-region-out
+    y-1, test y) over config.TEST_YEARS
+E3b One-week-ahead forecast (inputs known when the week starts) vs the
+    nowcast hindcast
+E4  Spatial holdout: leave-one-region-out, separated in time
 E5  Fusion strategy: early fusion, late fusion (mean), stacking, and the
     platform's hand-set weights
 E6  Source degradation: a source missing (filled with its training
     median) or stale (last week's values) at prediction time
 E7  Calibration: raw vs Platt scaling vs isotonic regression
+E8  Impact layers: only with NADMO incident records (nadmo.py)
 E9  SHAP fidelity (deletion test) and stability (bootstrap retraining)
-
-E8 (impact layers) needs district-level impact records (people affected
-per district per event), which no open source provides for Ghana; it is
-reported as not runnable in results/summary.md.
+E10 Label sensitivity (v2): the same models scored against news, SAR and
+    union labels
+LA  Label agreement (v2): how often news reports and Sentinel-1 agree
 
 Run: python -m research.flood_experiments.experiments
 """
@@ -38,7 +41,8 @@ from src.alerts.formatter import calculate_score
 from src.models.multi_source_confidence import RAINFALL_WEIGHT, RIVER_GAUGE_WEIGHT
 
 logger = logging.getLogger("nfcc.research.experiments")
-TEST_YEARS = list(range(2008, 2019))
+TEST_YEARS = C.TEST_YEARS
+MIN_VAL_ONSETS = 5
 
 
 # ---------------------------------------------------------------- splits
@@ -56,8 +60,9 @@ def spatial_folds(df):
     """Leave one region out AND separate it in time. One Global Flood
     Database event floods several regions in the same weeks, so a purely
     spatial split trains on the very event it tests (the model learns the
-    date). Train on other regions <= 2006, validate on them in 2007, test
-    the held-out region in 2008-2018."""
+    date). Train on other regions up to two years before the first test
+    year, validate on them the year before, test the held-out region over
+    the test years."""
     for region in sorted(df["region"].unique()):
         rest = df[df["region"] != region]
         yield (
@@ -69,18 +74,23 @@ def spatial_folds(df):
 
 
 def cross_validate(df, factory, folds):
-    """Fit per fold, threshold on validation, pool the test predictions."""
+    """Fit per fold, threshold on validation, pool the test predictions.
+
+    A validation year with almost no onsets gives a meaningless F1
+    threshold (v1 has six such years), so with fewer than MIN_VAL_ONSETS
+    the threshold is chosen on the training predictions instead."""
     parts = []
     for fold, train, val, test in folds:
         model = factory().fit(train, val)
-        p_val = model.predict(val)
-        thr = M.best_f1_threshold(val["onset"], p_val)
+        tune = val if val["onset"].sum() >= MIN_VAL_ONSETS else train
+        thr = M.best_f1_threshold(tune["onset"], model.predict(tune))
         p = model.predict(test)
         parts.append(
             pd.DataFrame(
                 {
                     "fold": fold,
                     "year": test["year"].to_numpy(),
+                    "week": test["week"].to_numpy(),
                     "district_code": test["district_code"].to_numpy(),
                     "y": test["onset"].to_numpy(),
                     "p": p,
@@ -98,6 +108,7 @@ def score(pred, name):
         "model": name,
         **M.probabilistic(y, p),
         **M.categorical(y, pred["alert"].to_numpy()),
+        **M.tolerant(pred["district_code"], pred["week"], y, pred["alert"]),
     }
     out["pr_auc_90ci"] = M.block_bootstrap_ci(
         y, p, pred["year"], lambda a, b: M.probabilistic(a, b)["pr_auc"]
@@ -121,6 +132,112 @@ def e1_e3_hierarchy(df):
         rows.append(score(pred, name))
         logger.info(f"E3 {name}: PR-AUC {rows[-1]['pr_auc']:.3f}")
     return rows
+
+
+def e3b_forecast(df):
+    """One week ahead: models that see only what is known when the week
+    starts, next to the nowcast multi-source model."""
+    rows = []
+    for factory in [
+        lambda: Mo.XGB(Mo.MULTI_SOURCE, "Nowcast multi-source XGBoost"),
+        lambda: Mo.logistic(Mo.FORECAST, "Forecast logistic regression"),
+        lambda: Mo.XGB(Mo.FORECAST, "Forecast multi-source XGBoost"),
+    ]:
+        name = factory().name
+        rows.append(score(cross_validate(df, factory, temporal_folds(df)), name))
+        logger.info(f"E3b {name}: PR-AUC {rows[-1]['pr_auc']:.3f}")
+    return rows
+
+
+def e10_labels(panel):
+    """The same models trained and scored on each flood record. If a
+    conclusion flips between news and satellite labels, it is about the
+    labels, not about flood prediction."""
+    rows = []
+    for label in C.S["labels"]:
+        df = build_features(panel, label)
+        for factory in [
+            lambda: Mo.Climatology(),
+            lambda: Mo.RainfallThreshold(),
+            lambda: Mo.RiverPercentile(),
+            lambda: Mo.XGB(Mo.MULTI_SOURCE, "Multi-source XGBoost"),
+        ]:
+            r = score(cross_validate(df, factory, temporal_folds(df)), factory().name)
+            r["label"] = label
+            rows.append(r)
+            logger.info(f"E10 {label} {r['model']}: PR-AUC {r['pr_auc']:.3f}")
+    return rows
+
+
+def _keys(df, col):
+    hit = df[df[col] == 1]
+    return set(zip(hit["district_code"], hit["week"]))
+
+
+def label_agreement(panel, tol=1):
+    """News onsets vs Sentinel-1 flags, within +/- tol weeks. A news onset
+    can only be confirmed where the satellite looked, so the confirmation
+    rate is computed over news onsets with a SAR pass within the window."""
+    news = build_features(panel, "news")
+    sar = build_features(panel, "sar")
+    p = panel.assign(week=pd.to_datetime(panel["week"]))
+    observed, flagged, reported = (
+        _keys(p, "sar_observed"),
+        _keys(p, "flood_sar"),
+        _keys(p, "flood_news"),
+    )
+    near = [pd.Timedelta(weeks=k) for k in range(-tol, tol + 1)]
+
+    def any_in(keys, d, w):
+        return any((d, w + k) in keys for k in near)
+
+    n_on = news[news.onset == 1]
+    seen = [r for r in n_on.itertuples() if any_in(observed, r.district_code, r.week)]
+    confirmed = sum(any_in(flagged, r.district_code, r.week) for r in seen)
+    s_on = sar[sar.onset == 1]
+    in_news = sum(any_in(reported, r.district_code, r.week) for r in s_on.itertuples())
+    return {
+        "news_onsets": int(len(n_on)),
+        "news_onsets_with_sar_pass": len(seen),
+        "news_confirmed_by_sar": int(confirmed),
+        "news_confirmation_rate": confirmed / len(seen) if seen else float("nan"),
+        "sar_onsets": int(len(s_on)),
+        "sar_onsets_reported_in_news": int(in_news),
+        "sar_reporting_rate": in_news / len(s_on) if len(s_on) else float("nan"),
+        "tolerance_weeks": tol,
+    }
+
+
+def e8_impact(panel):
+    """E8 needs people affected per district per event (NADMO). It tests
+    whether the exposure layer ranks impacts: Spearman correlation of
+    affected counts with population density and with population x
+    Sentinel-1 flooded share in the incident week."""
+    from research.flood_experiments import nadmo
+
+    static = panel.drop_duplicates("district_code")
+    inc = nadmo.load_incidents(static)
+    inc = inc[pd.to_numeric(inc["affected"], errors="coerce").notna()]
+    if len(inc) < 20:
+        return {
+            "not_run": "Needs NADMO incident records with people affected per "
+            "district (requested; see nadmo_data_request.md). "
+            f"{len(inc)} usable records found."
+        }
+    p = panel.assign(week=pd.to_datetime(panel["week"]))
+    day = pd.to_datetime(inc["date"])
+    inc = inc.assign(week=day - pd.to_timedelta(day.dt.weekday, unit="D"))
+    m = inc.merge(p, on=["district_code", "week"], how="left")
+    density = m["population"] / m["area_km2"]
+    exposed = m["population"] * (m["sar_flood_km2"].fillna(0) / m["area_km2"])
+    affected = m["affected"].astype(float)
+    return {
+        "records": int(len(m)),
+        "spearman_affected_vs_density": float(spearmanr(affected, density).statistic),
+        "spearman_affected_vs_sar_exposure": float(
+            spearmanr(affected, exposed).statistic
+        ),
+    }
 
 
 def e2_ablation(df):
@@ -339,9 +456,10 @@ def e7_calibration(df):
 def e9_shap(df, n_bootstrap=5):
     import shap
 
-    train = df[df["year"] <= 2012]
-    val = df[df["year"] == 2013]
-    test = df[df["year"] >= 2014]
+    end = C.S["shap_train_end"]
+    train = df[df["year"] <= end]
+    val = df[df["year"] == end + 1]
+    test = df[df["year"] >= end + 2]
     feats = Mo.MULTI_SOURCE
     model = Mo.XGB(feats).fit(train, val)
     rng = np.random.default_rng(C.RANDOM_SEED)
@@ -405,13 +523,29 @@ def e9_shap(df, n_bootstrap=5):
             "min": float(np.min(rhos)),
             "pairs": len(rhos),
         },
-        "test_period": "2014-2018",
+        "test_period": f"{end + 2}-{TEST_YEARS[-1]}",
     }
 
 
 def dataset_summary(raw, df):
     flooded = raw[raw["flood"] == 1]
+    extra = {}
+    if "flood_sar" in raw.columns:
+        news = pd.read_csv(C.DATA_DIR / "raw" / "groundsource_events.csv")
+        extra = {
+            "news_events_in_ghana": int(len(news)),
+            "news_events_placed": int(news["district_code"].notna().sum()),
+            "news_events_too_large_to_place": int(
+                (news["area_km2"] > C.NEWS_MAX_AREA_KM2).sum()
+            ),
+            "flood_weeks_by_label": {
+                k: int(raw[f"flood_{k}"].sum()) for k in C.S["labels"]
+            },
+            "sar_observed_share": float(raw["sar_observed"].mean()),
+        }
     return {
+        "study": C.STUDY,
+        **extra,
         "districts": int(raw["district_code"].nunique()),
         "regions": int(raw["region"].nunique()),
         "weeks": int(raw["week"].nunique()),
@@ -438,6 +572,7 @@ def main(only=None):
     out = C.RESULTS_DIR / "results.json"
     single = {
         "E1": ("E1_E3_hierarchy_temporal", e1_e3_hierarchy),
+        "E3b": ("E3b_forecast", e3b_forecast),
         "E2": ("E2_ablation", e2_ablation),
         "E4": ("E4_spatial", e4_spatial),
         "E5": ("E5_fusion", e5_fusion),
@@ -455,17 +590,23 @@ def main(only=None):
     results = {"dataset": dataset_summary(raw, df)}
     logger.info(json.dumps(results["dataset"], default=str))
     results["E1_E3_hierarchy_temporal"] = e1_e3_hierarchy(df)
+    results["E3b_forecast"] = e3b_forecast(df)
     results["E2_ablation"] = e2_ablation(df)
     results["E4_spatial"] = e4_spatial(df)
     results["E5_fusion"] = e5_fusion(df)
     results["E6_degradation"] = e6_degradation(df)
     results["E7_calibration"] = e7_calibration(df)
     results["E9_shap"] = e9_shap(df)
-    results["E8_impact"] = {
-        "not_run": "Needs people-affected counts per district per event; open "
-        "sources (DFO, EM-DAT, ReliefWeb) report them per event or per "
-        "country only."
-    }
+    if "flood_sar" in raw.columns:
+        results["E10_labels"] = e10_labels(raw)
+        results["label_agreement"] = label_agreement(raw)
+        results["E8_impact"] = e8_impact(raw)
+    else:
+        results["E8_impact"] = {
+            "not_run": "Needs people-affected counts per district per event; "
+            "open sources (DFO, EM-DAT, ReliefWeb) report them per event or "
+            "per country only."
+        }
     out.write_text(json.dumps(results, indent=2, default=str))
     logger.info(f"wrote {out}")
 

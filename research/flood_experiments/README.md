@@ -1,90 +1,102 @@
-# Flood-prediction experiments (E1–E7, E9)
+# Flood-prediction experiments
 
 This folder implements the computational experiments in the
 *NFCC CivicFlood Researcher Manuscript Writing Guide*, using only open
-data. It is separate from the live platform: nothing in `src/` imports it.
+data. It also adds the checks a reviewer would ask for: label quality, a
+true forecast mode, and event-tolerant scoring. It is separate from the
+live platform: nothing in `src/` imports it.
+
+## Two studies
+
+| Study | Period | Flood labels | Role |
+| --- | --- | --- | --- |
+| `v2` (default) | 2015–2025 | Groundsource news events (Mayo et al. 2026), our documented events and NADMO records if supplied (`flood_news`). Sentinel-1 detections (`flood_sar`) as an independent second label. Their union (`flood_union`). | Main study |
+| `v1_gfd` | 2000–2018 | Global Flood Database (MODIS, Tellman et al. 2021) and documented events | Sensitivity analysis |
+
+v1 had 203 flood onsets in 19 years and no Ghana events at all in
+2012–2014 or 2016–2017. That is too few, and too gappy, to train or test
+data-driven models. v2 replaces the label source; v1 is kept so the
+change of labels can itself be reported.
 
 ```
 pip install -r requirements.txt -r requirements-research.txt
-earthengine authenticate                                   # once
-python -m research.flood_experiments.build_dataset         # about 1 hour, cached
-python -m research.flood_experiments.experiments           # results/results.json
-python -m research.flood_experiments.report                # results/summary.md + figures
+earthengine authenticate                                       # once
+python -m research.flood_experiments.sar_labels start          # Sentinel-1 export tasks (v2)
+python -m research.flood_experiments.build_dataset dynamic     # these three can run in parallel
+python -m research.flood_experiments.build_dataset discharge
+python -m research.flood_experiments.build_dataset news
+python -m research.flood_experiments.build_dataset             # merge once the exports finish
+python -m research.flood_experiments.experiments               # results/<study>/results.json
+python -m research.flood_experiments.report                    # results/<study>/summary.md + figures
 ```
 
-## Study design
+Set `NFCC_STUDY=v1_gfd` to run the sensitivity study. To re-run a
+single experiment, pass its ID: `python -m research.flood_experiments.experiments E4`.
+
+## Study design (v2)
 
 | Item | Choice |
 | --- | --- |
 | Unit | GAUL 2015 district × Monday-start week |
-| Coverage | 216 districts in all 10 (2015) regions, March 2000 – December 2018 |
+| Coverage | 216 districts in all 10 (2015) regions, January 2015 – December 2025 |
 | Target | Flood **onset**: flooded this week, not flooded last week. Weeks right after a flooded week are excluded. |
-| Labels | Global Flood Database event extents (≥ 1 km² of non-permanent water in the district, all weeks overlapping the event), plus the platform's 8 documented events in `src/hydrology/flood_polygons.py` |
-| Inputs | Known by the end of the target week (perfect-forecast hindcast); no input uses labels |
-
-The study period ends in 2018 because the Global Flood Database ends on
-10 Dec 2018. It is the only satellite flood record with district-level
-extents for Ghana.
+| News label | A Groundsource event in the district overlapping the week. Events are placed by centroid. Events over 1,000 km² are region- or country-level mentions and are dropped. |
+| SAR label | Sentinel-1 VH change detection (UN-SPIDER recommended practice) with permanent-water and slope masks. A week counts only if the district was imaged, the new water is at least 1 km², and it is at least 3× the district's median detection. |
+| Inputs | Nowcast: known by the end of the target week (perfect-forecast hindcast). Forecast (E3b): known when the week starts. No input uses labels. |
+| Test years | 2018–2025, forward-chaining (train ≤ y−2, validate y−1) |
 
 ## Data sources
 
 | Group | Variables | Source |
 | --- | --- | --- |
-| Rainfall | weekly total, wettest day, 4-week antecedent total, weekly lags 1–4 | CHIRPS v2.0 daily, `UCSB-CHG/CHIRPS/DAILY` (Funk et al. 2015) |
-| Soil moisture | top-layer volumetric water, week mean and start-of-week | ERA5-Land daily, `ECMWF/ERA5_LAND/DAILY_AGGR` (Muñoz-Sabater et al. 2021) |
-| River | surface runoff (week, 4-week antecedent); GloFAS v4 discharge at the district centroid, as log and as ratio to the 2000–2007 median | ERA5-Land; GloFAS v4 reanalysis via the Open-Meteo Flood API (method: Harrigan et al. 2020) |
-| Geographic | mean elevation and slope; permanent-water share; built-up share | SRTM 30 m (Farr et al. 2007); JRC Global Surface Water occurrence ≥ 75% (Pekel et al. 2016); GHSL GHS-BUILT-S 2010 (Pesaresi & Politis 2023) |
-| Exposure | log population density, 2010 | WorldPop 100 m (Tatem 2017) |
-| Labels | flood extent per event | Global Flood Database v1 (Tellman et al. 2021), `GLOBAL_FLOOD_DB/MODIS_EVENTS/V1` |
-| Boundaries | districts and regions | FAO GAUL 2015 level 2 |
+| Rainfall | Weekly total and wettest day: district mean and 95th-percentile pixel; 4-week antecedent total; lags 1–4 | CHIRPS v2.0 daily (Funk et al. 2015) |
+| Soil moisture | Top-layer volumetric water: week mean and start of week | ERA5-Land daily (Muñoz-Sabater et al. 2021) |
+| River | Surface runoff; GloFAS v4 discharge at the district's main river (the MERIT Hydro cell with the largest upstream area), as log and as ratio to the pre-test median | ERA5-Land; GloFAS v4 via the Open-Meteo Flood API (Harrigan et al. 2020); MERIT Hydro (Yamazaki et al. 2019) |
+| Geographic | Mean elevation and slope; permanent-water share; built-up share | SRTM; JRC Global Surface Water; GHSL 2010 |
+| Exposure | Log population density, 2010 | WorldPop 100 m |
+| News labels | Flood events from news, geocoded and dated | Groundsource (Mayo et al. 2026), `projects/sat-io/open-datasets/groundsource_2026` |
+| SAR labels | Flooded and observed km² per district-week | Sentinel-1 GRD, `sar_labels.py` |
+| NADMO labels | Incident date, district, deaths, people affected | Requested from NADMO; see `nadmo_data_request.md` |
+| Boundaries | Districts and regions | FAO GAUL 2015 level 2 |
 
-Not available, so not used: TAHMO and GMet station rainfall, HSD river
-gauges and VRA dam records. No partnership data was ever obtained. The
-"+ Dam" ablation step is reported as not runnable, rather than filled
-with simulated values.
+We could not obtain TAHMO or GMet station rainfall, HSD river gauges, or
+VRA dam records. The "+ Dam" ablation step is therefore reported as not
+runnable rather than filled with simulated values.
 
 ## Experiments
 
-| Guide ID | What | Split |
-| --- | --- | --- |
-| E1 | Model hierarchy: climatology, persistence, live rainfall rule, logistic regression, random forest, XGBoost (rainfall only), temporal XGBoost (rain lags + soil state), multi-source XGBoost | Temporal (E3) |
-| E2 | Cumulative ablation: Baseline → +Soil → +River → +Dam → +Geographic → +Exposure | Temporal |
-| E3 | Forward chaining: for each test year *y* in 2008–2018, train on ≤ *y*−2, validate on *y*−1 | — |
-| E4 | Leave-one-region-out *and* separated in time: train on other regions ≤ 2006, validate on them in 2007, test the held-out region 2008–2018. A purely spatial split leaks, because one flood event covers several regions in the same weeks (PR-AUC 0.31 leaky vs 0.001 clean). | — |
-| E5 | Early fusion vs late fusion (mean of per-source models) vs stacking vs the platform's hand-set weights | Temporal |
-| E6 | One source missing (training median) or one week stale, at prediction time only | Temporal |
-| E7 | Raw vs Platt scaling vs isotonic regression, fitted on each validation year | Temporal |
-| E9 | SHAP fidelity (deletion test vs random) and stability (Spearman ρ across 5 bootstrap retrainings) | Train ≤ 2012, test 2014–2018 |
+| ID | What |
+| --- | --- |
+| E1 | Model hierarchy: climatology; persistence; the live rainfall rule; a river-percentile (GloFAS-style) benchmark; logistic regression; random forest; XGBoost on rainfall; temporal XGBoost; multi-source XGBoost |
+| E2 | Cumulative ablation: Baseline → +Soil → +River → +Dam → +Geographic → +Exposure |
+| E3 | Forward-chaining by year |
+| E3b | One week ahead: forecast-mode models vs the nowcast |
+| E4 | Leave-one-region-out *and* separated in time. A purely spatial split leaks, because one flood event covers several regions in the same weeks (v1: PR-AUC 0.31 leaky vs 0.001 clean). |
+| E5 | Early fusion vs late fusion vs stacking vs the platform's hand-set weights |
+| E6 | One source missing (training median) or one week stale, at prediction time only |
+| E7 | Raw vs Platt scaling vs isotonic regression |
+| E8 | Impact layers: Spearman ρ of NADMO people-affected counts with exposure. Runs only once NADMO records are supplied. |
+| E9 | SHAP fidelity (deletion test vs random) and stability (Spearman ρ across bootstrap retrainings) |
+| E10 | Label sensitivity: the same models trained and scored on news, SAR and union labels |
+| LA | Label agreement: the share of news onsets confirmed by Sentinel-1 when it imaged the district, and the share of SAR onsets that appear in the news |
 
-Not runnable in code: E8 (impact layers) needs people-affected counts per
-district per event, which no open source has for Ghana. The
-human-decision, warning-policy and "incorrect AI" studies need recruited
-participants and ethics approval.
+The human-decision, warning-policy and "incorrect AI" studies need
+recruited participants and ethics approval, so they are not in code.
 
-**Metrics:** ROC-AUC, PR-AUC, Brier score, expected calibration error,
-precision, recall (POD), F1, false-alarm ratio (FAR), missed-event rate
-(MER), POFD and SEDI (Ferro & Stephenson 2011). Decision thresholds
-maximise F1 on the validation fold and are then applied unchanged to the
-test fold. The 90% intervals come from a bootstrap that resamples whole
-years.
+## Modelling and evaluation choices
+
+- **Monotone XGBoost.** Rain, soil, runoff and discharge inputs can only raise risk. With a few hundred events, unconstrained trees learn physically impossible shapes. Trees are shallow (depth 3) and regularised.
+- **Thresholds.** The decision threshold maximises F1 on the validation year. When that year has fewer than 5 onsets, the threshold is chosen on the training years instead.
+- **Event-tolerant scores.** POD and FAR at ±1 week sit alongside strict week-matching, because news and satellite dating can be a week off.
+- **Metrics.** ROC-AUC, PR-AUC, Brier, ECE, precision, recall (POD), F1, FAR, MER, POFD and SEDI (Ferro & Stephenson 2011), with year-block bootstrap 90% intervals.
 
 ## Known limitations
 
-- **Incomplete labels.** MODIS (250 m, cloud-limited) misses most short
-  urban flash floods, so "no flood" weeks include unrecorded floods. This
-  biases precision and FAR toward looking worse, never better.
-- **Few events.** 203 onsets in 19 years. The Global Flood Database
-  has no Ghana event in 2012–2014 or 2016–2017, so test years 2008–2018
-  hold about 106 onsets, mostly in 2009, 2010 and 2018. Confidence
-  intervals are wide.
-- **Coarse event timing.** A Global Flood Database event's dates span its
-  whole observed period, so onset week can be off by the event's
-  detection lag.
-- **Perfect-forecast hindcast.** Using the target week's observed rainfall
-  stands in for a perfect forecast. Operational skill will be lower by
-  the forecast error.
-- **Discharge at centroids.** The river nearest a district centroid is not
-  always the one that floods it.
+- **News labels follow media coverage.** Groundsource recall is lower where digital news is scarce (rural north). Reporting also grows over time: 124 Ghana events in 2015 vs 338 in 2022. Models may partly learn where and when floods get reported. E10 and LA measure this; they do not remove it.
+- **SAR labels miss and confuse things.** Sentinel-1 images each district every 6–12 days. It misses short floods, floods under dense vegetation and floods in built-up areas (double bounce). It can mistake newly flooded rice fields for floods. The anomaly rule reduces, but does not remove, these errors.
+- **Coarse event timing.** A record's dates are when it was reported or imaged, not necessarily when the flood started.
+- **Perfect-forecast hindcast.** The nowcast uses observed rainfall for the target week. E3b shows the operational one-week-ahead case.
+- **GAUL 2015 districts.** Ghana has had 261 districts since 2018. Records for new districts map to their 2015 parent.
 
 ## References
 
@@ -93,10 +105,13 @@ years.
 - Funk, C. et al. (2015). The climate hazards infrared precipitation with stations. *Scientific Data* 2, 150066. doi:10.1038/sdata.2015.66
 - Harrigan, S. et al. (2020). GloFAS-ERA5 operational global river discharge reanalysis 1979–present. *Earth System Science Data* 12, 2043–2060. doi:10.5194/essd-12-2043-2020
 - Lundberg, S. M. et al. (2020). From local explanations to global understanding with explainable AI for trees. *Nature Machine Intelligence* 2, 56–67. doi:10.1038/s42256-019-0138-9
+- Mayo, R. et al. (2026). Groundsource: a dataset of flood events from news. EarthArXiv preprint; data doi:10.5281/zenodo.18647054
 - Muñoz-Sabater, J. et al. (2021). ERA5-Land: a state-of-the-art global reanalysis dataset for land applications. *Earth System Science Data* 13, 4349–4383. doi:10.5194/essd-13-4349-2021
 - Pekel, J.-F. et al. (2016). High-resolution mapping of global surface water and its long-term changes. *Nature* 540, 418–422. doi:10.1038/nature20584
 - Pesaresi, M. & Politis, P. (2023). GHS-BUILT-S R2023A. European Commission, JRC. doi:10.2905/9F06F36F-4B11-47EC-ABB0-4F8B7B1D72EA
 - Platt, J. (1999). Probabilistic outputs for support vector machines. *Advances in Large Margin Classifiers*, 61–74.
 - Tatem, A. J. (2017). WorldPop, open data for spatial demography. *Scientific Data* 4, 170004. doi:10.1038/sdata.2017.4
 - Tellman, B. et al. (2021). Satellite imaging reveals increased proportion of population exposed to floods. *Nature* 596, 80–86. doi:10.1038/s41586-021-03695-w
+- UN-SPIDER (2019). Recommended Practice: Flood mapping and damage assessment using Sentinel-1 SAR data in Google Earth Engine.
+- Yamazaki, D. et al. (2019). MERIT Hydro: a high-resolution global hydrography map based on latest topography dataset. *Water Resources Research* 55, 5053–5073. doi:10.1029/2019WR024873
 - Zadrozny, B. & Elkan, C. (2002). Transforming classifier scores into accurate multiclass probability estimates. *KDD '02*, 694–699.

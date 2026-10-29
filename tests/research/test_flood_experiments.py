@@ -117,3 +117,104 @@ class TestOnsetTarget:
         assert first["rain_week_sum"] == 4.0
         assert first["rain_lag1"] == 3.0
         assert first["rain_prev4w_sum"] == 3.0 + 2.0 + 1.0 + 0.0
+
+    def test_label_argument_selects_the_flood_record(self):
+        panel = _panel([0] * 10).assign(
+            flood_news=[0] * 6 + [1] + [0] * 3, flood_sar=[0] * 10
+        )
+        assert build_features(panel, "news")["onset"].sum() == 1
+        assert build_features(panel, "sar")["onset"].sum() == 0
+
+    def test_forecast_inputs_are_lagged(self):
+        panel = _panel([0] * 10).assign(q_week_max=np.arange(10, dtype=float))
+        df = build_features(panel)
+        assert (df["q_week_max_log_lag1"] == np.log1p(df["q_week_max"] - 1)).all()
+
+
+class TestTolerantScores:
+    def test_one_week_early_alert_is_a_hit_not_a_false_alarm(self):
+        weeks = pd.date_range("2020-01-06", periods=6, freq="7D")
+        y = [0, 0, 0, 1, 0, 0]
+        alert = [0, 0, 1, 0, 0, 0]
+        out = M.tolerant([1] * 6, weeks, y, alert)
+        assert out == {"tol_pod": 1.0, "tol_far": 0.0}
+        strict = M.categorical(y, alert)
+        assert strict["recall_pod"] == 0.0 and strict["false_alarm_ratio"] == 1.0
+
+    def test_alert_in_another_district_does_not_count(self):
+        weeks = pd.date_range("2020-01-06", periods=2, freq="7D")
+        out = M.tolerant([1, 2], weeks, [1, 0], [0, 1])
+        assert out == {"tol_pod": 0.0, "tol_far": 1.0}
+
+
+class TestModels:
+    def test_river_percentile_ranks_within_each_district(self):
+        from research.flood_experiments.models import RiverPercentile
+
+        train = pd.DataFrame(
+            {
+                "district_code": [1] * 4 + [2] * 4,
+                "q_week_max": [1, 2, 3, 4, 10, 20, 30, 40],
+            }
+        )
+        test = pd.DataFrame({"district_code": [1, 2, 3], "q_week_max": [4, 15, 5]})
+        p = RiverPercentile().fit(train).predict(test)
+        assert p.tolist() == [1.0, 0.25, 0.0]
+
+    def test_xgb_is_monotone_in_rainfall(self):
+        from research.flood_experiments.models import XGB
+
+        rng = np.random.default_rng(0)
+        n = 3000
+        df = pd.DataFrame(
+            {"rain_week_sum": rng.gamma(2, 20, n), "elev_mean": rng.normal(100, 30, n)}
+        )
+        df["onset"] = (rng.random(n) < 0.02 + 0.002 * df["rain_week_sum"]).astype(int)
+        m = XGB(["rain_week_sum", "elev_mean"]).fit(df, df)
+        grid = pd.DataFrame(
+            {"rain_week_sum": np.linspace(0, 200, 50), "elev_mean": 100.0}
+        )
+        assert np.all(np.diff(m.predict(grid)) >= -1e-9)
+
+
+class TestSarFlags:
+    def test_flags_need_observation_size_and_anomaly(self):
+        from research.flood_experiments.build_dataset import sar_flags
+
+        sar = pd.DataFrame(
+            {
+                "district_code": [1] * 6,
+                "flood_km2": [0.5, 0.5, 0.5, 5.0, 1.2, 9.0],
+                "obs_km2": [100, 100, 100, 100, 100, 0],
+            }
+        )
+        # median of observed weeks is 0.5, so the floor is 1.5 km2: week 3
+        # is a flood, week 4 is under the anomaly floor, week 5 unobserved
+        assert sar_flags(sar).tolist() == [0, 0, 0, 1, 0, 0]
+
+
+class TestNadmoMatching:
+    def test_matches_exact_suffix_stripped_and_reports_unmatched(
+        self, tmp_path, monkeypatch
+    ):
+        from research.flood_experiments import config as C
+        from research.flood_experiments import nadmo
+
+        monkeypatch.setattr(C, "DATA_DIR", tmp_path)
+        (tmp_path / "raw").mkdir()
+        pd.DataFrame(
+            {
+                "date": ["2022-06-01"] * 3,
+                "district": ["Keta Municipal", "Keta", "Nowhere"],
+                "region": ["Volta"] * 3,
+                "deaths": [0, 1, 0],
+                "affected": [100, 50, 10],
+                "houses_damaged": [5, 2, 0],
+            }
+        ).to_csv(tmp_path / "raw" / "nadmo_incidents.csv", index=False)
+        static = pd.DataFrame(
+            {"district": ["Keta Municipal"], "region": ["Volta"], "district_code": [7]}
+        )
+        out = nadmo.load_incidents(static)
+        assert out["district_code"].tolist() == [7, 7]
+        assert (tmp_path / "raw" / "nadmo_unmatched.csv").exists()

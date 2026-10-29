@@ -1,15 +1,20 @@
 """Turn the raw district-week panel into model inputs and the onset target.
 
 Target: flood ONSET - the district is flooded this week and was not
-flooded last week. Global Flood Database events span several weeks, so
-the plain weekly label is dominated by "still flooded" weeks that any
-persistence rule predicts trivially. Every week that follows a flooded
-week (flood still under way, or just receding) is dropped from training
-and scoring, so every model is judged on predicting a new flood.
+flooded last week. Flood records span several weeks, so the plain weekly
+label is dominated by "still flooded" weeks that any persistence rule
+predicts trivially. Every week that follows a flooded week (flood still
+under way, or just receding) is dropped from training and scoring, so
+every model is judged on predicting a new flood.
 
-Every input is known by the end of the target week: rainfall and runoff
-for that week (a perfect-forecast proxy, the standard hindcast setup)
-plus antecedent state from earlier weeks. No input uses labels.
+Two input timings:
+- Nowcast (default feature sets): inputs known by the END of the target
+  week, including that week's rainfall and runoff - a perfect-forecast
+  hindcast, the standard upper bound for a forecast system.
+- Forecast (models.FORECAST): only inputs known at the START of the
+  target week (lagged rain, soil, runoff and discharge). This is what an
+  operational one-week-ahead warning could use.
+No input uses labels.
 """
 
 import numpy as np
@@ -17,13 +22,14 @@ import pandas as pd
 
 from research.flood_experiments import config as C
 
-# Discharge climatology comes only from 2000-2007, before the first
-# forward-chaining test year (2008), so q_ratio never sees test years.
-_Q_CLIMATOLOGY_END = "2007-12-31"
 
-
-def build_features(panel: pd.DataFrame) -> pd.DataFrame:
+def build_features(panel: pd.DataFrame, label: str = "news") -> pd.DataFrame:
+    """label: which flood record defines the target - "news", "sar" or
+    "union" in v2 (columns flood_<label>); v1 has a single `flood`."""
     df = panel.copy()
+    col = f"flood_{label}"
+    if col in df.columns:
+        df["flood"] = df[col]
     df["week"] = pd.to_datetime(df["week"])
     df = df.sort_values(["district_code", "week"]).reset_index(drop=True)
     df["year"] = df["week"].dt.year
@@ -42,11 +48,15 @@ def build_features(panel: pd.DataFrame) -> pd.DataFrame:
 
     df["q_week_max"] = df["q_week_max"].clip(lower=0)
     df["q_week_max_log"] = np.log1p(df["q_week_max"])
-    early = df[df["week"] <= _Q_CLIMATOLOGY_END]
+    # Discharge climatology comes only from years before the first test
+    # year, so q_ratio never sees test data.
+    early = df[df["week"] <= C.S["q_climatology_end"]]
     q_median = early.groupby("district_code")["q_week_max"].median()
     df["q_ratio"] = df["q_week_max"] / (
         df["district_code"].map(q_median).replace(0, np.nan) + 1e-3
     )
+    df["q_ratio_lag1"] = g["q_ratio"].shift(1)
+    df["q_week_max_log_lag1"] = g["q_week_max_log"].shift(1)
 
     df["log_pop_density"] = np.log1p(df["population"] / df["area_km2"])
 

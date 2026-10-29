@@ -71,6 +71,32 @@ class RainfallThreshold:
         return np.array([calculate_score(v) / 100.0 for v in df["rain_week_max"]])
 
 
+class RiverPercentile:
+    """The GloFAS-style benchmark: how unusual this week's discharge is
+    for the district - its percentile within the district's training
+    weeks. Operational GloFAS warns on return-period exceedance; this is
+    the same signal without a fixed return period. Not a probability, so
+    judge it on ranking (ROC/PR-AUC) and thresholded scores, not Brier."""
+
+    name = "River percentile (GloFAS-style)"
+    features = ["q_week_max"]
+
+    def fit(self, train, val=None):
+        self.sorted = {
+            k: np.sort(g.dropna().to_numpy())
+            for k, g in train.groupby("district_code")["q_week_max"]
+        }
+        return self
+
+    def predict(self, df):
+        out = np.zeros(len(df))
+        for i, (code, q) in enumerate(zip(df["district_code"], df["q_week_max"])):
+            ref = self.sorted.get(code)
+            if ref is not None and len(ref) and q == q:
+                out[i] = np.searchsorted(ref, q, side="right") / len(ref)
+        return out
+
+
 class _Sklearn:
     def __init__(self, features, estimator, name):
         self.features = features
@@ -112,7 +138,13 @@ def random_forest(features, name="Random forest"):
 
 class XGB:
     """Gradient-boosted trees with early stopping on the validation fold's
-    PR-AUC. Missing values are handled natively."""
+    PR-AUC. Missing values are handled natively.
+
+    With a few hundred events, unconstrained trees learn noise such as
+    "more rain lowers risk" in some corner of the feature space. Rain,
+    soil, runoff and discharge inputs (config.MONOTONE_UP) are therefore
+    constrained to raise risk monotonically, and trees are kept shallow
+    and regularised."""
 
     def __init__(self, features, name="XGBoost", seed=C.RANDOM_SEED):
         self.features = features
@@ -123,14 +155,18 @@ class XGB:
         from xgboost import XGBClassifier
 
         self.model = XGBClassifier(
-            n_estimators=800,
+            n_estimators=600,
             learning_rate=0.03,
-            max_depth=4,
-            min_child_weight=5,
+            max_depth=3,
+            min_child_weight=10,
+            reg_lambda=5.0,
             subsample=0.8,
             colsample_bytree=0.8,
+            monotone_constraints=tuple(
+                1 if f in C.MONOTONE_UP else 0 for f in self.features
+            ),
             eval_metric="aucpr",
-            early_stopping_rounds=60,
+            early_stopping_rounds=50,
             random_state=self.seed,
             n_jobs=-1,
             verbosity=0,
@@ -154,6 +190,19 @@ TEMPORAL = C.SEASON + C.RAIN + C.RAIN_LAGS + C.SOIL
 MULTI_SOURCE = (
     C.SEASON + C.RAIN + C.RAIN_LAGS + C.SOIL + C.RIVER + C.GEOGRAPHIC + C.EXPOSURE
 )
+# One week ahead: only what is known when the week starts.
+FORECAST = (
+    C.SEASON
+    + C.RAIN_LAGS
+    + ["rain_prev4w_sum", "sm_start", "runoff_prev4w_sum"]
+    + ["q_ratio_lag1", "q_week_max_log_lag1"]
+    + C.GEOGRAPHIC
+    + C.EXPOSURE
+)
+C.MONOTONE_UP.update(
+    ["rain_prev4w_sum", "sm_start", "runoff_prev4w_sum"]
+    + ["q_ratio_lag1", "q_week_max_log_lag1"]
+)
 
 
 def hierarchy():
@@ -162,6 +211,7 @@ def hierarchy():
         lambda: Climatology(),
         lambda: Persistence(),
         lambda: RainfallThreshold(),
+        lambda: RiverPercentile(),
         lambda: logistic(RAIN_ONLY, "Logistic regression (rainfall)"),
         lambda: random_forest(RAIN_ONLY, "Random forest (rainfall)"),
         lambda: XGB(RAIN_ONLY, "XGBoost (rainfall)"),
