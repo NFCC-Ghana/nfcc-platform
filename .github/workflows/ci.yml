@@ -23,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -44,10 +44,11 @@ jobs:
           sleep 10
           curl -f http://127.0.0.1:8000/health
           curl -f http://127.0.0.1:8000/
-          curl -f http://127.0.0.1:8000/districts
+          curl -f http://127.0.0.1:8000/v1/districts
           curl -f -X POST http://127.0.0.1:8000/score \
             -H "Content-Type: application/json" \
             -d '{"location":"Accra Central","precipitation":95.5}'
+          curl -f -X POST http://127.0.0.1:8000/score/batch             -H "Content-Type: application/json"             -d '{"requests":[{"location":"Accra Central","precipitation":12}]}'
           kill %1
 
   lint:
@@ -58,10 +59,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install flake8 and black
-        run: python -m pip install --upgrade pip && pip install flake8 black
+        # Same black specifier as requirements-dev.txt - black's stable
+        # style only changes in each year's first release, so pinning the
+        # major keeps CI and local formatting in agreement.
+        run: python -m pip install --upgrade pip && pip install flake8 "black>=26.1,<27"
 
       # Uses the repo's existing .flake8 config (max-line-length=88, real
       # style noise like E501/F401/E402 already ignored there) - flags
@@ -89,7 +93,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install scanners
         run: python -m pip install --upgrade pip && pip install bandit pip-audit

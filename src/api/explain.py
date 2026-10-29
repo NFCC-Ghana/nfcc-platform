@@ -66,7 +66,9 @@ async def explain_prediction(request: ExplainRequest) -> Dict[str, Any]:
     # per-location adjustment to report here - src/hydrology/urban_
     # drainage.py's real per-district factor only applies via /situation.
     seasonal_factor = (
-        "rainy season" if datetime.now().month in _GHANA_RAINY_SEASON_MONTHS else "dry season"
+        "rainy season"
+        if datetime.now().month in _GHANA_RAINY_SEASON_MONTHS
+        else "dry season"
     )
 
     return {

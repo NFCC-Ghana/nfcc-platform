@@ -26,12 +26,19 @@ updates:
         applies-to: security-updates
         patterns:
           - "*"
-      # Routine version bumps are grouped into one weekly PR instead of
-      # a dozen separate ones for unrelated packages.
+      # Routine minor/patch bumps are grouped into one weekly PR instead
+      # of a dozen separate ones for unrelated packages. Major bumps are
+      # deliberately left out of the group so each arrives as its own PR:
+      # one bundled PR mixing 38 updates with breaking majors (numpy 1->2,
+      # which also needs a newer Python) could never pass CI, which held
+      # every safe patch in it hostage too.
       python-routine:
         applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
 

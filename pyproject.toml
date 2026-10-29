@@ -1,6 +1,6 @@
 [tool.black]
 line-length = 88
-target-version = ['py310']
+target-version = ['py311']
 include = '\.pyi?$'
 
 extend-exclude = '''
@@ -20,20 +20,6 @@ extend-exclude = '''
 profile = "black"
 line_length = 88
 
-[tool.flake8]
-max-line-length = 88
-extend-ignore = ["E203", "W503"]
-exclude = [
-    ".git",
-    "__pycache__",
-    ".venv",
-    "venv",
-    "build",
-    "dist"
-]
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-
+# flake8 config lives in .flake8 (flake8 doesn't read pyproject.toml) and
+# pytest config in pytest.ini (pytest ignores this file's section when a
+# pytest.ini exists) - sections for both used to sit here, silently unused.

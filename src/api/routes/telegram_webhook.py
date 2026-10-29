@@ -26,6 +26,7 @@ billing tier where this behaves differently, so there's no reason to use
 Telegram's alternate "answer via webhook response body" mechanism.
 """
 
+import hmac
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
@@ -64,9 +65,15 @@ def _send_message(chat_id, text: str) -> None:
 async def telegram_inbound(request: Request) -> dict:
     if settings.TELEGRAM_WEBHOOK_SECRET:
         secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if secret != settings.TELEGRAM_WEBHOOK_SECRET:
+        # Constant-time, same reasoning as verify_api_key in src/api/auth.py.
+        if not hmac.compare_digest(secret, settings.TELEGRAM_WEBHOOK_SECRET):
             logger.warning("Rejected Telegram webhook: invalid secret token")
             raise HTTPException(status_code=403, detail="Invalid secret token")
+    elif settings.is_production:
+        # Fail closed: without the secret, anyone could forge citizen
+        # flood reports or subscribe arbitrary chats to alerts.
+        logger.error("Rejected Telegram webhook: TELEGRAM_WEBHOOK_SECRET unset")
+        raise HTTPException(status_code=503, detail="Webhook not configured")
     else:
         logger.warning(
             "TELEGRAM_WEBHOOK_SECRET not configured - accepting Telegram "

@@ -102,7 +102,15 @@ async def v1_exercise(request: ExerciseRequest):
     return await create_exercise_alert(request)
 
 
-@router.get("/pending", response_model=PendingAlertListResponse)
+# The review queue holds UNREVIEWED drafts - "EVACUATE NOW" text a human
+# may still dismiss as a false alarm. Publicly readable, it let anyone
+# screenshot and spread an alert the platform never issued. The dashboard
+# (its only reader) already sends the API key.
+@router.get(
+    "/pending",
+    response_model=PendingAlertListResponse,
+    dependencies=[Depends(verify_api_key)],
+)
 async def v1_list_pending(status: str = "pending"):
     return await list_pending_alerts(status=status)
 
@@ -134,7 +142,9 @@ async def v1_dismiss(
     return await dismiss_pending_alert(alert_id, decision, approval_key)
 
 
-@router.get("/pending/{alert_id}/cap.xml")
+# Same reasoning as GET /pending - this exports any queue item, reviewed
+# or not.
+@router.get("/pending/{alert_id}/cap.xml", dependencies=[Depends(verify_api_key)])
 async def v1_cap_xml(alert_id: int):
     return await export_cap_xml(alert_id)
 

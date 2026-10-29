@@ -13,11 +13,12 @@ import numpy as np
 import pandas as pd
 import plotly
 import rasterio
-import shap
-import sklearn
 import streamlit as st
 import xarray as xr
-import xgboost
+
+# shap, scikit-learn and xgboost were dropped from the project on
+# 2026-09-27 along with the unused trained model (see requirements.txt),
+# so they're no longer part of a correct environment.
 
 
 def test_core_imports():
@@ -29,9 +30,6 @@ def test_core_imports():
         gpd,
         rasterio,
         xr,
-        sklearn,
-        xgboost,
-        shap,
         st,
         folium,
         plotly,

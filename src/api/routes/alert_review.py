@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from src.api.auth import approval_key_header, enforce_approval_key, verify_api_key
 from src.alerts.engine import AlertEngine
 from src.alerts.formatter import calculate_score, get_risk_tier
+from src.config.settings import settings
 from src.exposure.community_names import get_affected_communities
 from src.exposure.impact_estimator import impact_estimator
 from src.hydrology.sentinel_processor import sentinel_processor
@@ -41,17 +42,51 @@ from src.database.alert_db import (
     get_pending_alert,
     get_pending_alerts,
     save_pending_alert,
-    update_pending_alert_status,
+    transition_pending_alert_status,
 )
 
 logger = logging.getLogger("nfcc-api.alert-review")
 
 router = APIRouter(prefix="/alerts", tags=["alert-review"])
 
-# Matches AlertEngine.THRESHOLDS["MODERATE"][0] and
-# src/alerts/formatter.py:get_risk_tier's own LOW/MODERATE boundary - an
-# assessment below this doesn't warrant a human's attention at all.
-_REVIEW_THRESHOLD = 30
+# Same setting AlertEngine.THRESHOLDS["MODERATE"][0] and
+# src/alerts/formatter.py:get_risk_tier's LOW/MODERATE boundary read - an
+# assessment below this doesn't warrant a human's attention at all. Was a
+# hardcoded 30, which would silently drift from the tier boundary the
+# moment a deployer changed ALERT_THRESHOLD_MODERATE.
+_REVIEW_THRESHOLD = settings.ALERT_THRESHOLD_MODERATE
+
+
+def _claim(alert_id: int, from_status: str, to_status: str, reviewed_by: str) -> None:
+    """Atomically claim a status transition or raise 409 - see
+    transition_pending_alert_status for why a read-then-check isn't enough
+    when a real alert send depends on it."""
+    if not transition_pending_alert_status(
+        alert_id, from_status, to_status, reviewed_by
+    ):
+        current = get_pending_alert(alert_id)
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Alert #{alert_id} is already "
+                f"{current['status'] if current else 'gone'}"
+            ),
+        )
+
+
+def _send_or_release(alert_id: int, claimed_status: str, from_status: str, **kwargs):
+    """Send via the alert engine after a successful _claim; if the send
+    itself raises, hand the alert back to from_status so a reviewer can
+    retry instead of it being recorded as sent when nothing went out."""
+    from src.api.main import alert_engine as global_alert_engine
+
+    engine = global_alert_engine or AlertEngine()
+    try:
+        return engine.process(force=True, **kwargs)
+    except Exception:
+        transition_pending_alert_status(alert_id, claimed_status, from_status, None)
+        raise
+
 
 _DEFAULT_MESSAGES = {
     "MODERATE": "Moderate flood risk. Monitor conditions.",
@@ -394,7 +429,7 @@ async def approve_pending_alert(
                 "drill of the review workflow only."
             ),
         }
-        update_pending_alert_status(alert_id, "approved", decision.reviewed_by)
+        _claim(alert_id, "pending", "approved", decision.reviewed_by)
         logger.info(
             f"EXERCISE alert #{alert_id} approved by {decision.reviewed_by} "
             "- simulated, nothing sent"
@@ -403,18 +438,17 @@ async def approve_pending_alert(
 
     enforce_approval_key(approval_key)
 
-    from src.api.main import alert_engine as global_alert_engine
-
-    engine = global_alert_engine or AlertEngine()
-    result = engine.process(
+    _claim(alert_id, "pending", "approved", decision.reviewed_by)
+    result = _send_or_release(
+        alert_id,
+        "approved",
+        "pending",
         location=pending["location"],
         score=pending["score"],
-        force=True,
         precipitation=pending["precipitation"],
         message=pending["message"],
     )
 
-    update_pending_alert_status(alert_id, "approved", decision.reviewed_by)
     logger.warning(
         f"Pending alert #{alert_id} APPROVED by {decision.reviewed_by} - "
         f"send result: {result.get('alert_sent')}"
@@ -469,7 +503,7 @@ async def cancel_pending_alert(
             "simulated": True,
             "note": "EXERCISE - no real retraction was sent.",
         }
-        update_pending_alert_status(alert_id, "cancelled", decision.reviewed_by)
+        _claim(alert_id, "approved", "cancelled", decision.reviewed_by)
         logger.info(
             f"EXERCISE alert #{alert_id} cancelled by {decision.reviewed_by} "
             f"(reason: {decision.reason}) - simulated, nothing sent"
@@ -483,18 +517,17 @@ async def cancel_pending_alert(
 
     enforce_approval_key(approval_key)
 
-    from src.api.main import alert_engine as global_alert_engine
-
-    engine = global_alert_engine or AlertEngine()
-    result = engine.process(
+    _claim(alert_id, "approved", "cancelled", decision.reviewed_by)
+    result = _send_or_release(
+        alert_id,
+        "cancelled",
+        "approved",
         location=pending["location"],
         score=pending["score"],
-        force=True,
         precipitation=pending["precipitation"],
         message=cancel_message,
     )
 
-    update_pending_alert_status(alert_id, "cancelled", decision.reviewed_by)
     logger.warning(
         f"Pending alert #{alert_id} CANCELLED by {decision.reviewed_by} "
         f"(reason: {decision.reason}) - retraction send result: "
@@ -535,6 +568,6 @@ async def dismiss_pending_alert(
     if pending.get("cap_status") != _CAP_STATUS_EXERCISE:
         enforce_approval_key(approval_key)
 
-    update_pending_alert_status(alert_id, "dismissed", decision.reviewed_by)
+    _claim(alert_id, "pending", "dismissed", decision.reviewed_by)
     logger.info(f"Pending alert #{alert_id} dismissed by {decision.reviewed_by}")
     return {"id": alert_id, "status": "dismissed"}

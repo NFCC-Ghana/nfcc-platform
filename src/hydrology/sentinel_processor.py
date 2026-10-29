@@ -225,12 +225,20 @@ class SentinelProcessor:
             # Earth Engine chain that's expensive to mock faithfully, but
             # the arithmetic itself, where a fix could actually introduce
             # a bug, is isolated and unit-tested independently of that).
-            vh_diff_mean = vh_diff.reduceRegion(
-                reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
-            ).getInfo().get("VH")
-            vv_diff_mean = vv_diff.reduceRegion(
-                reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
-            ).getInfo().get("VV")
+            vh_diff_mean = (
+                vh_diff.reduceRegion(
+                    reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
+                )
+                .getInfo()
+                .get("VH")
+            )
+            vv_diff_mean = (
+                vv_diff.reduceRegion(
+                    reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
+                )
+                .getInfo()
+                .get("VV")
+            )
             confidence = _confidence_from_sar_margins(vh_diff_mean, vv_diff_mean)
 
             return {

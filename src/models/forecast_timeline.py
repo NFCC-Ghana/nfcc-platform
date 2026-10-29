@@ -23,9 +23,7 @@ from src.alerts.formatter import calculate_score, get_risk_tier
 from src.hydrology.weather_forecast import weather_forecast
 
 
-def build_risk_timeline(
-    current_precipitation_mm: float, forecast: Dict
-) -> List[Dict]:
+def build_risk_timeline(current_precipitation_mm: float, forecast: Dict) -> List[Dict]:
     """'Now' (scored directly from current_precipitation_mm) plus
     +6h/+12h/+18h/+24h projections, each layering the real forecast's
     cumulative rainfall on top of current_precipitation_mm and scoring

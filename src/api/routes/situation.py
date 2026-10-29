@@ -314,7 +314,10 @@ async def _build_situation_response(body: SituationRequest) -> dict:
     response["flood_hub"] = (
         get_flood_hub_forecast_for_district(district.lat, district.lon)
         if district is not None
-        else {"available": False, "reason": f"'{body.location}' is not a tracked district"}
+        else {
+            "available": False,
+            "reason": f"'{body.location}' is not a tracked district",
+        }
     )
 
     # Real, per-district activation of src/models/forecast_fusion.py's

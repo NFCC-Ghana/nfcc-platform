@@ -1,16 +1,26 @@
-"""SHAP-style attribution for linear multi-source forecast fusion."""
+"""Exact Shapley attribution for linear multi-source forecast fusion.
+
+The fused risk is a weighted mean of the active sources,
+    fused(x) = sum_i(w_i * m_i * x_i) / sum_i(w_i * m_i),
+which is linear in x for a fixed availability mask m. For a linear model
+the Shapley value of each feature against a reference vector has a
+closed form, w_i * m_i * (x_i - ref_i) / sum(w * m), so it's computed
+directly here instead of estimated.
+
+This module used to run SHAP's sampling KernelExplainer and fall back to
+that closed form only when `shap` wasn't importable - but shap was
+removed from requirements.txt on 2026-09-27, so the "fallback" (marked
+`pragma: no cover`, beside a comment claiming shap was required in
+production) had silently been the only code that ever ran. It is now
+the implementation, with no dependency and no sampling noise.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional
+from typing import List, Mapping, Optional
 
 import numpy as np
-
-try:
-    import shap
-except ImportError:  # pragma: no cover - shap is required in production requirements
-    shap = None  # type: ignore
 
 from src.models.forecast_fusion import (
     ForecastFusionInput,
@@ -51,73 +61,40 @@ def explain_fusion_shap(
     baseline_per_source: Optional[Mapping[str, float]] = None,
     nsamples: int = 80,
 ) -> FusionExplainOutput:
-    """
-    Attribute fused risk to each source using SHAP ``KernelExplainer``.
+    """Attribute fused risk to each source with exact Shapley values.
 
-    Unavailable sources are fixed out of the model via a binary mask; SHAP
-    mass is placed on active features only.
+    Unavailable sources are masked out and receive zero attribution; the
+    contributions of the active sources sum exactly to
+    unified_risk - expected_value. `nsamples` is accepted for backward
+    compatibility with callers of the old sampling explainer and ignored.
     """
+    del nsamples
     x, m = inp.as_vector_and_mask()
     mask = (m > 0).astype(float)
+    ref = _reference_vector(baseline_per_source)
+    baseline = {k: float(ref[i]) for i, k in enumerate(_SOURCE_ORDER)}
+
     if mask.sum() == 0:
         return FusionExplainOutput(
             unified_risk=0.0,
             expected_value=0.0,
             shap_values={k: 0.0 for k in _SOURCE_ORDER},
-            baseline={
-                k: float(_reference_vector(baseline_per_source)[i])
-                for i, k in enumerate(_SOURCE_ORDER)
-            },
+            baseline=baseline,
             feature_names=list(_SOURCE_ORDER),
         )
 
     weights = fusion_weights()
-    fused = fuse_from_arrays(x, mask, weights)
-
-    ref = _reference_vector(baseline_per_source)
-    background = ref.reshape(1, 3)
-
-    def _predict(z: np.ndarray) -> np.ndarray:
-        z = np.atleast_2d(np.asarray(z, dtype=float))
-        z = np.clip(z, 0.0, 100.0)
-        out = np.empty(z.shape[0], dtype=float)
-        for i in range(z.shape[0]):
-            out[i] = fuse_from_arrays(z[i], mask, weights)
-        return out
-
-    if shap is None:  # pragma: no cover
-        delta = (x - ref) * mask
-        w_eff = weights * mask
-        denom = float(w_eff.sum())
-        contrib = {
-            name: float(wi * delta[idx] / denom)
-            for idx, (name, wi) in enumerate(zip(_SOURCE_ORDER, w_eff))
-        }
-        return FusionExplainOutput(
-            unified_risk=fused,
-            expected_value=float(fuse_from_arrays(ref, mask, weights)),
-            shap_values=contrib,
-            baseline={k: float(ref[i]) for i, k in enumerate(_SOURCE_ORDER)},
-            feature_names=list(_SOURCE_ORDER),
-        )
-
-    instance = x.reshape(1, 3)
-    kw: Dict[str, Any] = {"silent": True}
-    try:
-        explainer = shap.KernelExplainer(_predict, background)
-        sv = explainer.shap_values(instance, nsamples=nsamples, **kw)
-    except TypeError:
-        explainer = shap.KernelExplainer(_predict, background)
-        sv = explainer.shap_values(instance, nsamples=nsamples)
-
-    arr = np.asarray(sv, dtype=float).reshape(3)
-    arr = arr * mask
-    exp_val = float(_predict(background)[0])
-    shap_map = {name: float(arr[i]) for i, name in enumerate(_SOURCE_ORDER)}
+    w_eff = weights * mask
+    denom = float(w_eff.sum())
+    delta = (x - ref) * mask
+    contrib = {
+        name: float(w_eff[idx] * delta[idx] / denom)
+        for idx, name in enumerate(_SOURCE_ORDER)
+    }
     return FusionExplainOutput(
-        unified_risk=fused,
-        expected_value=exp_val,
-        shap_values=shap_map,
-        baseline={k: float(ref[i]) for i, k in enumerate(_SOURCE_ORDER)},
+        unified_risk=fuse_from_arrays(x, mask, weights),
+        expected_value=float(fuse_from_arrays(ref, mask, weights)),
+        shap_values=contrib,
+        baseline=baseline,
         feature_names=list(_SOURCE_ORDER),
     )
