@@ -102,3 +102,6 @@ archive/
 backups/
 data/community_reports.db
 data/subscriptions.db
+
+# Research pulls (rebuilt by research/flood_experiments/build_dataset.py)
+research/flood_experiments/data/
