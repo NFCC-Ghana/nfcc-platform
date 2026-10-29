@@ -1,16 +1,16 @@
 # Core Framework
-fastapi==0.115.0
-uvicorn[standard]==0.24.0
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
 # Bumped from 2.5.0: google-genai (src/copilot/) hard-requires
 # pydantic>=2.12.5. Verified against the full existing test suite
 # before bumping; no other code in this repo depends on anything
 # specific to 2.5.0.
-pydantic==2.12.5
+pydantic==2.14.1
 # Bumped from 0.0.6: that version predates 0.0.7's fix for a ReDoS
 # advisory (CVE-2024-24762) in multipart/form-data parsing. 0.0.18
-# matches what fastapi==0.115.0 itself recommends as its "standard"/
+# matches what fastapi==0.162.0 itself recommends as its "standard"/
 # "all" extra's minimum.
-python-multipart==0.0.18
+python-multipart==0.0.32
 email-validator>=2.0.0
 
 # ML & Data Processing
@@ -26,9 +26,9 @@ pandas==2.1.4
 # codebase before removing (see tests/test_imports.py's updated comment).
 
 # Dashboard & Visualization
-streamlit==1.46.0
-folium==0.19.0
-streamlit-folium==0.24.0
+streamlit==1.66.1
+folium==0.20.0
+streamlit-folium==0.27.4
 plotly>=5.17.0
 
 # Alert Providers
@@ -50,14 +50,14 @@ redis>=5.0.0
 # not before: auth.py existed but was dead code (verify_api_key was
 # never wired into any route), so nothing ever actually imported it and
 # this missing pin went unnoticed until CI's clean install broke on it.
-slowapi==0.1.9
+slowapi==0.1.10
 
 # AI Copilot (src/copilot/) - Gemini API, automatic function calling.
 # Anthropic's own free tier has $0 usable credits; Gemini 2.5 Flash's
 # free tier (1,500 requests/day, no card required) is the realistic
 # option for a solo, low-budget maintainer - see src/copilot/engine.py's
 # module docstring.
-google-genai==2.24.0
+google-genai==2.33.0
 
 # Real OASIS CAP v1.2 XML export (src/api/routes/cap_export.py) - typed
 # dataclass bindings for the exact CAP schema (identifier/sender/status/
@@ -79,20 +79,20 @@ httpx==0.28.1
 
 # Utilities
 python-dateutil==2.8.2
-pyyaml==6.0.1
-click==8.1.7
+pyyaml==6.0.3
+click==8.5.0
 rich==15.0.0
 requests>=2.31.0
 gunicorn>=26.2.0
 apscheduler>=3.10.0
 # NOT bumped, despite a real DoS advisory (GHSA-2c2j-9gv5-cj73) fixed in
-# starlette 0.40.0: fastapi==0.115.0's real, PyPI-verified constraint is
+# starlette 0.40.0: fastapi==0.162.0's real, PyPI-verified constraint is
 # starlette<0.39.0,>=0.37.2 (confirmed the hard way - an initial attempt
 # to bump to 0.40.0 was checked against a local dev environment where
 # fastapi itself had silently drifted to a newer, unpinned version, so
 # its wider starlette range looked compatible when it wasn't; that bump
 # broke CI's actual `pip install -r requirements.txt` with a real
-# resolver conflict against the genuinely pinned fastapi==0.115.0).
+# resolver conflict against the genuinely pinned fastapi==0.162.0).
 # 0.38.6 is the latest version within that real constraint - clearing
 # this advisory requires a FastAPI major-version bump, which needs its
 # own dedicated compatibility pass across the whole app, not a blind
