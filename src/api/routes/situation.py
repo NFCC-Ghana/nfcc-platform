@@ -346,18 +346,18 @@ async def _build_situation_response(body: SituationRequest) -> dict:
     try:
         forecast = weather_forecast.get_forecast_for_district(body.location)
         response["risk_timeline"] = build_risk_timeline(body.precipitation, forecast)
-        response["forecast_24h_mm"] = forecast.get("24h", 0.0)
-        response["forecast_48h_mm"] = forecast.get("48h", 0.0)
-        response["forecast_72h_mm"] = forecast.get("72h", 0.0)
+        response["forecast_24h_mm"] = forecast.get("24h")
+        response["forecast_48h_mm"] = forecast.get("48h")
+        response["forecast_72h_mm"] = forecast.get("72h")
         response["forecast_source"] = forecast.get("source", "unknown")
         # Real current temperature/sky condition (src/hydrology/
         # weather_forecast.py, Open-Meteo's "current" block) - the
         # system stays useful outside rainy season, when score/risk_tier
         # sit near zero for every district: a citizen or operator still
         # gets a real reading of what it's actually like outside right
-        # now. "fallback" values (forecast_source == "fallback") are a
-        # climatological estimate, never a live measurement - always
-        # check forecast_source before treating this as a real reading.
+        # now. When Open-Meteo is unreachable forecast_source is
+        # "unavailable" and every forecast/weather value is null - never
+        # an invented estimate.
         response["temperature_c"] = forecast.get("temperature_c")
         response["temperature_f"] = forecast.get("temperature_f")
         response["weather_description"] = forecast.get("weather_description")

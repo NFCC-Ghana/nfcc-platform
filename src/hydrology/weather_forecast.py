@@ -2,7 +2,6 @@
 
 import json
 import logging
-import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -97,7 +96,7 @@ def celsius_to_fahrenheit(celsius: float) -> float:
 class WeatherForecastEngine:
     """
     Weather forecast engine for flood prediction.
-    Integrates Open-Meteo API with fallback generation.
+    Integrates the Open-Meteo API; reports "unavailable" when it is down.
     """
 
     def __init__(self):
@@ -153,14 +152,19 @@ class WeatherForecastEngine:
                 forecast = self._parse_open_meteo(data, hours, lat, lon)
             else:
                 logger.warning(f"Open-Meteo API returned status {response.status_code}")
-                forecast = self._generate_fallback_forecast(lat, lon, hours)
+                forecast = self._unavailable_forecast(lat, lon, hours)
 
         except Exception as e:
             logger.warning(f"Open-Meteo API error: {e}")
-            forecast = self._generate_fallback_forecast(lat, lon, hours)
+            forecast = self._unavailable_forecast(lat, lon, hours)
 
-        # Cache
-        self.forecast_cache[cache_key] = {"data": forecast, "timestamp": datetime.now()}
+        # Cache real forecasts only, so recovery is picked up on the next
+        # call instead of an outage being served for an hour.
+        if forecast["source"] == "open-meteo":
+            self.forecast_cache[cache_key] = {
+                "data": forecast,
+                "timestamp": datetime.now(),
+            }
 
         return forecast
 
@@ -241,93 +245,36 @@ class WeatherForecastEngine:
 
         return forecast
 
-    def _generate_fallback_forecast(self, lat: float, lon: float, hours: int) -> Dict:
-        """Generate fallback forecast - honestly labeled "source":
-        "fallback" (never presented as a real reading), used only when
-        Open-Meteo itself is unreachable."""
-        random.seed(hash(f"{lat}_{lon}") % 2**32)
+    def _unavailable_forecast(self, lat: float, lon: float, hours: int) -> Dict:
+        """What callers get when Open-Meteo is unreachable: no numbers.
 
-        month = datetime.now().month
-        is_rainy = month in [5, 6, 7, 9, 10]
-
-        forecast = {}
-
-        for h in [24, 48, 72]:
-            if h <= hours:
-                # random.exponential() doesn't exist on Python's stdlib
-                # `random` module (that's a numpy.random method) - this
-                # silently crashed with AttributeError any time this
-                # fallback path was actually exercised (real Open-Meteo
-                # call failing), never caught before because nothing had
-                # forced the fallback branch in a test until now.
-                # random.expovariate(lambd) is the stdlib equivalent. with
-                # lambd = 1/mean, matching numpy's exponential(scale=mean).
-                if is_rainy:
-                    base = 15 + random.expovariate(1 / 10)
-                else:
-                    base = 3 + random.expovariate(1 / 5)
-                forecast[f"{h}h"] = round(max(0, base), 1)
-            else:
-                forecast[f"{h}h"] = 0.0
-
-        forecast["daily"] = []
-        for day in range(3):
-            forecast["daily"].append(
-                {
-                    "day": day + 1,
-                    "rainfall_mm": forecast.get(
-                        "24h" if day == 0 else "48h" if day == 1 else "72h", 0
-                    )
-                    / 3,
-                }
-            )
-
-        # Same shape as _parse_open_meteo's real cumulative_6h, linearly
-        # interpolated from the 24h total so callers don't need to handle
-        # two different response shapes depending on whether the real API
-        # call succeeded.
-        rain_24h = forecast.get("24h", 0.0)
-        forecast["cumulative_6h"] = {
-            str(h): round(rain_24h * h / 24, 1) for h in [6, 12, 18, 24]
+        This used to return invented rainfall (15 mm plus a random draw
+        in rainy months) and a guessed temperature, labelled "fallback".
+        Those numbers reached users (/situation forecast_*_mm), the
+        forecast risk timeline and the AI Copilot's risk tools, which
+        scored them through calculate_score() like real rain - so an
+        outage could raise a district's risk. A warning system must say
+        "unavailable", never guess: every value here is None and callers
+        handle the gap explicitly.
+        """
+        return {
+            "24h": None,
+            "48h": None,
+            "72h": None,
+            "daily": [],
+            "cumulative_6h": {},
+            "temperature_c": None,
+            "temperature_f": None,
+            "weather_code": None,
+            "weather_description": "Forecast unavailable (Open-Meteo unreachable)",
+            "weather_icon": None,
+            "is_day": None,
+            "is_raining_now": None,
+            "rain_probability_now_percent": None,
+            "rain_probability_today_percent": None,
+            "source": "unavailable",
+            "timestamp": datetime.now().isoformat(),
         }
-
-        # Fallback temperature: a real climatological estimate for
-        # Ghana (coastal south ~24-32C, drier north around Tamale runs
-        # hotter/more variable, ~25-38C), NOT a plausible-looking random
-        # number pretending to be a live reading - explicitly disclosed
-        # via "source": "fallback" the same as the rainfall figures
-        # above, so a caller checking that field never treats this as a
-        # real measurement.
-        is_northern = lat > 8.0
-        base_temp = 29.0 if is_northern else 27.5
-        seasonal_swing = 3.0 if is_northern else 1.5
-        # Peaks around Feb-Mar (dry season, month 2-3), coolest around
-        # Jul-Aug (peak rains) - a simple sinusoid, not a real forecast.
-        month_offset = (month - 3) % 12
-        seasonal_delta = seasonal_swing * (0.5 + 0.5 * (1 - abs(month_offset - 6) / 6))
-        temp_c = round(base_temp + seasonal_delta + random.uniform(-1.5, 1.5), 1)
-
-        forecast["temperature_c"] = temp_c
-        forecast["temperature_f"] = celsius_to_fahrenheit(temp_c)
-        forecast["weather_code"] = None
-        weather_info = (
-            {"description": "Likely rain (estimated)", "icon": "🌧️"}
-            if is_rainy
-            else {"description": "Likely clear (estimated)", "icon": "🌤️"}
-        )
-        forecast["weather_description"] = weather_info["description"]
-        forecast["weather_icon"] = weather_info["icon"]
-        forecast["is_day"] = 6 <= datetime.now().hour < 18
-        forecast["is_raining_now"] = is_rainy
-        # Same climatological-estimate honesty as temperature above -
-        # a rough seasonal guess, not a real forecast model's output.
-        forecast["rain_probability_now_percent"] = 70 if is_rainy else 15
-        forecast["rain_probability_today_percent"] = 85 if is_rainy else 25
-
-        forecast["source"] = "fallback"
-        forecast["timestamp"] = datetime.now().isoformat()
-
-        return forecast
 
     def get_forecast_for_district(self, district: str, hours: int = 72) -> Dict:
         """Get forecast for a specific district."""

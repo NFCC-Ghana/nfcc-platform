@@ -4,8 +4,8 @@ POST /situation's response.
 
 Two genuinely different things live here, both real:
 - Rainfall forecast (src/hydrology/weather_forecast.py) - real Open-Meteo
-  data when reachable, an honestly-labeled ("fallback") seasonal estimate
-  otherwise. Not new logic; this endpoint just gives it its own contract.
+  data when reachable; null values with source "unavailable" otherwise
+  (never an invented estimate). Not new logic; this endpoint just gives it its own contract.
 - risk_timeline - a forward projection of calculate_score() at +6h/+12h/
   +18h/+24h, layering the real forecast's cumulative rainfall on top of
   the caller-supplied current precipitation.
@@ -18,7 +18,7 @@ docstring). This route just adapts the shared dict into its own
 versioned Pydantic contract.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -42,9 +42,9 @@ class RiskTimelinePoint(BaseModel):
 
 class ForecastResponse(BaseModel):
     district: str
-    forecast_24h_mm: float
-    forecast_48h_mm: float
-    forecast_72h_mm: float
+    forecast_24h_mm: Optional[float]
+    forecast_48h_mm: Optional[float]
+    forecast_72h_mm: Optional[float]
     cumulative_6h_mm: Dict[str, float]
     daily: List[DailyForecast]
     risk_timeline: List[RiskTimelinePoint]
