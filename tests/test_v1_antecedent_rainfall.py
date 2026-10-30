@@ -6,6 +6,19 @@ no Earth Engine credentials of its own."""
 
 from unittest.mock import patch
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_imerg():
+    """IMERG is the primary source; these tests exercise the CHIRPS v3
+    fallback, so IMERG returns nothing (and never reaches Earth Engine)."""
+    with patch(
+        "src.hydrology.antecedent_rainfall.fetch_imerg_daily_series",
+        return_value=([], 1.0),
+    ):
+        yield
+
 
 def test_unknown_district_404(api_client):
     resp = api_client.get("/v1/districts/Not A Real District/antecedent-rainfall")

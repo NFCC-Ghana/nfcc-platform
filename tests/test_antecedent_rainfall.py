@@ -8,7 +8,21 @@ with a synthetic series."""
 
 from unittest.mock import patch
 
+import pytest
+
 from src.hydrology.antecedent_rainfall import get_antecedent_rainfall
+from src.hydrology.antecedent_rainfall import fetch_imerg_daily_series as _real_imerg
+
+
+@pytest.fixture(autouse=True)
+def _no_imerg():
+    """IMERG is the primary source; these tests exercise the CHIRPS v3
+    fallback, so IMERG returns nothing (and never reaches Earth Engine)."""
+    with patch(
+        "src.hydrology.antecedent_rainfall.fetch_imerg_daily_series",
+        return_value=([], 1.0),
+    ):
+        yield
 
 
 def test_unknown_district_honestly_reported():
@@ -93,3 +107,77 @@ def test_not_stale_when_freshest_data_is_recent():
         result = get_antecedent_rainfall("Tamale")
     assert result["available"] is True
     assert result["stale"] is False
+
+
+def test_imerg_is_primary_and_reported_as_the_source():
+    """CHIRPS in Earth Engine ran a month behind (ended 2026-09-30 when
+    checked on 2026-10-30); IMERG is about 2 days behind."""
+    from datetime import date, timedelta
+
+    recent = [
+        {"date": (date.today() - timedelta(days=k)).isoformat(), "precipitation_mm": mm}
+        for k, mm in ((4, 1.0), (3, 2.0), (2, 4.0))
+    ]
+    with (
+        patch(
+            "src.hydrology.antecedent_rainfall.fetch_imerg_daily_series",
+            return_value=(recent, 1.2),
+        ),
+        patch(
+            "src.hydrology.antecedent_rainfall.fetch_historical_chirps_series"
+        ) as chirps,
+    ):
+        result = get_antecedent_rainfall("Tamale")
+    chirps.assert_not_called()
+    assert result["source"] == "imerg_v07_scaled_to_chirps"
+    assert result["rolling_3d_mm"] == 7.0
+    assert result["imerg_to_chirps_scale"] == 1.2
+    assert result["stale"] is False
+
+
+def test_falls_back_to_chirps_when_imerg_is_unavailable():
+    series = [{"date": "2026-09-12", "precipitation_mm": 5.0}]
+    with patch(
+        "src.hydrology.antecedent_rainfall.fetch_historical_chirps_series",
+        return_value=series,
+    ):
+        result = get_antecedent_rainfall("Tamale")
+    assert result["source"] == "chirps_v3_daily_sat"
+    assert result["imerg_to_chirps_scale"] == 1.0
+
+
+def test_imerg_series_keeps_only_complete_days_and_applies_the_scale():
+    """A day still being processed (fewer than 48 half-hourly images)
+    must not read as a dry day."""
+    from src.hydrology import antecedent_rainfall as ar
+
+    payload = {
+        "days": [
+            {"date": "2026-10-26", "n": 48, "mm": 10.0},
+            {"date": "2026-10-27", "n": 48, "mm": 0.0},
+            {"date": "2026-10-28", "n": 20, "mm": 1.0},  # incomplete
+            {"date": "2026-10-29", "n": 0, "mm": None},  # not published yet
+        ],
+    }
+
+    class _Dict:
+        def __init__(self, *a, **k):
+            pass
+
+        def getInfo(self):
+            return payload
+
+    with (
+        patch.object(ar, "initialize_earth_engine", return_value=True),
+        patch.object(ar, "_imerg_to_chirps_scale", return_value=1.2),
+        patch("ee.Dictionary", _Dict),
+        patch("ee.Geometry.Point"),
+        patch("ee.ImageCollection"),
+        patch("ee.List"),
+    ):
+        series, scale = _real_imerg(9.4, -0.84)  # the autouse fixture stubs ar's copy
+    assert scale == 1.2
+    assert series == [
+        {"date": "2026-10-26", "precipitation_mm": 12.0},
+        {"date": "2026-10-27", "precipitation_mm": 0.0},
+    ]
