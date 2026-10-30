@@ -1,0 +1,99 @@
+name: Weekly Shadow Flood Forecast
+
+# Scores the coming week's flood-onset probability for all 216 districts
+# with the operational research model (research/flood_experiments/
+# operational.py). SHADOW MODE: it never sends an alert. Each run's CSV
+# is appended to the `shadow-log` branch so forecasts can later be
+# compared with what actually happened, before anyone acts on them.
+#
+# Inputs at run time: GPM IMERG (rain, ~2 days behind), ERA5-Land,
+# GloFAS discharge (Open-Meteo), and the 51-member ECMWF ensemble as
+# context. Earth Engine auth reuses GEE_SERVICE_ACCOUNT_KEY, the same
+# secret the daily CHIRPS workflow uses.
+
+on:
+  schedule:
+    # Mondays 05:17 UTC - scores the week starting that day.
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "Monday to score (YYYY-MM-DD); empty = next Monday"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Writes only to the dedicated shadow-log branch, never to main.
+    permissions:
+      contents: write
+    env:
+      GEE_PROJECT_ID: nfcc-earth-engine-2026
+      GEE_SERVICE_ACCOUNT_KEY: ${{ secrets.GEE_SERVICE_ACCOUNT_KEY }}
+      PYTHONWARNINGS: ignore
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-research.txt
+
+      - name: Pick the week
+        id: week
+        env:
+          WEEK_INPUT: ${{ inputs.week }}
+        run: |
+          if [ -n "$WEEK_INPUT" ]; then
+            date -u -d "$WEEK_INPUT" +%F >/dev/null  # reject anything not a date
+            echo "week=$(date -u -d "$WEEK_INPUT" +%F)" >> "$GITHUB_OUTPUT"
+          elif [ "$(date -u +%u)" = "1" ]; then
+            echo "week=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+          else
+            echo "week=$(date -u -d 'next monday' +%F)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run shadow forecast
+        run: python -m research.flood_experiments.operational shadow "${{ steps.week.outputs.week }}"
+
+      - name: Summary
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import pandas as pd
+          week = "${{ steps.week.outputs.week }}"
+          d = pd.read_csv(f"research/flood_experiments/data/v2/shadow/{week}.csv")
+          ok = d[d.status == "ok"]
+          print(f"## Shadow flood forecast, week of {week}\n")
+          print(f"{len(ok)} of {len(d)} districts scored. Levels: {ok.level.value_counts().to_dict()}.")
+          print("Shadow mode: no alerts were sent.\n")
+          print("| District | Region | P(onset) | Level | ECMWF week rain (mm) | Top drivers |")
+          print("| --- | --- | --- | --- | --- | --- |")
+          for r in ok.sort_values("p_flood_onset", ascending=False).head(15).itertuples():
+              print(f"| {r.district} | {r.region} | {r.p_flood_onset:.1%} | {r.level} "
+                    f"| {r.ecmwf_rain_week_mm_median} | {r.drivers} |")
+          EOF
+
+      - name: Append to the shadow-log branch
+        run: |
+          week="${{ steps.week.outputs.week }}"
+          cp "research/flood_experiments/data/v2/shadow/${week}.csv" "$RUNNER_TEMP/"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch origin shadow-log 2>/dev/null; then
+            git switch -c shadow-log origin/shadow-log
+          else
+            git switch --orphan shadow-log
+          fi
+          mkdir -p shadow
+          cp "$RUNNER_TEMP/${week}.csv" shadow/
+          git add shadow
+          git commit -m "Shadow forecast for week of ${week}"
+          git push origin shadow-log
