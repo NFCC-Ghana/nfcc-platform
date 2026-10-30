@@ -30,9 +30,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      # Coverage of src/ was 84% in CI on 2026-10-30. The gate sits a
+      # little below that, so a PR that drops coverage fails instead of
+      # passing silently (it was 0, which could never fail). Raise it
+      # toward 90% as tests are added (issue #22).
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short -k "not providers" --cov=src --cov-report=term-missing --cov-report=html:reports/coverage --cov-fail-under=0
+          pytest tests/ -v --tb=short -k "not providers" --cov=src --cov-report=term-missing --cov-report=html:reports/coverage --cov-fail-under=80
 
       - name: Check imports
         run: |

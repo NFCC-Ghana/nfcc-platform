@@ -5,6 +5,8 @@ risk_tier sit near zero for every district, by still showing what it's
 actually like outside right now.
 """
 
+from unittest.mock import patch
+
 import pytest
 
 from src.hydrology.weather_forecast import (
@@ -89,16 +91,57 @@ def test_situation_endpoint_exposes_temperature_and_rain_probability(api_client)
     assert "forecast_source" in data
 
 
+_REAL_SHAPED_FORECAST = {
+    "24h": 0.0,
+    "48h": 0.0,
+    "72h": 0.0,
+    "daily": [],
+    "cumulative_6h": {"6": 0.0, "12": 0.0, "18": 0.0, "24": 0.0},
+    "temperature_c": 31.2,
+    "temperature_f": celsius_to_fahrenheit(31.2),
+    "weather_code": 1,
+    "weather_description": "Mainly clear",
+    "weather_icon": "🌤️",
+    "is_day": True,
+    "is_raining_now": False,
+    "rain_probability_now_percent": 5,
+    "rain_probability_today_percent": 10,
+    "source": "open-meteo",
+    "timestamp": "2026-10-30T12:00:00",
+}
+
+
 def test_situation_still_useful_with_zero_rainfall(api_client):
     """The exact scenario motivating this feature: dry season, zero
     precipitation input, flood risk at its floor - the system must
     still surface real temperature/weather data rather than going
-    blank just because there's no flood risk to report."""
-    resp = api_client.post(
-        "/situation", json={"location": "Accra Central", "precipitation": 0}
-    )
+    blank just because there's no flood risk to report. Uses a fixed
+    real-shaped Open-Meteo reading so a CI timeout can't fail it."""
+    with patch.object(
+        weather_forecast,
+        "get_forecast_for_district",
+        return_value=_REAL_SHAPED_FORECAST,
+    ):
+        resp = api_client.post(
+            "/situation", json={"location": "Accra Central", "precipitation": 0}
+        )
     assert resp.status_code == 200
     data = resp.json()
     assert data["score"] == 0.0
     assert data["temperature_c"] is not None
     assert data["weather_icon"] is not None
+
+
+def test_situation_never_guesses_weather_when_forecast_unreachable(
+    api_client, offline_http
+):
+    """Outage: the reading is reported as unavailable, never guessed."""
+    weather_forecast.forecast_cache.clear()
+    resp = api_client.post(
+        "/situation", json={"location": "Accra Central", "precipitation": 0}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["forecast_source"] == "unavailable"
+    assert data["temperature_c"] is None
+    assert data["forecast_24h_mm"] is None
