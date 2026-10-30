@@ -43,6 +43,7 @@ supplies. WARNING (P >= 20%) suits costly ones - move people and goods.
 import json
 import logging
 import sys
+import time
 from datetime import date, timedelta
 
 import numpy as np
@@ -367,6 +368,24 @@ class OperationalModel:
 
 
 # ------------------------------------------------------------- shadow run
+def _get_json(url, params, attempts=4):
+    """GET with retries on timeouts, connection errors and non-200
+    replies (backoff 15, 30, 45 s). Returns the JSON body, or None after
+    the last attempt: a slow API must not crash the weekly run, it only
+    leaves that input missing."""
+    for attempt in range(attempts):
+        try:
+            r = requests.get(url, params=params, timeout=30)
+            if r.status_code == 200:
+                return r.json()
+            logger.info(f"{url}: HTTP {r.status_code} (attempt {attempt + 1})")
+        except requests.RequestException as e:
+            logger.info(f"{url}: {type(e).__name__} (attempt {attempt + 1})")
+        if attempt < attempts - 1:
+            time.sleep(15 * (attempt + 1))
+    return None
+
+
 def _ensemble_week(lat, lon, week: date):
     """Per-member weekly total and wettest day from the ECMWF IFS
     ensemble (51 members) for the 7 days from `week`."""
@@ -379,19 +398,10 @@ def _ensemble_week(lat, lon, week: date):
         "end_date": (week + timedelta(days=6)).isoformat(),
         "timezone": "GMT",
     }
-    for attempt in range(6):
-        try:
-            r = requests.get(ENSEMBLE_URL, params=params, timeout=60)
-            if r.status_code == 200:
-                break
-        except requests.RequestException:
-            pass
-        import time
-
-        time.sleep(20 * (attempt + 1))
-    else:
+    body = _get_json(ENSEMBLE_URL, params)
+    if body is None:
         return None
-    h = r.json()["hourly"]
+    h = body["hourly"]
     t = pd.to_datetime(h["time"])
     cols = [k for k in h if k.startswith("precipitation")]
     daily = (
@@ -404,21 +414,21 @@ def _ensemble_week(lat, lon, week: date):
 
 
 def _discharge_lag1(lat, lon, week: date):
-    """GloFAS max discharge over the week before `week` (Open-Meteo)."""
-    r = requests.get(
+    """GloFAS max discharge over the week before `week` (Open-Meteo);
+    NaN (a missing input the model handles) if the API stays down."""
+    body = _get_json(
         C.OPEN_METEO_FLOOD_URL,
-        params={
+        {
             "latitude": round(lat, 4),
             "longitude": round(lon, 4),
             "daily": "river_discharge",
             "start_date": (week - timedelta(days=7)).isoformat(),
             "end_date": (week - timedelta(days=1)).isoformat(),
         },
-        timeout=60,
     )
-    if r.status_code != 200:
+    if body is None:
         return np.nan
-    v = [x for x in r.json()["daily"]["river_discharge"] if x is not None]
+    v = [x for x in body["daily"]["river_discharge"] if x is not None]
     return float(max(v)) if v else np.nan
 
 
@@ -492,75 +502,91 @@ def shadow(week: date):
     woy = pd.Timestamp(week).isocalendar().week
     out = []
     for r in static.merge(points, on="district_code").itertuples():
-        code = r.district_code
-        p = past[past["district_code"] == code].set_index("lag")
-        ens = _ensemble_week(r.lat, r.lon, week)
-        if ens is None or p.empty:
+        try:
+            out.append(_score_district(r, past, week, woy, om, meta))
+        except Exception as e:  # one district must not stop the other 215
+            logger.warning(f"shadow {r.district}: {type(e).__name__}: {e}")
             out.append(
                 {
-                    "district_code": code,
+                    "district_code": r.district_code,
                     "district": r.district,
-                    "status": "inputs unavailable",
+                    "region": r.region,
+                    "status": f"error: {type(e).__name__}",
                 }
             )
-            continue
-        q1 = _discharge_lag1(r.river_lat, r.river_lon, week)
-        qm = meta["q_median"].get(str(code), np.nan)
-        base = {
-            "woy_sin": np.sin(2 * np.pi * woy / 52.18),
-            "woy_cos": np.cos(2 * np.pi * woy / 52.18),
-            **{
-                f"rain_lag{k}": p.loc[k, "rain"] if k in p.index else np.nan
-                for k in range(1, 5)
-            },
-            "sm_start": p.loc[1, "sm"] if 1 in p.index else np.nan,
-            "runoff_prev4w_sum": p["runoff"].sum(min_count=4),
-            "q_week_max_log_lag1": np.log1p(q1) if q1 == q1 else np.nan,
-            "q_ratio_lag1": q1 / (qm + 1e-3) if q1 == q1 and qm == qm else np.nan,
-            "elev_mean": r.elev_mean,
-            "slope_mean": r.slope_mean,
-            "perm_water_frac": r.perm_water_frac,
-            "built_frac": r.built_frac,
-            "log_pop_density": np.log1p(r.population / r.area_km2),
-        }
-        base["rain_prev4w_sum"] = sum(base[f"rain_lag{k}"] for k in range(1, 5))
-        base["rain_prev4w_pct"] = om.percentile(
-            code, "rain_prev4w_sum", base["rain_prev4w_sum"]
-        )
-        s = om.score(pd.DataFrame([base]))
-        pm = float(s["p"].iloc[0])
-        # Forecaster context, not model input (see module docstring).
-        ws = ens["sum"] * meta["scale_rain_week_sum"].get(str(code), 1.0)
-        wm = ens["max"] * meta["scale_rain_week_max"].get(str(code), 1.0)
-        out.append(
-            {
-                "district_code": code,
-                "district": r.district,
-                "region": r.region,
-                "p_flood_onset": round(pm, 4),
-                "level": om.level(pm),
-                "drivers": s["drivers"].iloc[0],
-                "ecmwf_rain_week_mm_median": round(float(ws.median()), 1),
-                "ecmwf_rain_week_mm_p90": round(float(ws.quantile(0.9)), 1),
-                "ecmwf_wettest_day_local_pct_median": round(
-                    om.percentile(code, "rain_week_max", float(wm.median())), 2
-                ),
-                "ecmwf_members": int(len(ens)),
-                "last_week_rain_days_observed": (
-                    float(p.loc[1, "rain_days"]) if 1 in p.index else 0.0
-                ),
-                "status": "ok",
-            }
-        )
     res = pd.DataFrame(out)
     d = C.DATA_DIR / "shadow"
     d.mkdir(parents=True, exist_ok=True)
     res.to_csv(d / f"{week.isoformat()}.csv", index=False)
+    ok = res["status"] == "ok"
     logger.info(
-        f"shadow {week}: {(res['status'] == 'ok').sum()} districts scored; "
-        f"levels {res['level'].value_counts().to_dict() if 'level' in res else {}}"
+        f"shadow {week}: {int(ok.sum())} of {len(res)} districts scored; "
+        f"levels {res.loc[ok, 'level'].value_counts().to_dict() if ok.any() else {}}"
     )
+    if ok.mean() < 0.9:  # mostly failed: make the scheduled job show red
+        raise RuntimeError(f"only {int(ok.sum())} of {len(res)} districts scored")
     return res
+
+
+def _score_district(r, past, week, woy, om, meta):
+    """One district's shadow forecast row."""
+    code = r.district_code
+    p = past[past["district_code"] == code].set_index("lag")
+    ens = _ensemble_week(r.lat, r.lon, week)
+    if ens is None or p.empty:
+        return {
+            "district_code": code,
+            "district": r.district,
+            "region": r.region,
+            "status": "inputs unavailable",
+        }
+    q1 = _discharge_lag1(r.river_lat, r.river_lon, week)
+    qm = meta["q_median"].get(str(code), np.nan)
+    base = {
+        "woy_sin": np.sin(2 * np.pi * woy / 52.18),
+        "woy_cos": np.cos(2 * np.pi * woy / 52.18),
+        **{
+            f"rain_lag{k}": p.loc[k, "rain"] if k in p.index else np.nan
+            for k in range(1, 5)
+        },
+        "sm_start": p.loc[1, "sm"] if 1 in p.index else np.nan,
+        "runoff_prev4w_sum": p["runoff"].sum(min_count=4),
+        "q_week_max_log_lag1": np.log1p(q1) if q1 == q1 else np.nan,
+        "q_ratio_lag1": q1 / (qm + 1e-3) if q1 == q1 and qm == qm else np.nan,
+        "elev_mean": r.elev_mean,
+        "slope_mean": r.slope_mean,
+        "perm_water_frac": r.perm_water_frac,
+        "built_frac": r.built_frac,
+        "log_pop_density": np.log1p(r.population / r.area_km2),
+    }
+    base["rain_prev4w_sum"] = sum(base[f"rain_lag{k}"] for k in range(1, 5))
+    base["rain_prev4w_pct"] = om.percentile(
+        code, "rain_prev4w_sum", base["rain_prev4w_sum"]
+    )
+    s = om.score(pd.DataFrame([base]))
+    pm = float(s["p"].iloc[0])
+    # Forecaster context, not model input (see module docstring).
+    ws = ens["sum"] * meta["scale_rain_week_sum"].get(str(code), 1.0)
+    wm = ens["max"] * meta["scale_rain_week_max"].get(str(code), 1.0)
+    return {
+        "district_code": code,
+        "district": r.district,
+        "region": r.region,
+        "p_flood_onset": round(pm, 4),
+        "level": om.level(pm),
+        "drivers": s["drivers"].iloc[0],
+        "ecmwf_rain_week_mm_median": round(float(ws.median()), 1),
+        "ecmwf_rain_week_mm_p90": round(float(ws.quantile(0.9)), 1),
+        "ecmwf_wettest_day_local_pct_median": round(
+            om.percentile(code, "rain_week_max", float(wm.median())), 2
+        ),
+        "ecmwf_members": int(len(ens)),
+        "river_discharge_available": bool(q1 == q1),
+        "last_week_rain_days_observed": (
+            float(p.loc[1, "rain_days"]) if 1 in p.index else 0.0
+        ),
+        "status": "ok",
+    }
 
 
 if __name__ == "__main__":
