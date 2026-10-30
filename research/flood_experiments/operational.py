@@ -206,6 +206,11 @@ def fit(panel: pd.DataFrame):
     meta["scale_imerg"] = _imerg_scale(_init_ee())
     (MODEL_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
     (MODEL_DIR / "MODEL_CARD.md").write_text(model_card(meta), encoding="utf-8")
+    raw = C.DATA_DIR / "raw"
+    pd.read_csv(raw / "static.csv").to_csv(MODEL_DIR / "districts.csv", index=False)
+    pd.read_csv(raw / "river_points.csv").to_csv(
+        MODEL_DIR / "river_points.csv", index=False
+    )
     (MODEL_DIR / "local_climate.json").write_text(
         json.dumps(
             {
@@ -476,9 +481,10 @@ def shadow(week: date):
     ee = _init_ee()
     om = OperationalModel()
     meta = om.meta
-    raw = C.DATA_DIR / "raw"
-    static = pd.read_csv(raw / "static.csv")
-    points = pd.read_csv(raw / "river_points.csv")
+    # District attributes and main-river points ship with the model, so
+    # a scheduled run needs no data folder (data/ is git-ignored).
+    static = pd.read_csv(MODEL_DIR / "districts.csv")
+    points = pd.read_csv(MODEL_DIR / "river_points.csv")
     past = _past_weeks(ee, week)
     past["rain"] = past["rain"] * past["district_code"].astype(str).map(
         meta["scale_imerg"]
