@@ -2,11 +2,12 @@
 (src/api/v1/evidence.py)."""
 
 
-def test_evidence_matches_decision_card_evidence(api_client):
+def test_evidence_matches_decision_card_evidence(api_client, offline_http):
     """The evidence endpoint and POST /decision/card call the exact same
     build_evidence() - for the same inputs, their evidence/reason/
     data_gaps must be identical, proving there's one implementation, not
-    two that could drift."""
+    two that could drift. Offline so both calls see identical inputs
+    (see conftest.offline_http)."""
     params = {"location": "Tamale", "precipitation": 90}
 
     card_resp = api_client.post("/decision/card", json=params)

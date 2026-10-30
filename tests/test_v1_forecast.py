@@ -1,7 +1,19 @@
 """Regression tests for GET /v1/districts/{district}/forecast
 (src/api/v1/forecast.py)."""
 
+from unittest.mock import patch
+
 from src.alerts.formatter import calculate_score, get_risk_tier
+
+_REAL_SHAPED_FORECAST = {
+    "24h": 8.0,
+    "48h": 3.0,
+    "72h": 0.0,
+    "daily": [],
+    "cumulative_6h": {"6": 2.0, "12": 4.0, "18": 6.0, "24": 8.0},
+    "source": "open-meteo",
+    "timestamp": "2026-10-30T00:00:00",
+}
 
 
 def test_forecast_schema(api_client):
@@ -44,13 +56,34 @@ def test_forecast_risk_timeline_now_matches_calculate_score(api_client):
 def test_forecast_risk_timeline_has_five_points(api_client):
     """Now, 6h, 12h, 18h, 24h - matching /situation's existing timeline
     shape, since this endpoint is meant to be a drop-in replacement for
-    that part of it."""
-    resp = api_client.get(
-        "/v1/districts/Ho/forecast", params={"current_precipitation_mm": 20}
-    )
+    that part of it. Uses a fixed real-shaped forecast: the live API can
+    time out in CI, and then there is (correctly) no projection."""
+    with patch(
+        "src.models.forecast_timeline.weather_forecast.get_forecast_for_district",
+        return_value=_REAL_SHAPED_FORECAST,
+    ):
+        resp = api_client.get(
+            "/v1/districts/Ho/forecast", params={"current_precipitation_mm": 20}
+        )
     data = resp.json()
     hours = [p["hour"] for p in data["risk_timeline"]]
     assert hours == ["Now", "6h", "12h", "18h", "24h"]
+
+
+def test_forecast_unavailable_gives_now_only_and_null_amounts(api_client, offline_http):
+    """With Open-Meteo unreachable there is no projection to make: the
+    timeline is "Now" only and the amounts are null, never invented."""
+    from src.hydrology.weather_forecast import weather_forecast
+
+    weather_forecast.forecast_cache.clear()
+    resp = api_client.get(
+        "/v1/districts/Ho/forecast", params={"current_precipitation_mm": 20}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["source"] == "unavailable"
+    assert data["forecast_24h_mm"] is None
+    assert [p["hour"] for p in data["risk_timeline"]] == ["Now"]
 
 
 def test_forecast_unknown_district_404(api_client):
