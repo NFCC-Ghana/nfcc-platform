@@ -117,3 +117,186 @@ class TestOnsetTarget:
         assert first["rain_week_sum"] == 4.0
         assert first["rain_lag1"] == 3.0
         assert first["rain_prev4w_sum"] == 3.0 + 2.0 + 1.0 + 0.0
+
+    def test_label_argument_selects_the_flood_record(self):
+        panel = _panel([0] * 10).assign(flood_news=[0] * 6 + [1] + [0] * 3)
+        assert build_features(panel, "news")["onset"].sum() == 1
+        assert build_features(panel.drop(columns="flood_news"))["onset"].sum() == 0
+
+    def test_forecast_inputs_are_lagged(self):
+        panel = _panel([0] * 10).assign(q_week_max=np.arange(10, dtype=float))
+        df = build_features(panel)
+        assert (df["q_week_max_log_lag1"] == np.log1p(df["q_week_max"] - 1)).all()
+
+
+class TestTolerantScores:
+    def test_one_week_early_alert_is_a_hit_not_a_false_alarm(self):
+        weeks = pd.date_range("2020-01-06", periods=6, freq="7D")
+        y = [0, 0, 0, 1, 0, 0]
+        alert = [0, 0, 1, 0, 0, 0]
+        out = M.tolerant([1] * 6, weeks, y, alert)
+        assert out == {"tol_pod": 1.0, "tol_far": 0.0}
+        strict = M.categorical(y, alert)
+        assert strict["recall_pod"] == 0.0 and strict["false_alarm_ratio"] == 1.0
+
+    def test_alert_in_another_district_does_not_count(self):
+        weeks = pd.date_range("2020-01-06", periods=2, freq="7D")
+        out = M.tolerant([1, 2], weeks, [1, 0], [0, 1])
+        assert out == {"tol_pod": 0.0, "tol_far": 1.0}
+
+
+class TestModels:
+    def test_river_percentile_ranks_within_each_district(self):
+        from research.flood_experiments.models import RiverPercentile
+
+        train = pd.DataFrame(
+            {
+                "district_code": [1] * 4 + [2] * 4,
+                "q_week_max": [1, 2, 3, 4, 10, 20, 30, 40],
+            }
+        )
+        test = pd.DataFrame({"district_code": [1, 2, 3], "q_week_max": [4, 15, 5]})
+        p = RiverPercentile().fit(train).predict(test)
+        assert p.tolist() == [1.0, 0.25, 0.0]
+
+    def test_xgb_is_monotone_in_rainfall(self):
+        from research.flood_experiments.models import XGB
+
+        rng = np.random.default_rng(0)
+        n = 3000
+        df = pd.DataFrame(
+            {"rain_week_sum": rng.gamma(2, 20, n), "elev_mean": rng.normal(100, 30, n)}
+        )
+        df["onset"] = (rng.random(n) < 0.02 + 0.002 * df["rain_week_sum"]).astype(int)
+        m = XGB(["rain_week_sum", "elev_mean"]).fit(df, df)
+        grid = pd.DataFrame(
+            {"rain_week_sum": np.linspace(0, 200, 50), "elev_mean": 100.0}
+        )
+        assert np.all(np.diff(m.predict(grid)) >= -1e-9)
+
+
+class TestSarAudit:
+    def test_controls_are_matched_and_never_flooded(self):
+        from research.flood_experiments.sar_labels import audit_sample
+
+        weeks = pd.date_range("2016-01-04", periods=160, freq="7D")
+        rows = []
+        for code in (1, 2, 3):
+            for k, w in enumerate(weeks):
+                rows.append((code, w.strftime("%Y-%m-%d"), int(code == 1 and k == 80)))
+        panel = pd.DataFrame(rows, columns=["district_code", "week", "flood_news"])
+        panel = panel.assign(
+            region="R",
+            rain_week_sum=1.0,
+            rain_week_max=1.0,
+            sm_week_mean=0.3,
+            runoff_week_sum=0.1,
+            q_week_max=10.0,
+            population=1e3,
+            area_km2=10.0,
+        )
+        s = audit_sample(panel)
+        onset = s[s.kind == "onset"].iloc[0]
+        same_week = s[s.kind == "control_same_week"].iloc[0]
+        same_place = s[s.kind == "control_same_place"].iloc[0]
+        assert (onset.district_code, onset.week) == (1, weeks[80].strftime("%Y-%m-%d"))
+        assert same_week.week == onset.week and same_week.district_code != 1
+        assert same_place.district_code == 1 and same_place.week != onset.week
+        assert pd.Timestamp(same_place.week).weekday() == 0
+
+
+class TestNadmoMatching:
+    def test_matches_exact_suffix_stripped_and_reports_unmatched(
+        self, tmp_path, monkeypatch
+    ):
+        from research.flood_experiments import config as C
+        from research.flood_experiments import nadmo
+
+        monkeypatch.setattr(C, "DATA_DIR", tmp_path)
+        (tmp_path / "raw").mkdir()
+        pd.DataFrame(
+            {
+                "date": ["2022-06-01"] * 3,
+                "district": ["Keta Municipal", "Keta", "Nowhere"],
+                "region": ["Volta"] * 3,
+                "deaths": [0, 1, 0],
+                "affected": [100, 50, 10],
+                "houses_damaged": [5, 2, 0],
+            }
+        ).to_csv(tmp_path / "raw" / "nadmo_incidents.csv", index=False)
+        static = pd.DataFrame(
+            {"district": ["Keta Municipal"], "region": ["Volta"], "district_code": [7]}
+        )
+        out = nadmo.load_incidents(static)
+        assert out["district_code"].tolist() == [7, 7]
+        assert (tmp_path / "raw" / "nadmo_unmatched.csv").exists()
+
+
+class TestWhenNotWhere:
+    def test_within_district_auc_ignores_which_district_floods_more(self):
+        # district 1 floods often and always scores high; within each
+        # district the scores are random, so timing skill is 0.5
+        rng = np.random.default_rng(0)
+        d = np.repeat([1, 2], 500)
+        y = np.concatenate([rng.random(500) < 0.2, rng.random(500) < 0.02]).astype(int)
+        p = np.where(d == 1, 0.9, 0.1) + rng.normal(0, 0.01, 1000)
+        assert M.probabilistic(y, p)["roc_auc"] > 0.7  # pooled: rewards "where"
+        assert M.within_district_auc(d, y, p) == pytest.approx(0.5, abs=0.1)
+
+    def test_relative_value_is_one_for_perfect_and_zero_for_useless(self):
+        y = np.array([0] * 90 + [1] * 10)
+        perfect = M.relative_value(y, y.astype(float), alphas=np.array([0.05, 0.3]))
+        assert perfect["value"] == pytest.approx([1.0, 1.0])
+        noise = M.relative_value(y, np.full(100, 0.5), alphas=np.array([0.05, 0.3]))
+        assert max(noise["value"]) <= 1e-9
+
+
+class TestForecastArchive:
+    def test_day_k_of_the_week_uses_the_forecast_issued_k_plus_1_days_earlier(self):
+        from research.flood_experiments.forecast_archive import weekly_forecast
+
+        t = pd.date_range("2024-01-01", periods=7 * 24, freq="h")  # Mon-Sun
+        hourly = {"time": t.strftime("%Y-%m-%dT%H:%M").tolist()}
+        for n in range(1, 8):
+            # lead n forecasts 1 mm/h on day n-1 only, 0 elsewhere
+            hourly[f"precipitation_previous_day{n}"] = [
+                1.0 if ts.dayofweek == n - 1 else 0.0 for ts in t
+            ]
+        w = weekly_forecast(hourly)
+        assert w["fc_rain_week_sum"].tolist() == [7 * 24.0]
+        assert w["fc_rain_week_max"].tolist() == [24.0]
+
+    def test_with_sparse_leads_each_day_uses_the_shortest_lead_issued_before_the_week(
+        self,
+    ):
+        from research.flood_experiments.forecast_archive import weekly_forecast
+
+        t = pd.date_range("2024-01-01", periods=7 * 24, freq="h")
+        hourly = {"time": t.strftime("%Y-%m-%dT%H:%M").tolist()}
+        for n in (2, 4, 6, 7):  # each lead forecasts n mm/h everywhere
+            hourly[f"precipitation_previous_day{n}"] = [float(n)] * len(t)
+        w = weekly_forecast(hourly)
+        # days 0-1 lead 2, days 2-3 lead 4, days 4-5 lead 6, day 6 lead 7
+        assert w["fc_rain_week_sum"].iloc[0] == 24 * (2 + 2 + 4 + 4 + 6 + 6 + 7)
+
+
+class TestLocalClimate:
+    def test_percentile_is_relative_to_each_districts_own_record(self):
+        from research.flood_experiments.features import local_percentile
+
+        clim = {"rain_week_sum": {1: np.arange(0, 100.0), 2: np.arange(0, 10.0)}}
+        df = pd.DataFrame({"district_code": [1, 2], "rain_week_sum": [40.0, 40.0]})
+        pct = local_percentile(df, "rain_week_sum", clim)
+        assert pct[0] == pytest.approx(0.41)  # ordinary for district 1
+        assert pct[1] == 1.0  # beyond anything district 2 has seen
+
+    def test_operational_inputs_are_all_known_when_the_week_starts(self):
+        from research.flood_experiments.models import OPERATIONAL
+
+        same_week_observed = {
+            "sm_week_mean",
+            "runoff_week_sum",
+            "q_week_max_log",
+            "q_ratio",
+        }
+        assert not same_week_observed & set(OPERATIONAL)

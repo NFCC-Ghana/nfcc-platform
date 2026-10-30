@@ -1,17 +1,23 @@
 """Build the Ghana district-week panel used by every experiment.
 
-One row per (GAUL 2015 district, Monday-start week), 2000-2018:
+One row per (GAUL 2015 district, Monday-start week) over the study
+period in config.STUDY:
 
-- Dynamic inputs: CHIRPS weekly rainfall total and daily maximum; ERA5-Land
-  top-layer soil moisture and surface runoff; GloFAS v4 river discharge
-  at the district centroid (Open-Meteo Flood API).
+- Dynamic inputs: CHIRPS weekly rainfall total and daily maximum (district
+  mean and, in v2, the 95th-percentile pixel); ERA5-Land top-layer soil
+  moisture and surface runoff; GloFAS v4 river discharge (Open-Meteo
+  Flood API) at the district centroid (v1) or at the district's main
+  river, the MERIT Hydro cell with the most upstream area (v2).
 - Static inputs: SRTM elevation and slope, JRC permanent-water share, GHSL
   built-up share, WorldPop population density.
-- Label: the district was flooded that week, from the Global Flood
-  Database (Tellman et al. 2021) plus the platform's documented events.
+- Labels: the district was flooded that week.
+  v1: Global Flood Database (Tellman et al. 2021) + documented events.
+  v2: flood_news = Groundsource news events (Mayo et al. 2026) +
+      documented events + NADMO incidents if supplied (nadmo.py).
+      Sentinel-1 audits these labels (sar_labels.py); it is not a label.
 
-Raw pulls are cached under data/raw/ so a re-run only fetches what is
-missing. Run: python -m research.flood_experiments.build_dataset
+Raw pulls are cached under data/<study>/raw/ so a re-run only fetches
+what is missing. Run: python -m research.flood_experiments.build_dataset
 """
 
 import json
@@ -66,6 +72,11 @@ def fetch_static(ee) -> pd.DataFrame:
     out = RAW / "static.csv"
     if out.exists():
         return pd.read_csv(out)
+    v1 = C.ROOT / "data" / "v1_gfd" / "raw" / "static.csv"
+    if v1.exists():  # static layers don't depend on the study period
+        df = pd.read_csv(v1)
+        df.to_csv(out, index=False)
+        return df
     districts = _districts(ee).map(
         lambda f: f.set(
             {
@@ -124,6 +135,30 @@ def fetch_static(ee) -> pd.DataFrame:
     return df
 
 
+def fetch_river_points(ee) -> pd.DataFrame:
+    """Each district's main river: the cell with the largest MERIT Hydro
+    upstream area. GloFAS discharge read there tracks the river that
+    floods the district, which a centroid often misses."""
+    out = RAW / "river_points.csv"
+    if out.exists():
+        return pd.read_csv(out)
+    img = ee.Image(C.MERIT_HYDRO).select("upa").addBands(ee.Image.pixelLonLat())
+    fc = img.reduceRegions(
+        _districts(ee), ee.Reducer.max(3), scale=C.STATIC_SCALE_M, tileScale=4
+    )
+    rows = _fetch_features(fc, ["ADM2_CODE", "max", "max1", "max2"])
+    df = pd.DataFrame(rows).rename(
+        columns={
+            "ADM2_CODE": "district_code",
+            "max": "river_upa_km2",
+            "max1": "river_lon",
+            "max2": "river_lat",
+        }
+    )
+    df.to_csv(out, index=False)
+    return df
+
+
 def _weekly_image(ee, week_ms):
     start = ee.Date(week_ms)
     end = start.advance(7, "day")
@@ -150,11 +185,18 @@ def _weekly_image(ee, week_ms):
     )
 
 
-def fetch_dynamic(ee, chunk_weeks: int = 20) -> pd.DataFrame:
+def fetch_dynamic(ee, chunk_weeks: int = 10) -> pd.DataFrame:
     cache = RAW / "dynamic"
     cache.mkdir(parents=True, exist_ok=True)
     districts = _districts(ee).select(["ADM2_CODE"])
     weeks = _week_starts()
+    base = ["rain_week_sum", "rain_week_max", "sm_week_mean", "runoff_week_sum"]
+    if C.STUDY == "v1_gfd":
+        reducer, bands = ee.Reducer.mean(), base
+    else:
+        # mean plus the wettest-pixel (95th percentile) value per band
+        reducer = ee.Reducer.mean().combine(ee.Reducer.percentile([95]), "", True)
+        bands = [f"{b}_mean" for b in base] + [f"{b}_p95" for b in base[:2]]
     for i in range(0, len(weeks), chunk_weeks):
         chunk = weeks[i : i + chunk_weeks]
         out = cache / f"{chunk[0].isoformat()}.csv"
@@ -168,22 +210,12 @@ def fetch_dynamic(ee, chunk_weeks: int = 20) -> pd.DataFrame:
         images = ee.ImageCollection(ee.List(ms).map(lambda m: _weekly_image(ee, m)))
         fc = images.map(
             lambda img: img.reduceRegions(
-                districts, ee.Reducer.mean(), scale=C.DYNAMIC_SCALE_M, tileScale=2
+                districts, reducer, scale=C.DYNAMIC_SCALE_M, tileScale=2
             ).map(lambda f: f.set("week_ms", img.get("week_ms")))
         ).flatten()
         for attempt in range(4):
             try:
-                rows = _fetch_features(
-                    fc,
-                    [
-                        "ADM2_CODE",
-                        "week_ms",
-                        "rain_week_sum",
-                        "rain_week_max",
-                        "sm_week_mean",
-                        "runoff_week_sum",
-                    ],
-                )
+                rows = _fetch_features(fc, ["ADM2_CODE", "week_ms"] + bands)
                 break
             except Exception as e:  # EE throttling / transient errors
                 logger.warning(f"chunk {chunk[0]} attempt {attempt + 1}: {e}")
@@ -196,31 +228,31 @@ def fetch_dynamic(ee, chunk_weeks: int = 20) -> pd.DataFrame:
         [pd.read_csv(p) for p in sorted(cache.glob("*.csv"))], ignore_index=True
     )
     df["week"] = pd.to_datetime(df["week_ms"], unit="ms").dt.date.astype(str)
+    df.columns = [c[:-5] if c.endswith("_mean") else c for c in df.columns]
     return df.rename(columns={"ADM2_CODE": "district_code"}).drop(columns="week_ms")
 
 
-def _fetch_discharge_file(row, out) -> bool:
-    """One 19-year request per district. The free API weighs a request by
-    its length, so about 100 of these use up the hourly quota; on HTTP 429
-    wait for the quota to reset instead of skipping the district."""
+def _fetch_discharge_file(lat, lon, name, out) -> bool:
+    """One whole-period request per district. The free API weighs a
+    request by its length, so about 100 19-year requests use up the
+    hourly quota; on HTTP 429 wait for the quota to reset instead of
+    skipping the district."""
     for attempt in range(12):
         try:
             resp = requests.get(
                 C.OPEN_METEO_FLOOD_URL,
                 params={
-                    "latitude": round(row.lat, 4),
-                    "longitude": round(row.lon, 4),
+                    "latitude": round(lat, 4),
+                    "longitude": round(lon, 4),
                     "daily": "river_discharge",
-                    "start_date": "2000-01-01",
-                    "end_date": "2018-12-31",
+                    "start_date": f"{C.FIRST_WEEK[:4]}-01-01",
+                    "end_date": f"{C.LAST_WEEK[:4]}-12-31",
                 },
                 timeout=60,
             )
         except requests.RequestException as e:  # DNS / connection drops
             wait = 30 * (attempt + 1)
-            logger.info(
-                f"discharge {row.district}: {type(e).__name__}, retry in {wait}s"
-            )
+            logger.info(f"discharge {name}: {type(e).__name__}, retry in {wait}s")
             time.sleep(wait)
             continue
         if resp.status_code == 200:
@@ -228,24 +260,28 @@ def _fetch_discharge_file(row, out) -> bool:
             time.sleep(0.5)
             return True
         wait = 600 if resp.status_code == 429 else 15 * (attempt + 1)
-        logger.info(
-            f"discharge {row.district}: HTTP {resp.status_code}, retry in {wait}s"
-        )
+        logger.info(f"discharge {name}: HTTP {resp.status_code}, retry in {wait}s")
         time.sleep(wait)
     return False
 
 
-def fetch_discharge(static: pd.DataFrame) -> pd.DataFrame:
-    """Weekly max GloFAS v4 discharge at each district centroid. The API
-    returns the largest river within ~5 km of the point, so a centroid
-    with no nearby river yields a small, steady series - captured by
-    q_ratio staying near 1."""
+def fetch_discharge(static: pd.DataFrame, points=None) -> pd.DataFrame:
+    """Weekly max GloFAS v4 discharge at each district's point: the
+    centroid (v1), or the main-river cell from fetch_river_points (v2).
+    The API reads the 0.05 degree GloFAS cell holding the point."""
     cache = RAW / "discharge"
     cache.mkdir(parents=True, exist_ok=True)
+    if points is not None:
+        static = static.drop(columns=["lat", "lon"]).merge(
+            points.rename(columns={"river_lat": "lat", "river_lon": "lon"}),
+            on="district_code",
+        )
     frames = []
     for row in static.itertuples():
         out = cache / f"{row.district_code}.json"
-        if not out.exists() and not _fetch_discharge_file(row, out):
+        if not out.exists() and not _fetch_discharge_file(
+            row.lat, row.lon, row.district, out
+        ):
             logger.warning(f"No discharge for {row.district}")
             continue
         daily = json.loads(out.read_text())["daily"]
@@ -313,70 +349,142 @@ def fetch_gfd_labels(ee) -> pd.DataFrame:
     return df
 
 
+def fetch_news_events(ee) -> pd.DataFrame:
+    """Groundsource flood events in Ghana, each placed in the district
+    holding its centroid. Events larger than NEWS_MAX_AREA_KM2 (region-
+    or country-level mentions) keep district_code = NaN, so the summary
+    can count them, but never label a district."""
+    out = RAW / "groundsource_events.csv"
+    if out.exists():
+        return pd.read_csv(out)
+    districts = _districts(ee).select(["ADM2_CODE"])
+    events = (
+        ee.FeatureCollection(C.GROUNDSOURCE)
+        .filterBounds(districts.geometry())
+        .map(lambda f: f.setGeometry(f.geometry().centroid(100)))
+    )
+    joined = ee.Join.saveFirst("district").apply(
+        events, districts, ee.Filter.intersects(".geo", None, ".geo")
+    )
+    joined = joined.map(
+        lambda f: f.set("ADM2_CODE", ee.Feature(f.get("district")).get("ADM2_CODE"))
+    )
+    rows = _fetch_features(
+        joined, ["uuid", "start_date", "end_date", "area_km2", "ADM2_CODE"]
+    )
+    df = pd.DataFrame(rows).rename(columns={"ADM2_CODE": "district_code"})
+    df.loc[df["area_km2"] > C.NEWS_MAX_AREA_KM2, "district_code"] = np.nan
+    df.to_csv(out, index=False)
+    return df
+
+
 def curated_events():
     from src.hydrology.flood_polygons import flood_polygons
 
     return flood_polygons.get_flood_events()
 
 
-def build_labels(panel, static, gfd):
-    """flood = 1 for every week overlapping a GFD event that flooded at
-    least LABEL_MIN_FLOODED_KM2 of the district, or containing one of
-    our documented events for a district it names."""
+def _mark(panel, col, code, start, end, source):
+    """Flag every week of district `code` that overlaps [start, end]."""
     week = pd.to_datetime(panel["week"])
-    panel["flood"] = 0
-    panel["label_source"] = ""
-    hits = gfd[gfd["flooded_km2"] >= C.LABEL_MIN_FLOODED_KM2]
-    for ev in hits.itertuples():
-        start, end = pd.Timestamp(ev.start), pd.Timestamp(ev.end)
-        mask = (
-            (panel["district_code"] == ev.district_code)
-            & (week + pd.Timedelta(days=6) >= start)
-            & (week <= end)
-        )
-        panel.loc[mask, "flood"] = 1
-        panel.loc[mask, "label_source"] = "GFD"
+    mask = (
+        (panel["district_code"] == code)
+        & (week + pd.Timedelta(days=6) >= start)
+        & (week <= end)
+    )
+    panel.loc[mask, col] = 1
+    src = panel.loc[mask, "label_source"]
+    panel.loc[mask, "label_source"] = np.where(
+        src.str.contains(source, regex=False),
+        src,
+        (src + "|" + source).str.strip("|"),
+    )
 
+
+def _mark_curated(panel, static, col):
     name_to_code = static.groupby("district")["district_code"].apply(list).to_dict()
     for ev in curated_events():
         day = pd.Timestamp(ev["date"])
         for name in ev["districts"]:
             for gaul_name in C.CURATED_DISTRICT_NAMES.get(name, [name]):
                 for code in name_to_code.get(gaul_name, []):
-                    mask = (
-                        (panel["district_code"] == code)
-                        & (week <= day)
-                        & (week + pd.Timedelta(days=6) >= day)
-                    )
-                    panel.loc[mask, "flood"] = 1
-                    panel.loc[mask, "label_source"] = (
-                        panel.loc[mask, "label_source"] + "|curated"
-                    ).str.strip("|")
+                    _mark(panel, col, code, day, day, "curated")
+
+
+def build_labels(panel, static, gfd):
+    """v1. flood = 1 for every week overlapping a GFD event that flooded
+    at least LABEL_MIN_FLOODED_KM2 of the district, or containing one of
+    our documented events for a district it names."""
+    panel["flood"] = 0
+    panel["label_source"] = ""
+    hits = gfd[gfd["flooded_km2"] >= C.LABEL_MIN_FLOODED_KM2]
+    for ev in hits.itertuples():
+        _mark(
+            panel,
+            "flood",
+            ev.district_code,
+            pd.Timestamp(ev.start),
+            pd.Timestamp(ev.end),
+            "GFD",
+        )
+    _mark_curated(panel, static, "flood")
+    return panel
+
+
+def build_labels_v2(panel, static, news):
+    """flood_news: a Groundsource event (or a documented / NADMO event)
+    overlaps the week in the district."""
+    from research.flood_experiments import nadmo
+
+    panel["flood_news"] = 0
+    panel["label_source"] = ""
+    for ev in news.dropna(subset=["district_code"]).itertuples():
+        _mark(
+            panel,
+            "flood_news",
+            ev.district_code,
+            pd.Timestamp(ev.start_date),
+            pd.Timestamp(ev.end_date),
+            "news",
+        )
+    _mark_curated(panel, static, "flood_news")
+    for ev in nadmo.load_incidents(static).itertuples():
+        day = pd.Timestamp(ev.date)
+        _mark(panel, "flood_news", ev.district_code, day, day, "nadmo")
     return panel
 
 
 def main(stage: str = "all"):
-    """stage: all | discharge | dynamic. The discharge and Earth Engine
-    pulls are independent, so they can run as two processes at once;
-    `all` then merges from the caches."""
+    """stage: all | discharge | dynamic | news. The discharge and Earth
+    Engine pulls are independent, so they can run as separate processes
+    at once; `all` then merges from the caches."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     RAW.mkdir(parents=True, exist_ok=True)
     ee = _init_ee()
     static = fetch_static(ee)
     logger.info(f"{len(static)} districts")
+    points = fetch_river_points(ee) if C.S["discharge_point"] == "river" else None
     if stage == "discharge":
-        fetch_discharge(static)
+        fetch_discharge(static, points)
         return
     if stage == "dynamic":
         fetch_dynamic(ee)
         return
-    gfd = fetch_gfd_labels(ee)
-    logger.info(f"{len(gfd)} GFD district-event hits")
-    discharge = fetch_discharge(static)
+    if stage == "news":
+        logger.info(f"{len(fetch_news_events(ee))} Groundsource events")
+        return
+    discharge = fetch_discharge(static, points)
     dynamic = fetch_dynamic(ee)
     panel = dynamic.merge(discharge, on=["district_code", "week"], how="left")
     panel = panel.merge(static, on="district_code", how="left")
-    panel = build_labels(panel, static, gfd)
+    if C.STUDY == "v1_gfd":
+        gfd = fetch_gfd_labels(ee)
+        logger.info(f"{len(gfd)} GFD district-event hits")
+        panel = build_labels(panel, static, gfd)
+    else:
+        news = fetch_news_events(ee)
+        panel = build_labels_v2(panel, static, news)
+        panel["flood"] = panel["flood_news"]
     panel = panel.sort_values(["district_code", "week"]).reset_index(drop=True)
     out = C.DATA_DIR / "panel.parquet"
     panel.to_parquet(out, index=False)
