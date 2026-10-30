@@ -300,3 +300,48 @@ class TestLocalClimate:
             "q_ratio",
         }
         assert not same_week_observed & set(OPERATIONAL)
+
+
+class TestShadowRunResilience:
+    """The first scheduled shadow run crashed on one GloFAS timeout."""
+
+    def test_discharge_timeout_becomes_missing_not_a_crash(self, monkeypatch):
+        import requests
+
+        from research.flood_experiments import operational as ops
+
+        monkeypatch.setattr(ops.time, "sleep", lambda s: None)
+        monkeypatch.setattr(
+            ops.requests,
+            "get",
+            lambda *a, **k: (_ for _ in ()).throw(requests.ReadTimeout()),
+        )
+        from datetime import date
+
+        assert math.isnan(ops._discharge_lag1(6.0, 0.6, date(2026, 11, 2)))
+
+    def test_retries_recover_from_a_temporary_failure(self, monkeypatch):
+        import requests
+
+        from research.flood_experiments import operational as ops
+
+        monkeypatch.setattr(ops.time, "sleep", lambda s: None)
+        calls = []
+
+        class _Ok:
+            status_code = 200
+
+            def json(self):
+                return {"daily": {"river_discharge": [1.0, 5.0, None]}}
+
+        def flaky(*a, **k):
+            calls.append(1)
+            if len(calls) < 3:
+                raise requests.ConnectionError()
+            return _Ok()
+
+        monkeypatch.setattr(ops.requests, "get", flaky)
+        from datetime import date
+
+        assert ops._discharge_lag1(6.0, 0.6, date(2026, 11, 2)) == 5.0
+        assert len(calls) == 3
