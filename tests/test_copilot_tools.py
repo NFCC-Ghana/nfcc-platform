@@ -7,10 +7,34 @@ fallback, and honestly report unknown districts / missing history
 instead of guessing.
 """
 
+from unittest.mock import patch
+
 import pytest
 
 from src.copilot import tools
+from src.hydrology.weather_forecast import weather_forecast
 from src.database.risk_history_db import init_risk_history_table
+
+
+@pytest.fixture
+def live_forecast():
+    """A fixed, real-shaped Open-Meteo forecast. Tests of the "forecast
+    available" path must not depend on the live API: when it times out
+    (it does in CI) the tools correctly answer "forecast_unavailable"
+    instead of scoring invented rain (tests/test_weather_forecast_fallback.py)."""
+    forecast = {
+        "24h": 12.0,
+        "48h": 4.0,
+        "72h": 0.0,
+        "daily": [],
+        "cumulative_6h": {"6": 3.0, "12": 6.0, "18": 9.0, "24": 12.0},
+        "source": "open-meteo",
+        "timestamp": "2026-10-30T00:00:00",
+    }
+    with patch.object(
+        weather_forecast, "get_forecast_for_district", return_value=forecast
+    ):
+        yield
 
 
 @pytest.mark.asyncio
@@ -37,13 +61,22 @@ async def test_get_district_decision_rejects_untracked_district():
 async def test_get_district_decision_real_data_for_tracked_district():
     result = await tools.get_district_decision("Tamale", precipitation_mm=90)
     assert result["precipitation_source"] == "user-specified"
-    assert result["risk_tier"] in ("VERY_LOW", "LOW", "MODERATE", "HIGH", "CRITICAL", "EXTREME")
+    assert result["risk_tier"] in (
+        "VERY_LOW",
+        "LOW",
+        "MODERATE",
+        "HIGH",
+        "CRITICAL",
+        "EXTREME",
+    )
     assert "evidence" in result
     assert "data_gaps" in result
 
 
 @pytest.mark.asyncio
-async def test_get_district_decision_auto_fetches_precipitation_when_omitted():
+async def test_get_district_decision_auto_fetches_precipitation_when_omitted(
+    live_forecast,
+):
     result = await tools.get_district_decision("Tamale")
     assert result["precipitation_source"].startswith("auto:")
     assert isinstance(result["precipitation_mm_used"], float)
@@ -71,7 +104,7 @@ async def test_get_district_evidence_rejects_untracked_district():
 
 
 @pytest.mark.asyncio
-async def test_get_district_forecast_includes_six_hour_point():
+async def test_get_district_forecast_includes_six_hour_point(live_forecast):
     result = await tools.get_district_forecast("Kumasi", current_precipitation_mm=20)
     hours = [p["hour"] for p in result["risk_timeline"]]
     assert "6h" in hours
