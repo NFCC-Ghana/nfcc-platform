@@ -1,6 +1,6 @@
 # NFCC flood early-warning system: critical review and upgrade
 
-*30 October 2026. For the NFCC team and the PhD supervisory committee.*
+*30 October 2026 (status updated the same evening). For the NFCC team and the PhD supervisory committee.*
 
 ## Bottom line
 
@@ -52,7 +52,7 @@ What remains needs partners, not code:
 | D1 | Flood records came from MODIS only (Global Flood Database): 203 onsets in 19 years, none in 2012–2014 or 2016–2017 | MODIS misses most urban and flash floods; too few events to train or test | Main study switched to Groundsource news-reported floods (Google, 2026): 2,527 placed events | Done |
 | D2 | News records follow media coverage | A model can learn where floods get reported instead of where they happen | Radar audit of every reported onset against matched no-flood weeks | Done. Rural confirmed (32.5% vs 16–17%); urban unverifiable by radar (9.4% vs 9–10%) |
 | D3 | No ground-truth flood or impact records | Nobody can verify urban floods or train impact warnings | NADMO request letter and loader (`nadmo_data_request.md`, `nadmo.py`) | Letter not yet sent |
-| D4 | Antecedent rain in production reads CHIRPS, which ends on 30 September in Earth Engine | The live "last 3 days" rain signal is a month old | Shadow run uses GPM IMERG (2 days behind), rescaled per district to CHIRPS | Shadow run done; production `antecedent_rainfall.py` still to switch |
+| D4 | Antecedent rain in production reads CHIRPS, which ends on 30 September in Earth Engine | The live "last 3 days" rain signal is a month old | Shadow run uses GPM IMERG (2 days behind), rescaled per district to CHIRPS | Done: production switched to IMERG in PR #60 (merged; live after the next deploy) |
 | D5 | District-mean rain dilutes storms | Flash floods come from convective cells | Wettest-pixel (95th percentile) rain per district | Done |
 | D6 | Discharge read at district centroids | Often nowhere near the flooding river | Read at each district's main river (largest MERIT Hydro upstream area) | Done |
 | D7 | Station rain, river gauges and dam releases never obtained | The strongest predictors of river and dam floods are missing; Bagre spillage drives Upper East and Northern floods | Not solvable with open data | Needs GMet, TAHMO, HSD, VRA and SONABEL |
@@ -74,12 +74,12 @@ What remains needs partners, not code:
 
 | # | Problem | Status |
 | --- | --- | --- |
-| P1 | When Open-Meteo failed, the platform **invented rainfall** (15 mm plus a random draw in rainy months). It reached users, the risk timeline and the AI Copilot's risk tools | Fixed in PR #58: an outage now returns "unavailable" with every value null. 660 tests pass |
-| P2 | Antecedent rain is a month stale (D4) | Fix designed (IMERG); production change pending |
-| P3 | Single deterministic forecast, no uncertainty | Ensemble shadow run built; production adoption after a shadow season |
+| P1 | When Open-Meteo failed, the platform **invented rainfall** (15 mm plus a random draw in rainy months). It reached users, the risk timeline and the AI Copilot's risk tools | Fixed in PR #58 (merged; live after the next deploy): an outage now returns "unavailable" with every value null |
+| P2 | Antecedent rain is a month stale (D4) | Fixed in PR #60 (merged; live after the next deploy): rain now 3 days old instead of about 30 |
+| P3 | Single deterministic forecast, no uncertainty | Weekly ensemble shadow run scheduled (PR #61; network-retry fix in PR #63). Production adoption after a shadow season |
 | P4 | Verification ledger outcomes come from ReliefWeb keyword search; 881 of 982 marked "confirmed" | Replace with Groundsource and the radar audit, and NADMO when available |
 | P5 | Live system tracks 9 districts; the research covers 216 | The shadow run covers all 216 |
-| P6 | **Security:** the production API key matches one in a public commit | Not fixed: rotate it (owner action, see the security punch list) |
+| P6 | **Security:** the production API key matches one in a public commit | Done 30 Oct: key rotated, leaked version disabled, GitHub leak alert closed. Next: activate the separate alert-approval key |
 
 ## Results (2015–2025, 216 districts, test years 2018–2025)
 
@@ -216,33 +216,37 @@ yet.
 
 **Now (weeks), code and decisions only:**
 
-1. Merge PR #58, so the system never invents data. Rotate the leaked API
+1. **Done:** PR #58 merged (the system never invents data) and the
+   leaked API key rotated. **Still to do:** activate the alert-approval
    key.
-2. Run `operational.py shadow` every Monday through the 2027 rainy season
-   (GitHub Actions). Compare it with the live rule and with what happened.
-3. Switch production antecedent rain to IMERG (D4).
-4. Send the NADMO request.
+2. **Scheduled:** `operational.py shadow` runs every Monday (PR #61). The
+   first run hit a network timeout; PR #63 adds retries. Keep it running
+   through the 2027 rainy season, and compare it with the live rule and
+   with what happened.
+3. **Done:** production antecedent rain switched to IMERG (PR #60).
+4. **Deploy** once, so PRs #58 and #60 go live.
+5. **Send the NADMO request.**
 
 **Next season, with partners:**
 
-5. **NADMO incident records:** verify urban labels and run E8
+6. **NADMO incident records:** verify urban labels and run E8
    impact-based warnings (people affected).
-6. **VRA and SONABEL dam release notices:** a dam pathway with real
+7. **VRA and SONABEL dam release notices:** a dam pathway with real
    data. Bagre spillage is the main driver of floods on the White Volta
    in the north.
-7. **GMet and TAHMO station rain:** bias-correct satellite rain and
+8. **GMet and TAHMO station rain:** bias-correct satellite rain and
    detect convective extremes.
-8. **HSD gauges:** calibrate GloFAS locally (Google Flood Hub's approach).
+9. **HSD gauges:** calibrate GloFAS locally (Google Flood Hub's approach).
 
 **Within a year, to be recognised as leading:**
 
-9. Separate flash-flood (sub-daily, Accra/Kumasi drainage) and riverine
+10. Separate flash-flood (sub-daily, Accra/Kumasi drainage) and riverine
    (Volta, Oti, White Volta) models with their own lead times.
-10. A public skill dashboard updated from the shadow log, like ECMWF's
+11. A public skill dashboard updated from the shadow log, like ECMWF's
     and Google's published reliability.
-11. Align with WMO impact-based forecasting and the IFRC Ghana flood
+12. Align with WMO impact-based forecasting and the IFRC Ghana flood
     Early Action Protocol, so NFCC can provide its trigger.
-12. Peer-reviewed publication of the methods and results in this
+13. Peer-reviewed publication of the methods and results in this
     document.
 
 ## What we can and cannot claim today
