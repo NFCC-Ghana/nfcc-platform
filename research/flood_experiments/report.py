@@ -41,6 +41,10 @@ def _skill_table(rows, label="Model"):
     return head + body
 
 
+def _alpha(rng):
+    return "–" if not rng else f"{rng[0]:.3f}–{rng[1]:.2f}"
+
+
 def _bar(ax, labels, values, errs=None, title="", ref=None):
     y = range(len(labels))
     xerr = None
@@ -95,6 +99,34 @@ def main():
         "## E3b. One week ahead (inputs known when the week starts)",
         "",
         _skill_table(R.get("E3b_forecast", [])),
+        "## E3c. Real lead time: archived ECMWF forecasts (test 2024-2025)",
+        "",
+        (
+            _skill_table(R["E3c_real_forecast"]["rows"], "Rain input")
+            if "rows" in R.get("E3c_real_forecast", {})
+            else "Not run: no archived forecasts.\n"
+        ),
+        "## When vs where, and value to users",
+        "",
+        "Within-district AUC ranks weeks inside each district (0.5 = no timing "
+        "skill). Peak value: relative economic value at the best cost-loss ratio "
+        "(Richardson 2000; 1 = perfect, 0 = no better than always/never acting).",
+        "",
+        "| Model | Within-district AUC | Urban PR-AUC (base) | Rural PR-AUC (base) "
+        "| Peak value | Useful for cost/loss |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    md += [
+        f"| {r['model']} | {_f(r.get('within_district_auc'))} "
+        f"| {_f(r.get('urban_pr_auc'))} ({_f(r.get('urban_base_rate'), 4)}) "
+        f"| {_f(r.get('rural_pr_auc'))} ({_f(r.get('rural_base_rate'), 4)}) "
+        f"| {_f(r.get('peak_value'))} "
+        f"| {_alpha(r.get('useful_alpha_range'))} |"
+        for r in R["E1_E3_hierarchy_temporal"]
+        + R.get("E3c_real_forecast", {}).get("rows", [])
+    ]
+    md += [
+        "",
         "## E2. Source ablation (XGBoost, temporal)",
         "",
         _skill_table(R["E2_ablation"], "Configuration"),

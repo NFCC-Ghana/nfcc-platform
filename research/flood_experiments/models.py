@@ -190,15 +190,32 @@ TEMPORAL = C.SEASON + C.RAIN + C.RAIN_LAGS + C.SOIL
 MULTI_SOURCE = (
     C.SEASON + C.RAIN + C.RAIN_LAGS + C.SOIL + C.RIVER + C.GEOGRAPHIC + C.EXPOSURE
 )
+# The final model: multi-source plus rain judged against local climate.
+FINAL = MULTI_SOURCE + C.RAIN_LOCAL
+# Timing only: no place features (geography, exposure). What survives
+# here is skill at saying WHEN a district floods, not WHICH districts get
+# reported - the part of the signal media bias cannot inflate.
+TIMING_ONLY = C.SEASON + C.RAIN + C.RAIN_LAGS + C.SOIL + C.RIVER + C.RAIN_LOCAL
 # One week ahead: only what is known when the week starts.
 FORECAST = (
     C.SEASON
     + C.RAIN_LAGS
     + ["rain_prev4w_sum", "sm_start", "runoff_prev4w_sum"]
+    + [p for p in C.RAIN_LOCAL if p == "rain_prev4w_pct"]
     + ["q_ratio_lag1", "q_week_max_log_lag1"]
     + C.GEOGRAPHIC
     + C.EXPOSURE
 )
+# What an operational system has when a week starts: everything known
+# then, plus a RAINFALL FORECAST for the week (rain, wettest-pixel rain
+# and local percentiles of the target week). Trained on observed rain
+# (a perfect forecast); run on real forecasts. E3c measures exactly this
+# model with archived ECMWF forecasts, and operational.py deploys it.
+OPERATIONAL = [
+    f
+    for f in FINAL
+    if f not in ("sm_week_mean", "runoff_week_sum", "q_week_max_log", "q_ratio")
+] + ["q_ratio_lag1", "q_week_max_log_lag1"]
 C.MONOTONE_UP.update(
     ["rain_prev4w_sum", "sm_start", "runoff_prev4w_sum"]
     + ["q_ratio_lag1", "q_week_max_log_lag1"]
@@ -217,4 +234,11 @@ def hierarchy():
         lambda: XGB(RAIN_ONLY, "XGBoost (rainfall)"),
         lambda: XGB(TEMPORAL, "Temporal XGBoost (rain lags + soil state)"),
         lambda: XGB(MULTI_SOURCE, "Multi-source XGBoost"),
-    ]
+    ] + (
+        [
+            lambda: XGB(TIMING_ONLY, "Timing-only XGBoost (no place features)"),
+            lambda: XGB(FINAL, "Final: multi-source + local climate XGBoost"),
+        ]
+        if C.RAIN_LOCAL
+        else []
+    )

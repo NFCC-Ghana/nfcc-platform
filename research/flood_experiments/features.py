@@ -17,6 +17,8 @@ Two input timings:
 No input uses labels.
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -59,6 +61,14 @@ def build_features(panel: pd.DataFrame, label: str = "news") -> pd.DataFrame:
     df["q_week_max_log_lag1"] = g["q_week_max_log"].shift(1)
 
     df["log_pop_density"] = np.log1p(df["population"] / df["area_km2"])
+    if C.RAIN_LOCAL:
+        try:
+            clim = local_climate()
+        except FileNotFoundError as e:  # e.g. tests or a fresh checkout
+            warnings.warn(f"local rainfall percentiles left empty: {e}")
+            clim = None
+        for target, source in LOCAL_PAIRS:
+            df[target] = np.nan if clim is None else local_percentile(df, source, clim)
 
     df["flood_prev"] = g["flood"].shift(1).fillna(0).astype(int)
     df["flood_recent8"] = (
@@ -70,6 +80,53 @@ def build_features(panel: pd.DataFrame, label: str = "news") -> pd.DataFrame:
     # are not onset candidates.
     df = df[df["rain_lag4"].notna() & (df["flood_prev"] == 0)].copy()
     return df.reset_index(drop=True)
+
+
+LOCAL_PAIRS = [
+    ("rain_week_sum_pct", "rain_week_sum"),
+    ("rain_week_max_pct", "rain_week_max"),
+    ("rain_prev4w_pct", "rain_prev4w_sum"),
+]
+_CLIMATE = {}
+
+
+def local_climate() -> dict:
+    """Each district's sorted weekly rainfall values over 2000-2014
+    (CHIRPS district means from the v1 panel), per rainfall variable."""
+    if _CLIMATE:
+        return _CLIMATE
+    path = C.ROOT / "data" / "v1_gfd" / "panel.parquet"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} is needed for local rainfall percentiles; build it with "
+            "NFCC_STUDY=v1_gfd python -m research.flood_experiments.build_dataset"
+        )
+    v1 = pd.read_parquet(
+        path, columns=["district_code", "week", "rain_week_sum", "rain_week_max"]
+    )
+    v1 = v1[pd.to_datetime(v1["week"]) <= C.LOCAL_CLIMATE_END].sort_values(
+        ["district_code", "week"]
+    )
+    g = v1.groupby("district_code")["rain_week_sum"]
+    v1["rain_prev4w_sum"] = sum(g.shift(k) for k in range(1, 5))
+    for _, source in LOCAL_PAIRS:
+        _CLIMATE[source] = {
+            code: np.sort(s.dropna().to_numpy())
+            for code, s in v1.groupby("district_code")[source]
+        }
+    return _CLIMATE
+
+
+def local_percentile(df: pd.DataFrame, source: str, clim: dict) -> np.ndarray:
+    """Percentile (0-1) of df[source] within the district's own climate."""
+    out = np.full(len(df), np.nan)
+    for code, idx in df.groupby("district_code").indices.items():
+        ref = clim[source].get(code)
+        if ref is not None and len(ref):
+            v = df[source].to_numpy()[idx]
+            pct = np.searchsorted(ref, v, side="right") / len(ref)
+            out[idx] = np.where(np.isnan(v), np.nan, pct)
+    return out
 
 
 def all_features():

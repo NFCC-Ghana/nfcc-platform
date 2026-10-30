@@ -8,6 +8,8 @@ E3  Temporal holdout: forward-chaining by year (train <= y-2, validate
     y-1, test y) over config.TEST_YEARS
 E3b One-week-ahead forecast (inputs known when the week starts) vs the
     nowcast hindcast
+E3c Real lead time: 2024-2025 with archived ECMWF forecasts issued before
+    each week, vs perfect forecast, no forecast and the live rule
 E4  Spatial holdout: leave-one-region-out, separated in time
 E5  Fusion strategy: early fusion, late fusion (mean), stacking, and the
     platform's hand-set weights
@@ -91,6 +93,7 @@ def cross_validate(df, factory, folds):
                     "year": test["year"].to_numpy(),
                     "week": test["week"].to_numpy(),
                     "district_code": test["district_code"].to_numpy(),
+                    "built_frac": test["built_frac"].to_numpy(),
                     "y": test["onset"].to_numpy(),
                     "p": p,
                     "alert": p >= thr,
@@ -118,6 +121,18 @@ def score(pred, name):
         pred["year"],
         lambda a, b: M.categorical(a, b >= 0.5)["sedi"],
     )
+    # WHEN vs WHERE: skill inside each district, and urban vs rural (the
+    # radar audit confirms rural news labels; urban ones are unverified).
+    out["within_district_auc"] = M.within_district_auc(pred["district_code"], y, p)
+    cut = pred.drop_duplicates("district_code")["built_frac"].quantile(0.75)
+    urban = pred["built_frac"].to_numpy() >= cut
+    for name_, m in (("urban", urban), ("rural", ~urban)):
+        out[f"{name_}_pr_auc"] = M.probabilistic(y[m], p[m])["pr_auc"]
+        out[f"{name_}_base_rate"] = float(y[m].mean())
+    rv = M.relative_value(y, p)
+    out["peak_value"] = rv["peak_value"]
+    out["useful_alpha_range"] = rv["useful_alpha_range"]
+    out["value_curve"] = {"alpha": rv["alpha"], "value": rv["value"]}
     return out
 
 
@@ -146,6 +161,139 @@ def e3b_forecast(df):
         rows.append(score(cross_validate(df, factory, temporal_folds(df)), name))
         logger.info(f"E3b {name}: PR-AUC {rows[-1]['pr_auc']:.3f}")
     return rows
+
+
+def _with_forecast(test, train, fc, other_years):
+    """Replace the target week's observed rainfall with the archived
+    ECMWF forecast issued before the week. ECMWF and CHIRPS differ in
+    scale, so each district's forecast is rescaled by its mean CHIRPS /
+    mean forecast ratio, fitted on the OTHER forecast year only (no use
+    of the test year's observations)."""
+    from research.flood_experiments.features import LOCAL_PAIRS, local_climate
+    from research.flood_experiments.features import local_percentile
+
+    t = test.merge(fc, on=["district_code", "week"], how="left")
+    ref = train[train["year"].isin(other_years)].merge(
+        fc, on=["district_code", "week"], how="inner"
+    )
+    for obs, f in (
+        ("rain_week_sum", "fc_rain_week_sum"),
+        ("rain_week_max", "fc_rain_week_max"),
+    ):
+        g = ref.groupby("district_code")
+        ratio = (
+            (g[obs].mean() / g[f].mean().replace(0, np.nan)).clip(0.2, 5).fillna(1.0)
+        )
+        t[obs] = t[f] * t["district_code"].map(ratio).fillna(1.0)
+    # wettest-pixel features: the district's usual p95/mean ratio
+    for col in ("rain_week_sum", "rain_week_max"):
+        if f"{col}_p95" in t.columns:
+            k = (
+                (train[f"{col}_p95"] / train[col].replace(0, np.nan))
+                .groupby(train["district_code"])
+                .median()
+            )
+            t[f"{col}_p95"] = t[col] * t["district_code"].map(k).fillna(1.0)
+    clim = local_climate()
+    for target, source in LOCAL_PAIRS:
+        if target in t.columns and source != "rain_prev4w_sum":
+            t[target] = local_percentile(t, source, clim)
+    return t.dropna(subset=["fc_rain_week_sum"])
+
+
+def e3c_real_forecast(df):
+    """Honest lead time: test 2024-2025 with the ECMWF forecast issued
+    before each week (forecast_archive.py) in place of observed rain.
+
+    Two ways to use a forecast:
+    - Perfect prog: a model trained on observed rain is fed the forecast.
+    - MOS (model output statistics): the antecedent-only model's
+      probability is blended with the forecast's local-climate
+      percentiles by a 3-parameter logistic model fitted on the OTHER
+      forecast year (cross-fitted), so it learns how far to trust the
+      forecast. With two years of archive, intervals are indicative."""
+    path = C.DATA_DIR / "raw" / "forecast_weekly.csv"
+    if not path.exists():
+        return {"not_run": "No archived forecasts (forecast_archive.py)."}
+    fc = pd.read_csv(path, parse_dates=["week"])
+    years = sorted(set(fc["week"].dt.year) & set(TEST_YEARS))
+    setups = {
+        "Perfect forecast (observed rain), upper bound": "observed",
+        "Real ECMWF forecast issued before the week": "forecast",
+        "No rain forecast (antecedent only)": "none",
+        "Live rule on the real ECMWF forecast": "live",
+        "Climatology": "clim",
+    }
+    preds = {k: [] for k in setups}
+    mos_parts = {}
+    for y in years:
+        train = df[df["year"] <= y - 2]
+        val = df[df["year"] == y - 1]
+        test = df[df["year"] == y]
+        other = [o for o in years if o != y]
+        tf = _with_forecast(test, df[df["year"].isin(other)], fc, other)
+        test_obs = test.merge(
+            tf[["district_code", "week"]], on=["district_code", "week"]
+        )
+        models = {
+            "observed": Mo.XGB(Mo.OPERATIONAL).fit(train, val),
+            "none": Mo.XGB(Mo.FORECAST).fit(train, val),
+            "clim": Mo.Climatology().fit(train, val),
+        }
+        models["forecast"] = models["observed"]
+        live = Mo.RainfallThreshold()
+        for name, kind in setups.items():
+            m = live if kind == "live" else models[kind]
+            frame = test_obs if kind == "observed" else tf
+            tune = val if val["onset"].sum() >= MIN_VAL_ONSETS else train
+            thr = M.best_f1_threshold(tune["onset"], m.predict(tune))
+            p = m.predict(frame)
+            if kind == "none":
+                mos_parts[y] = frame.assign(p_none=p)
+            preds[name].append(
+                pd.DataFrame(
+                    {
+                        "fold": str(y),
+                        "year": frame["year"].to_numpy(),
+                        "week": frame["week"].to_numpy(),
+                        "district_code": frame["district_code"].to_numpy(),
+                        "built_frac": frame["built_frac"].to_numpy(),
+                        "y": frame["onset"].to_numpy(),
+                        "p": p,
+                        "alert": p >= thr,
+                    }
+                )
+            )
+    mos_name = "MOS blend: antecedent model + ECMWF forecast"
+    preds[mos_name] = []
+    cols = ["rain_week_max_pct", "rain_week_sum_pct"]
+    for y in years:
+        fit_on = pd.concat([mos_parts[o] for o in years if o != y])
+        Xf = np.column_stack([_logit(fit_on["p_none"]), fit_on[cols].fillna(0.5)])
+        blend = LogisticRegression(max_iter=1000).fit(Xf, fit_on["onset"])
+        thr = M.best_f1_threshold(fit_on["onset"], blend.predict_proba(Xf)[:, 1])
+        t = mos_parts[y]
+        p = blend.predict_proba(
+            np.column_stack([_logit(t["p_none"]), t[cols].fillna(0.5)])
+        )[:, 1]
+        preds[mos_name].append(
+            pd.DataFrame(
+                {
+                    "fold": str(y),
+                    "year": t["year"].to_numpy(),
+                    "week": t["week"].to_numpy(),
+                    "district_code": t["district_code"].to_numpy(),
+                    "built_frac": t["built_frac"].to_numpy(),
+                    "y": t["onset"].to_numpy(),
+                    "p": p,
+                    "alert": p >= thr,
+                }
+            )
+        )
+    rows = [score(pd.concat(v, ignore_index=True), k) for k, v in preds.items()]
+    for r in rows:
+        logger.info(f"E3c {r['model']}: PR-AUC {r['pr_auc']:.3f}")
+    return {"test_years": years, "rows": rows}
 
 
 def label_audit(panel):
@@ -571,6 +719,7 @@ def main(only=None):
     single = {
         "E1": ("E1_E3_hierarchy_temporal", e1_e3_hierarchy),
         "E3b": ("E3b_forecast", e3b_forecast),
+        "E3c": ("E3c_real_forecast", e3c_real_forecast),
         "E2": ("E2_ablation", e2_ablation),
         "E4": ("E4_spatial", e4_spatial),
         "E5": ("E5_fusion", e5_fusion),
@@ -599,6 +748,7 @@ def main(only=None):
     logger.info(json.dumps(results["dataset"], default=str))
     results["E1_E3_hierarchy_temporal"] = e1_e3_hierarchy(df)
     results["E3b_forecast"] = e3b_forecast(df)
+    results["E3c_real_forecast"] = e3c_real_forecast(df)
     results["E2_ablation"] = e2_ablation(df)
     results["E4_spatial"] = e4_spatial(df)
     results["E5_fusion"] = e5_fusion(df)

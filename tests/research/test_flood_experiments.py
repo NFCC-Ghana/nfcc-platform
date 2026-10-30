@@ -230,3 +230,73 @@ class TestNadmoMatching:
         out = nadmo.load_incidents(static)
         assert out["district_code"].tolist() == [7, 7]
         assert (tmp_path / "raw" / "nadmo_unmatched.csv").exists()
+
+
+class TestWhenNotWhere:
+    def test_within_district_auc_ignores_which_district_floods_more(self):
+        # district 1 floods often and always scores high; within each
+        # district the scores are random, so timing skill is 0.5
+        rng = np.random.default_rng(0)
+        d = np.repeat([1, 2], 500)
+        y = np.concatenate([rng.random(500) < 0.2, rng.random(500) < 0.02]).astype(int)
+        p = np.where(d == 1, 0.9, 0.1) + rng.normal(0, 0.01, 1000)
+        assert M.probabilistic(y, p)["roc_auc"] > 0.7  # pooled: rewards "where"
+        assert M.within_district_auc(d, y, p) == pytest.approx(0.5, abs=0.1)
+
+    def test_relative_value_is_one_for_perfect_and_zero_for_useless(self):
+        y = np.array([0] * 90 + [1] * 10)
+        perfect = M.relative_value(y, y.astype(float), alphas=np.array([0.05, 0.3]))
+        assert perfect["value"] == pytest.approx([1.0, 1.0])
+        noise = M.relative_value(y, np.full(100, 0.5), alphas=np.array([0.05, 0.3]))
+        assert max(noise["value"]) <= 1e-9
+
+
+class TestForecastArchive:
+    def test_day_k_of_the_week_uses_the_forecast_issued_k_plus_1_days_earlier(self):
+        from research.flood_experiments.forecast_archive import weekly_forecast
+
+        t = pd.date_range("2024-01-01", periods=7 * 24, freq="h")  # Mon-Sun
+        hourly = {"time": t.strftime("%Y-%m-%dT%H:%M").tolist()}
+        for n in range(1, 8):
+            # lead n forecasts 1 mm/h on day n-1 only, 0 elsewhere
+            hourly[f"precipitation_previous_day{n}"] = [
+                1.0 if ts.dayofweek == n - 1 else 0.0 for ts in t
+            ]
+        w = weekly_forecast(hourly)
+        assert w["fc_rain_week_sum"].tolist() == [7 * 24.0]
+        assert w["fc_rain_week_max"].tolist() == [24.0]
+
+    def test_with_sparse_leads_each_day_uses_the_shortest_lead_issued_before_the_week(
+        self,
+    ):
+        from research.flood_experiments.forecast_archive import weekly_forecast
+
+        t = pd.date_range("2024-01-01", periods=7 * 24, freq="h")
+        hourly = {"time": t.strftime("%Y-%m-%dT%H:%M").tolist()}
+        for n in (2, 4, 6, 7):  # each lead forecasts n mm/h everywhere
+            hourly[f"precipitation_previous_day{n}"] = [float(n)] * len(t)
+        w = weekly_forecast(hourly)
+        # days 0-1 lead 2, days 2-3 lead 4, days 4-5 lead 6, day 6 lead 7
+        assert w["fc_rain_week_sum"].iloc[0] == 24 * (2 + 2 + 4 + 4 + 6 + 6 + 7)
+
+
+class TestLocalClimate:
+    def test_percentile_is_relative_to_each_districts_own_record(self):
+        from research.flood_experiments.features import local_percentile
+
+        clim = {"rain_week_sum": {1: np.arange(0, 100.0), 2: np.arange(0, 10.0)}}
+        df = pd.DataFrame({"district_code": [1, 2], "rain_week_sum": [40.0, 40.0]})
+        pct = local_percentile(df, "rain_week_sum", clim)
+        assert pct[0] == pytest.approx(0.41)  # ordinary for district 1
+        assert pct[1] == 1.0  # beyond anything district 2 has seen
+
+    def test_operational_inputs_are_all_known_when_the_week_starts(self):
+        from research.flood_experiments.models import OPERATIONAL
+
+        same_week_observed = {
+            "sm_week_mean",
+            "runoff_week_sum",
+            "q_week_max_log",
+            "q_ratio",
+        }
+        assert not same_week_observed & set(OPERATIONAL)

@@ -30,6 +30,26 @@ POD/FAR ±1 wk count an alert one week early or late as a hit.
 | Forecast logistic regression | 0.611 | 0.004 [0.000, 0.012] | 0.0009 | 0.001 | 0.047 | 0.002 | 0.999 | 0.953 | -0.003 [-0.617, 0.275] | 0.047 | 0.999 |
 | Forecast multi-source XGBoost | 0.788 | 0.003 [0.001, 0.007] | 0.0009 | 0.004 | 0.189 | 0.007 | 0.996 | 0.811 | 0.317 [-0.555, 0.511] | 0.453 | 0.989 |
 
+## E3c. Real lead time: archived ECMWF forecasts (test 2024-2025)
+
+Not run: no archived forecasts.
+
+## When vs where, and value to users
+
+Within-district AUC ranks weeks inside each district (0.5 = no timing skill). Peak value: relative economic value at the best cost-loss ratio (Richardson 2000; 1 = perfect, 0 = no better than always/never acting).
+
+| Model | Within-district AUC | Urban PR-AUC (base) | Rural PR-AUC (base) | Peak value | Useful for cost/loss |
+| --- | --- | --- | --- | --- | --- |
+| Climatology | 0.578 | 0.004 (0.0006) | 0.006 (0.0010) | 0.346 | 0.001–0.02 |
+| Persistence | 0.499 | 0.005 (0.0006) | 0.001 (0.0010) | 0.021 | 0.001–0.00 |
+| Rainfall threshold (live rule) | 0.781 | 0.005 (0.0006) | 0.003 (0.0010) | 0.375 | 0.001–0.01 |
+| River percentile (GloFAS-style) | 0.821 | 0.001 (0.0006) | 0.005 (0.0010) | 0.413 | 0.001–0.01 |
+| Logistic regression (rainfall) | 0.635 | 0.001 (0.0006) | 0.003 (0.0010) | 0.266 | 0.001–0.01 |
+| Random forest (rainfall) | 0.611 | 0.001 (0.0006) | 0.002 (0.0010) | 0.198 | 0.001–0.00 |
+| XGBoost (rainfall) | 0.636 | 0.001 (0.0006) | 0.002 (0.0010) | 0.193 | 0.001–0.00 |
+| Temporal XGBoost (rain lags + soil state) | 0.644 | 0.001 (0.0006) | 0.002 (0.0010) | 0.151 | 0.001–0.00 |
+| Multi-source XGBoost | 0.670 | 0.005 (0.0006) | 0.005 (0.0010) | 0.442 | 0.001–0.01 |
+
 ## E2. Source ablation (XGBoost, temporal)
 
 | Configuration | ROC-AUC | PR-AUC (90% CI) | Brier | Precision | Recall | F1 | FAR | MER | SEDI (90% CI) | POD ±1 wk | FAR ±1 wk |

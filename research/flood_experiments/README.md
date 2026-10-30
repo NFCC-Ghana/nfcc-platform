@@ -26,9 +26,15 @@ python -m research.flood_experiments.build_dataset discharge
 python -m research.flood_experiments.build_dataset news
 python -m research.flood_experiments.build_dataset             # merge into data/<study>/panel.parquet
 python -m research.flood_experiments.sar_labels                # v2: Sentinel-1 label audit (~30 min)
+python -m research.flood_experiments.forecast_archive          # v2: archived ECMWF forecasts for E3c (rate-limited, hours)
 python -m research.flood_experiments.experiments               # results/<study>/results.json
 python -m research.flood_experiments.report                    # results/<study>/summary.md + figures
+python -m research.flood_experiments.operational fit           # v2: calibrated operational model -> model/
+python -m research.flood_experiments.operational shadow        # v2: score next week, all districts (never alerts)
 ```
+
+The 2000-2018 panel (`NFCC_STUDY=v1_gfd`) must be built before v2: the
+v2 local-climate rain features use its 2000-2014 CHIRPS record.
 
 Set `NFCC_STUDY=v1_gfd` to run the sensitivity study. To re-run a
 single experiment, pass its ID: `python -m research.flood_experiments.experiments E4`.
@@ -71,6 +77,7 @@ runnable rather than filled with simulated values.
 | E2 | Cumulative ablation: Baseline → +Soil → +River → +Dam → +Geographic → +Exposure |
 | E3 | Forward-chaining by year |
 | E3b | One week ahead: forecast-mode models vs the nowcast |
+| E3c | Real lead time, 2024-2025: archived ECMWF forecasts issued before each week, fed directly (perfect prog) or through a cross-fitted MOS blend, vs no forecast, climatology and the live rule on the forecast |
 | E4 | Leave-one-region-out *and* separated in time. A purely spatial split leaks, because one flood event covers several regions in the same weeks (v1: PR-AUC 0.31 leaky vs 0.001 clean). |
 | E5 | Early fusion vs late fusion vs stacking vs the platform's hand-set weights |
 | E6 | One source missing (training median) or one week stale, at prediction time only |
@@ -86,6 +93,9 @@ recruited participants and ethics approval, so they are not in code.
 
 - **Monotone XGBoost.** Rain, soil, runoff and discharge inputs can only raise risk. With a few hundred events, unconstrained trees learn physically impossible shapes. Trees are shallow (depth 3) and regularised.
 - **Thresholds.** The decision threshold maximises F1 on the validation year. When that year has fewer than 5 onsets, the threshold is chosen on the training years instead.
+- **When vs where.** Within-district AUC ranks weeks inside each district, so a model that only knows which districts flood scores 0.5. Skill is also reported for urban and rural districts, because the radar audit verifies only rural labels.
+- **Value to users.** Relative economic value (Richardson 2000) across cost-loss ratios, beside the scores.
+- **Local climate.** Rain is also given as a percentile of the district's own 2000-2014 CHIRPS record.
 - **Event-tolerant scores.** POD and FAR at ±1 week sit alongside strict week-matching, because news and satellite dating can be a week off.
 - **Metrics.** ROC-AUC, PR-AUC, Brier, ECE, precision, recall (POD), F1, FAR, MER, POFD and SEDI (Ferro & Stephenson 2011), with year-block bootstrap 90% intervals.
 

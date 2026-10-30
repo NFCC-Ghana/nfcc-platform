@@ -23,14 +23,49 @@ POD/FAR ±1 wk count an alert one week early or late as a hit.
 | XGBoost (rainfall) | 0.745 | 0.025 [0.019, 0.032] | 0.0083 | 0.036 | 0.208 | 0.061 | 0.964 | 0.792 | 0.338 [0.235, 0.433] | 0.283 | 0.942 |
 | Temporal XGBoost (rain lags + soil state) | 0.724 | 0.022 [0.018, 0.028] | 0.0083 | 0.030 | 0.155 | 0.050 | 0.970 | 0.845 | 0.269 [0.174, 0.366] | 0.205 | 0.954 |
 | Multi-source XGBoost | 0.834 | 0.072 [0.058, 0.091] | 0.0081 | 0.131 | 0.159 | 0.144 | 0.869 | 0.841 | 0.451 [0.405, 0.499] | 0.183 | 0.808 |
+| Timing-only XGBoost (no place features) | 0.758 | 0.034 [0.025, 0.045] | 0.0083 | 0.054 | 0.209 | 0.085 | 0.946 | 0.791 | 0.397 [0.276, 0.506] | 0.271 | 0.917 |
+| Final: multi-source + local climate XGBoost | 0.840 | 0.081 [0.063, 0.099] | 0.0081 | 0.132 | 0.196 | 0.158 | 0.868 | 0.804 | 0.485 [0.437, 0.529] | 0.227 | 0.810 |
 
 ## E3b. One week ahead (inputs known when the week starts)
 
 | Model | ROC-AUC | PR-AUC (90% CI) | Brier | Precision | Recall | F1 | FAR | MER | SEDI (90% CI) | POD ±1 wk | FAR ±1 wk |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nowcast multi-source XGBoost | 0.834 | 0.072 [0.058, 0.091] | 0.0081 | 0.131 | 0.159 | 0.144 | 0.869 | 0.841 | 0.451 [0.405, 0.499] | 0.183 | 0.808 |
-| Forecast logistic regression | 0.811 | 0.044 [0.038, 0.053] | 0.0083 | 0.079 | 0.125 | 0.097 | 0.921 | 0.875 | 0.368 [0.312, 0.420] | 0.149 | 0.849 |
-| Forecast multi-source XGBoost | 0.791 | 0.047 [0.035, 0.065] | 0.0082 | 0.074 | 0.172 | 0.103 | 0.926 | 0.828 | 0.404 [0.334, 0.467] | 0.212 | 0.854 |
+| Forecast logistic regression | 0.817 | 0.046 [0.038, 0.057] | 0.0082 | 0.068 | 0.156 | 0.095 | 0.932 | 0.844 | 0.380 [0.330, 0.433] | 0.181 | 0.868 |
+| Forecast multi-source XGBoost | 0.810 | 0.051 [0.040, 0.068] | 0.0082 | 0.071 | 0.172 | 0.101 | 0.929 | 0.828 | 0.400 [0.312, 0.476] | 0.205 | 0.861 |
+
+## E3c. Real lead time: archived ECMWF forecasts (test 2024-2025)
+
+| Rain input | ROC-AUC | PR-AUC (90% CI) | Brier | Precision | Recall | F1 | FAR | MER | SEDI (90% CI) | POD ±1 wk | FAR ±1 wk |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Perfect forecast (observed rain), upper bound | 0.849 | 0.084 [0.072, 0.125] | 0.0074 | 0.129 | 0.189 | 0.153 | 0.871 | 0.811 | 0.484 [0.410, 0.578] | 0.232 | 0.813 |
+| Real ECMWF forecast issued before the week | 0.837 | 0.050 [0.050, 0.072] | 0.0076 | 0.112 | 0.122 | 0.117 | 0.888 | 0.878 | 0.407 [0.397, 0.457] | 0.140 | 0.832 |
+| No rain forecast (antecedent only) | 0.870 | 0.089 [0.089, 0.101] | 0.0074 | 0.071 | 0.299 | 0.115 | 0.929 | 0.701 | 0.513 [0.466, 0.625] | 0.329 | 0.864 |
+| Live rule on the real ECMWF forecast | 0.693 | 0.013 [0.010, 0.020] | 0.1499 | 0.014 | 0.024 | 0.018 | 0.986 | 0.976 | 0.073 [-0.004, 0.121] | 0.024 | 0.986 |
+| Climatology | 0.803 | 0.060 [0.045, 0.075] | 0.0075 | 0.135 | 0.159 | 0.146 | 0.865 | 0.841 | 0.460 [0.436, 0.474] | 0.183 | 0.756 |
+
+## When vs where, and value to users
+
+Within-district AUC ranks weeks inside each district (0.5 = no timing skill). Peak value: relative economic value at the best cost-loss ratio (Richardson 2000; 1 = perfect, 0 = no better than always/never acting).
+
+| Model | Within-district AUC | Urban PR-AUC (base) | Rural PR-AUC (base) | Peak value | Useful for cost/loss |
+| --- | --- | --- | --- | --- | --- |
+| Climatology | 0.715 | 0.079 (0.0206) | 0.011 (0.0045) | 0.362 | 0.003–0.14 |
+| Persistence | 0.554 | 0.032 (0.0206) | 0.009 (0.0045) | 0.217 | 0.001–0.04 |
+| Rainfall threshold (live rule) | 0.798 | 0.066 (0.0206) | 0.019 (0.0045) | 0.407 | 0.002–0.11 |
+| River percentile (GloFAS-style) | 0.765 | 0.049 (0.0206) | 0.019 (0.0045) | 0.395 | 0.003–0.03 |
+| Logistic regression (rainfall) | 0.797 | 0.075 (0.0206) | 0.039 (0.0045) | 0.388 | 0.003–0.40 |
+| Random forest (rainfall) | 0.768 | 0.063 (0.0206) | 0.019 (0.0045) | 0.357 | 0.003–0.11 |
+| XGBoost (rainfall) | 0.774 | 0.059 (0.0206) | 0.017 (0.0045) | 0.365 | 0.004–0.07 |
+| Temporal XGBoost (rain lags + soil state) | 0.755 | 0.054 (0.0206) | 0.015 (0.0045) | 0.361 | 0.004–0.06 |
+| Multi-source XGBoost | 0.779 | 0.106 (0.0206) | 0.019 (0.0045) | 0.552 | 0.002–0.40 |
+| Timing-only XGBoost (no place features) | 0.764 | 0.068 (0.0206) | 0.025 (0.0045) | 0.443 | 0.004–0.09 |
+| Final: multi-source + local climate XGBoost | 0.782 | 0.116 (0.0206) | 0.027 (0.0045) | 0.557 | 0.002–0.50 |
+| Perfect forecast (observed rain), upper bound | 0.766 | 0.116 (0.0239) | 0.009 (0.0025) | 0.548 | 0.001–0.50 |
+| Real ECMWF forecast issued before the week | 0.725 | 0.069 (0.0239) | 0.019 (0.0025) | 0.543 | 0.001–0.11 |
+| No rain forecast (antecedent only) | 0.766 | 0.116 (0.0239) | 0.008 (0.0025) | 0.585 | 0.001–0.21 |
+| Live rule on the real ECMWF forecast | 0.722 | 0.041 (0.0239) | 0.006 (0.0025) | 0.327 | 0.003–0.03 |
+| Climatology | 0.718 | 0.089 (0.0239) | 0.009 (0.0025) | 0.468 | 0.002–0.21 |
 
 ## E2. Source ablation (XGBoost, temporal)
 

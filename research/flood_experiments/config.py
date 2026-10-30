@@ -118,10 +118,21 @@ SOIL = ["sm_start", "sm_week_mean"]
 RIVER = ["runoff_week_sum", "runoff_prev4w_sum", "q_week_max_log", "q_ratio"]
 GEOGRAPHIC = ["elev_mean", "slope_mean", "perm_water_frac", "built_frac"]
 EXPOSURE = ["log_pop_density"]
+# Rain judged against each district's own climate: the percentile of this
+# week's rain within the district's 2000-2014 CHIRPS record (before the
+# v2 study, so no leakage). 40 mm is ordinary in Axim and extreme in
+# Bolgatanga; flash-flood guidance and Japan's soil-water-index warnings
+# use local thresholds for the same reason. v2 only.
+RAIN_LOCAL = (
+    ["rain_week_sum_pct", "rain_week_max_pct", "rain_prev4w_pct"]
+    if STUDY != "v1_gfd"
+    else []
+)
+LOCAL_CLIMATE_END = "2014-12-31"
 
 # Inputs whose increase can only raise flood risk; XGBoost is constrained
 # to be monotone in them, so it cannot learn physically impossible
 # shapes from a few hundred events.
-MONOTONE_UP = set(RAIN + RAIN_LAGS + SOIL + RIVER)
+MONOTONE_UP = set(RAIN + RAIN_LAGS + SOIL + RIVER + RAIN_LOCAL)
 
 RANDOM_SEED = 42

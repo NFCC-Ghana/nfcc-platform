@@ -83,6 +83,56 @@ def tolerant(district, week, y, alert, tol=1):
     }
 
 
+def within_district_auc(district, y, p):
+    """ROC-AUC computed inside each district, averaged with weights by the
+    district's onsets. It scores only WHEN a district floods: a model
+    that merely knows which districts flood (or get reported) more often
+    scores 0.5 here."""
+    d, y, p = np.asarray(district), np.asarray(y), np.asarray(p, dtype=float)
+    aucs, weights = [], []
+    for code in np.unique(d):
+        m = d == code
+        n = int(y[m].sum())
+        if 0 < n < m.sum():
+            aucs.append(roc_auc_score(y[m], p[m]))
+            weights.append(n)
+    return float(np.average(aucs, weights=weights)) if aucs else float("nan")
+
+
+def relative_value(y, p, alphas=None):
+    """Relative economic value (Richardson 2000). A user who can take
+    protective action costing C to avoid a loss L acts when the forecast
+    says so; for each cost-loss ratio alpha = C/L, V is the share of the
+    saving a perfect forecast would bring that this forecast delivers
+    (1 = perfect, 0 = no better than always or never acting), at the
+    best threshold for that user."""
+    y, p = np.asarray(y).astype(bool), np.asarray(p, dtype=float)
+    s = y.mean()
+    if alphas is None:
+        alphas = np.geomspace(1e-3, 0.5, 30)
+    thresholds = np.unique(np.quantile(p, np.linspace(0.5, 0.9999, 200)))
+    n1, n0 = y.sum(), (~y).sum()
+    hf = [((p[y] >= t).sum() / n1, (p[~y] >= t).sum() / n0) for t in thresholds]
+    values = []
+    for a in alphas:
+        climate = min(a, s)
+        perfect = s * a
+        best = max(climate - (f * (1 - s) * a - h * s * (1 - a) + s) for h, f in hf)
+        values.append(best / (climate - perfect) if climate > perfect else float("nan"))
+    values = np.asarray(values)
+    i = int(np.nanargmax(values))
+    useful = alphas[values > 0]
+    return {
+        "alpha": [float(a) for a in alphas],
+        "value": [float(v) for v in values],
+        "peak_value": float(values[i]),
+        "alpha_at_peak": float(alphas[i]),
+        "useful_alpha_range": (
+            [float(useful.min()), float(useful.max())] if len(useful) else None
+        ),
+    }
+
+
 def best_f1_threshold(y, p):
     """Decision threshold that maximises F1 - chosen on validation data
     only, then applied unchanged to the test fold."""
