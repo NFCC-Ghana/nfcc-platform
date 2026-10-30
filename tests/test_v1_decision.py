@@ -2,10 +2,11 @@
 (src/api/v1/decision.py)."""
 
 
-def test_v1_decision_matches_legacy_post_decision_card(api_client):
+def test_v1_decision_matches_legacy_post_decision_card(api_client, offline_http):
     """Both call the exact same get_decision_card() - for the same
     inputs they must produce identical decisions (aside from the
-    randomly-generated decision_id/generated_at fields)."""
+    randomly-generated decision_id/generated_at fields). Offline so both
+    calls see identical inputs (see conftest.offline_http)."""
     legacy = api_client.post(
         "/decision/card", json={"location": "Tamale", "precipitation": 90}
     )

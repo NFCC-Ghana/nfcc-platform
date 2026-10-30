@@ -59,17 +59,33 @@ def _not_tracked_error(district: str) -> dict:
     }
 
 
-async def _live_precipitation_mm(district: str) -> tuple[float, str]:
+async def _live_precipitation_mm(district: str) -> tuple[Optional[float], str]:
     """Real 24h forecasted rainfall for `district` (src/hydrology/
     weather_forecast.py, Open-Meteo-backed) - used only when a tool call
     doesn't specify precipitation_mm itself. Returns (value, source_label)
     so callers never present an auto-fetched number as if it were
-    operator-confirmed."""
+    operator-confirmed. The value is None when the forecast is
+    unavailable; callers must then answer with _forecast_unavailable()
+    rather than score a made-up amount."""
     forecast = weather_forecast.get_forecast_for_district(district)
+    if forecast.get("source") != "open-meteo" or forecast.get("24h") is None:
+        return None, "unavailable: Open-Meteo forecast unreachable"
     return (
-        forecast.get("24h", 0.0),
+        forecast["24h"],
         "auto: Open-Meteo 24h forecast (no precipitation_mm supplied)",
     )
+
+
+def _forecast_unavailable(district: str) -> dict:
+    return {
+        "district": district,
+        "error": "forecast_unavailable",
+        "message": (
+            "The live rainfall forecast is unavailable right now, so no risk "
+            "was computed. Ask for the observed or expected precipitation and "
+            "call again with precipitation_mm, or retry shortly."
+        ),
+    }
 
 
 async def list_tracked_districts() -> dict:
@@ -130,6 +146,8 @@ async def get_district_decision(
     precip_source = "user-specified"
     if precipitation_mm is None:
         precipitation_mm, precip_source = await _live_precipitation_mm(district)
+        if precipitation_mm is None:
+            return _forecast_unavailable(district)
 
     card = await get_decision_card(
         DecisionCardRequest(location=district, precipitation=precipitation_mm)
@@ -159,6 +177,8 @@ async def get_district_evidence(
     precip_source = "user-specified"
     if precipitation_mm is None:
         precipitation_mm, precip_source = await _live_precipitation_mm(district)
+        if precipitation_mm is None:
+            return _forecast_unavailable(district)
 
     situation = await _build_situation_response(
         SituationRequest(location=district, precipitation=precipitation_mm)
@@ -207,6 +227,8 @@ async def get_district_forecast(
     precip_source = "user-specified"
     if current_precipitation_mm is None:
         current_precipitation_mm, precip_source = await _live_precipitation_mm(district)
+        if current_precipitation_mm is None:
+            return _forecast_unavailable(district)
 
     data = get_forecast_and_timeline(district, current_precipitation_mm)
     return {
@@ -240,6 +262,8 @@ async def get_district_resources(
     precip_source = "user-specified"
     if precipitation_mm is None:
         precipitation_mm, precip_source = await _live_precipitation_mm(district)
+        if precipitation_mm is None:
+            return _forecast_unavailable(district)
 
     # Imported here for the same circular-import reason as
     # get_data_source_health/get_data_quality_report below.

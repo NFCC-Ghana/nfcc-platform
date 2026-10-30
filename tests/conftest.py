@@ -122,3 +122,21 @@ def pytest_collection_modifyitems(items):
         for item in items:
             if "provider" in item.nodeid.lower() or "mock" in item.nodeid.lower():
                 item.add_marker(pytest.mark.skip(reason="Skipping in CI environment"))
+
+
+@pytest.fixture
+def offline_http():
+    """Take outgoing HTTP (Open-Meteo, GloFAS, ReliefWeb, ...) offline.
+
+    For tests that build the same response twice and compare the two:
+    against live APIs one call can time out while the other succeeds,
+    so the two differ for reasons unrelated to the code under test. The
+    FastAPI test client uses httpx, not requests, so it is unaffected.
+    """
+    from unittest.mock import patch
+
+    import requests
+
+    offline = requests.ConnectionError("tests run offline")
+    with patch("requests.sessions.Session.request", side_effect=offline):
+        yield

@@ -34,6 +34,10 @@ def build_risk_timeline(current_precipitation_mm: float, forecast: Dict) -> List
     timeline = [
         {"hour": "Now", "score": score_now, "risk_tier": get_risk_tier(score_now)}
     ]
+    if forecast.get("source") == "unavailable" or not cumulative:
+        # No forecast: no projection. A flat line built from missing
+        # values would look like a real "no change" forecast.
+        return timeline
     for h in (6, 12, 18, 24):
         future_precip = current_precipitation_mm + cumulative.get(str(h), 0.0)
         future_score = calculate_score(future_precip)
@@ -48,16 +52,16 @@ def build_risk_timeline(current_precipitation_mm: float, forecast: Dict) -> List
 
 
 def get_forecast_and_timeline(district: str, current_precipitation_mm: float) -> Dict:
-    """Real rainfall forecast (24h/48h/72h/daily, Open-Meteo-backed, an
-    honestly-labeled "fallback" seasonal estimate when unreachable - see
+    """Real rainfall forecast (24h/48h/72h/daily, Open-Meteo-backed;
+    None values with source "unavailable" when unreachable - see
     weather_forecast.py) plus its derived risk_timeline, for one district -
     the single computation POST /situation, GET /v1/districts/{d}/forecast,
     and the AI Copilot's get_district_forecast tool all now share."""
     forecast = weather_forecast.get_forecast_for_district(district)
     return {
-        "forecast_24h_mm": forecast.get("24h", 0.0),
-        "forecast_48h_mm": forecast.get("48h", 0.0),
-        "forecast_72h_mm": forecast.get("72h", 0.0),
+        "forecast_24h_mm": forecast.get("24h"),
+        "forecast_48h_mm": forecast.get("48h"),
+        "forecast_72h_mm": forecast.get("72h"),
         "cumulative_6h_mm": forecast.get("cumulative_6h", {}),
         "daily": forecast.get("daily", []),
         "risk_timeline": build_risk_timeline(current_precipitation_mm, forecast),
