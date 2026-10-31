@@ -227,8 +227,8 @@ def test_stale_chirps_falls_back_to_open_meteo_observed_past():
             return _mock_response(
                 {"available": True, "rolling_3d_mm": 90.0, "stale": True, "data_age_days": 20}
             )
-        # Open-Meteo forecast endpoint with past_days
-        return _mock_response({"hourly": {"rain": [1.0] * 72 + [0.0] * 24}})
+        # Open-Meteo forecast endpoint with past_hours
+        return _mock_response({"hourly": {"precipitation": [1.0] * 72 + [0.0]}})
 
     with patch.object(
         script, "get_forecast_precipitation", return_value=5.0
