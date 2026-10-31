@@ -611,6 +611,15 @@ def render_header(state):
     st.divider()
 
 
+@st.cache_data(ttl=900, show_spinner=False)
+def _live_forecast_24h_mm(district: str) -> Optional[float]:
+    """Live next-24h forecast (Open-Meteo, via /situation) used as the
+    rainfall slider's starting value; None when the API can't give one."""
+    result = call_api("/situation", "POST", {"location": district, "precipitation": 0})
+    value = result.get("forecast_24h_mm") if isinstance(result, dict) else None
+    return float(value) if value is not None else None
+
+
 def render_control_panel():
     """Control Panel."""
     with st.sidebar:
@@ -630,12 +639,30 @@ def render_control_panel():
 
         district = st.selectbox("📍 Select District", districts, index=0)
 
+        # Every panel is computed from this value. It starts at the live
+        # 24-hour forecast, so the page opens on current conditions; it
+        # used to start at a fixed 75 mm, which scores 100 (EXTREME), so
+        # the dashboard opened on an emergency whatever the weather.
         st.markdown("### 🌧️ Rainfall (mm)")
+        live_mm = _live_forecast_24h_mm(district)
+        if live_mm is not None:
+            st.caption(
+                f"Live 24-hour forecast for {district}: **{live_mm:.1f} mm** "
+                "(Open-Meteo). Moving the slider turns every panel into a "
+                "what-if scenario."
+            )
+        else:
+            st.caption(
+                "Live forecast unavailable - the slider value is a "
+                "scenario, not current conditions."
+            )
+        live_default = int(round(min(live_mm, 200))) if live_mm is not None else 0
         rainfall_mm = st.slider(
             "Rainfall amount (mm)",
             min_value=0,
             max_value=200,
-            value=75,
+            value=live_default,
+            key=f"rainfall_mm_{district}",
             help="24-hour cumulative rainfall",
         )
 
@@ -698,6 +725,8 @@ def render_control_panel():
     return {
         "district": district,
         "rainfall_mm": rainfall_mm,
+        "live_forecast_mm": live_mm,
+        "is_scenario": live_mm is None or rainfall_mm != live_default,
         "demo_mode": demo_mode,
         "start_demo": start_demo,
         "review_mode": review_mode,
@@ -3124,7 +3153,15 @@ def main():
     if not control_data["demo_mode"]:
         st.session_state["demo_stage_idx"] = None
         _clear_demo_alert_state()
-        render_situation(district, control_data["rainfall_mm"])
+        scenario_label = None
+        if control_data["is_scenario"]:
+            live = control_data["live_forecast_mm"]
+            scenario_label = (
+                f"SCENARIO: {control_data['rainfall_mm']} mm - live forecast "
+                + (f"{live:.1f} mm" if live is not None else "unavailable")
+                + ". Panels show this what-if, not current conditions."
+            )
+        render_situation(district, control_data["rainfall_mm"], stage_label=scenario_label)
         return
 
     if control_data["start_demo"]:
