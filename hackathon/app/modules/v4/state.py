@@ -115,6 +115,10 @@ class DashboardState:
     # POPULATION IMPACT
     # ============================================================
     population_exposed: int = 0
+    # True when /situation returned an impact estimate at all. A real
+    # estimate is 0 exposed whenever the risk score is 0 (any dry day), so
+    # population_exposed == 0 can't mean "unavailable" by itself.
+    impact_available: bool = False
     exposure_percentage: float = 0.0
     children_exposed: int = 0
     elderly_exposed: int = 0
@@ -270,6 +274,7 @@ def create_state_from_api(api_data: dict) -> DashboardState:
 
     # Extract other data
     state.population_exposed = api_data.get("population_exposed", 0)
+    state.impact_available = "population_exposed" in api_data
     state.exposure_percentage = api_data.get("exposure_percentage", 0.0)
     state.communities_affected = api_data.get("communities_affected", 0)
     state.total_reports = api_data.get("total_reports", 0)

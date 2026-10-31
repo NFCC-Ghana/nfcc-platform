@@ -1060,9 +1060,10 @@ def render_impact_panel(state, district_data):
     st.markdown("## 👥 Impact Assessment")
     st.caption("*Who is affected and how?*")
 
-    # Get fallback data if API returns zeros
+    # Fallback only when /situation sent no impact estimate at all - a real
+    # estimate of 0 exposed (risk score 0 on a dry day) is shown as 0.
     population_exposed = getattr(state, "population_exposed", 0)
-    if population_exposed == 0:
+    if not getattr(state, "impact_available", False):
         st.warning(
             "⚠️ The platform's real impact estimate is unavailable right now "
             "(API unreachable or returned no data for this district), so "
