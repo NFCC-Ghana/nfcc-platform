@@ -218,8 +218,11 @@ async def _build_situation_response(body: SituationRequest) -> dict:
         households_affected = int(population_exposed / 4)
         # impact_estimator doesn't model power infrastructure at all - same
         # rough population-based heuristic the dashboard's old fallback
-        # used, not real substation data.
-        power_substations_affected = max(1, int(impact["population_total"] / 75000))
+        # used, not real substation data. 0 when nobody is exposed: the
+        # old max(1, ...) reported a substation affected on a dry day.
+        power_substations_affected = (
+            max(1, int(impact["population_total"] / 75000)) if population_exposed else 0
+        )
 
         response.update(
             {
