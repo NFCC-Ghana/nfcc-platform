@@ -88,7 +88,7 @@ class DashboardState:
     # Real Sentinel-1 SAR satellite flood detection (Google Earth Engine,
     # via src/hydrology/sentinel_processor.py) when reachable -
     # satellite_source says "Sentinel-1 SAR" for a real detection or
-    # "Sentinel-1 (simulated)"/"(unavailable)" otherwise.
+    # "Sentinel-1 (unavailable)" otherwise.
     satellite_water_detected: bool = False
     satellite_flood_extent_km2: float = 0.0
     satellite_source: str = "Sentinel-1 (unavailable)"
@@ -324,7 +324,8 @@ def create_state_from_api(api_data: dict) -> DashboardState:
 
     satellite = api_data.get("satellite", {})
     state.satellite_water_detected = satellite.get("water_detected", False)
-    state.satellite_flood_extent_km2 = satellite.get("flood_extent_km2", 0.0)
+    # None when there is no real reading ("Sentinel-1 (unavailable)").
+    state.satellite_flood_extent_km2 = satellite.get("flood_extent_km2") or 0.0
     state.satellite_source = satellite.get("source", "Sentinel-1 (unavailable)")
 
     # Population/infrastructure impact - from src/exposure/impact_estimator.py

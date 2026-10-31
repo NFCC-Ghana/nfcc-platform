@@ -78,12 +78,8 @@ class SentinelProcessor:
     """
 
     def __init__(self):
-        # Was a bare ee.Initialize() with no service account/project - that
-        # silently fails in any non-interactive environment (Cloud Run,
-        # CI), which is why this always fell back to
-        # _simulate_flood_detection()'s random numbers in production
-        # despite the real Earth Engine credentials already being set up
-        # and working for the CHIRPS rainfall pull.
+        # Earth Engine auth via the shared service-account helper; without
+        # it every request reports the satellite reading as unavailable.
         self.ee_initialized = initialize_earth_engine()
         if self.ee_initialized:
             logger.info("Earth Engine initialized for Sentinel-1 processing")
@@ -137,7 +133,7 @@ class SentinelProcessor:
             Flood detection results
         """
         if not self.ee_initialized:
-            return self._simulate_flood_detection(district)
+            return self._unavailable(district, "Earth Engine unavailable")
 
         try:
             if district not in self.districts:
@@ -194,7 +190,10 @@ class SentinelProcessor:
                     f"No Sentinel-1 imagery for {district} in "
                     f"{after_start} to {after_end}"
                 )
-                return self._simulate_flood_detection(district)
+                return self._unavailable(
+                    district,
+                    f"no Sentinel-1 image between {after_start} and {after_end}",
+                )
 
             after = after_collection.median()
 
@@ -253,84 +252,27 @@ class SentinelProcessor:
 
         except Exception as e:
             logger.error(f"Sentinel-1 processing failed: {e}")
-            return self._simulate_flood_detection(district)
+            return self._unavailable(district, f"processing failed: {type(e).__name__}")
 
-    def _simulate_flood_detection(self, district: str) -> Dict:
-        """Generate simulated flood detection."""
-        import random
+    def _unavailable(self, district: str, reason: str) -> Dict:
+        """No Sentinel-1 reading: no Earth Engine, no image in the last 12
+        days (Ghana is imaged every 6-12 days), or a processing error.
 
-        random.seed(hash(district + datetime.now().strftime("%Y%m%d")) % 2**32)
-
-        # More likely in wet season
-        month = datetime.now().month
-        is_rainy = month in [5, 6, 7, 9, 10]
-
-        if is_rainy:
-            area = random.uniform(0.5, 10.0)
-            detected = area > 1.0
-        else:
-            area = random.uniform(0, 2.0)
-            detected = area > 0.5
-
+        Reports "unavailable" with no detection and no area. A warning
+        system must not show a satellite reading it does not have:
+        risk decisions only ever count source == "Sentinel-1 SAR", but
+        random values here were still displayed on the dashboard.
+        """
         return {
             "district": district,
-            "water_detected": detected,
-            "flood_extent_km2": round(area, 2),
-            "acquisition_date": datetime.now().strftime("%Y-%m-%d"),
-            "baseline_date": f"{(datetime.now() - timedelta(days=60)).strftime('%Y-%m-%d')} to {(datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')}",
-            "source": "Sentinel-1 (simulated)",
-            "confidence": 0.75,
+            "water_detected": False,
+            "flood_extent_km2": None,
+            "acquisition_date": None,
+            "baseline_date": None,
+            "source": "Sentinel-1 (unavailable)",
+            "confidence": 0,
+            "reason": reason,
         }
-
-    def get_flood_extent_geojson(self, district: str) -> Optional[Dict]:
-        """
-        Get flood extent as GeoJSON (for visualization).
-
-        Args:
-            district: District name
-
-        Returns:
-            GeoJSON feature collection or None
-        """
-        try:
-            coords = self.districts[district]
-
-            # Create a simple rectangle for demo
-            lat = coords["lat"]
-            lon = coords["lon"]
-            radius = coords["radius"] * 0.5
-
-            polygon = {
-                "type": "FeatureCollection",
-                "features": [
-                    {
-                        "type": "Feature",
-                        "geometry": {
-                            "type": "Polygon",
-                            "coordinates": [
-                                [
-                                    [lon - radius, lat - radius],
-                                    [lon + radius, lat - radius],
-                                    [lon + radius, lat + radius],
-                                    [lon - radius, lat + radius],
-                                    [lon - radius, lat - radius],
-                                ]
-                            ],
-                        },
-                        "properties": {
-                            "district": district,
-                            "type": "flood_extent",
-                            "timestamp": datetime.now().isoformat(),
-                        },
-                    }
-                ],
-            }
-
-            return polygon
-
-        except Exception as e:
-            logger.error(f"GeoJSON generation failed: {e}")
-            return None
 
 
 # Singleton instance

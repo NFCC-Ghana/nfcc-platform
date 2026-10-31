@@ -934,7 +934,7 @@ def render_evidence_panel(state):
         # real signal behind it) shown here as if genuine for every
         # district. Labeled "(no real gauge nearby)" rather than removed,
         # matching the same disclosure convention already used for
-        # simulated satellite detection below.
+        # an unavailable satellite reading below.
         {
             "name": (
                 "River Levels"
@@ -988,19 +988,32 @@ def render_evidence_panel(state):
             # satellite data behind it at all
             # (75/40 purely from risk_score, which is itself derived from
             # rainfall, not satellite imagery). Label discloses when it's
-            # simulated rather than a real detection.
+            # unavailable rather than a real detection.
             "name": (
                 "Satellite Detection"
                 if state.satellite_source == "Sentinel-1 SAR"
-                else "Satellite Detection (simulated)"
+                else "Satellite Detection (no real Sentinel-1 reading)"
             ),
-            "score": min(100, state.satellite_flood_extent_km2 * 10),
+            "score": (
+                min(100, state.satellite_flood_extent_km2 * 10)
+                if state.satellite_source == "Sentinel-1 SAR"
+                else 0
+            ),
             "stars": (
-                "★★★★★"
-                if state.satellite_water_detected and state.satellite_flood_extent_km2 > 5
-                else "★★★★☆" if state.satellite_water_detected else "★★★☆☆"
+                "☆☆☆☆☆"
+                if state.satellite_source != "Sentinel-1 SAR"
+                else (
+                    "★★★★★"
+                    if state.satellite_water_detected
+                    and state.satellite_flood_extent_km2 > 5
+                    else "★★★★☆" if state.satellite_water_detected else "★★★☆☆"
+                )
             ),
-            "confidence": state.evidence_satellite_confidence,
+            "confidence": (
+                state.evidence_satellite_confidence
+                if state.satellite_source == "Sentinel-1 SAR"
+                else 0
+            ),
         },
         {
             "name": "Citizen Reports",
@@ -1700,7 +1713,7 @@ def fetch_situation_state(district: str, rainfall_mm: float):
     # reading exists for this district (render_evidence_panel) - rainfall,
     # satellite, and citizen confidence never varied at all before this:
     state.evidence_rainfall_confidence = (
-        85.0 if state.forecast_source not in ("fallback", "unknown") else 35.0
+        85.0 if state.forecast_source == "open-meteo" else 35.0
     )
     state.evidence_satellite_confidence = (
         80.0 if state.satellite_source == "Sentinel-1 SAR" else 30.0
