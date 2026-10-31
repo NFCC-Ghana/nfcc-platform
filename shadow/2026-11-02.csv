@@ -1,0 +1,217 @@
+district_code,district,region,p_flood_onset,level,drivers,ecmwf_rain_week_mm_median,ecmwf_rain_week_mm_p90,ecmwf_wettest_day_local_pct_median,ecmwf_members,river_discharge_available,last_week_rain_days_observed,status
+190542,Wa Municipal,Upper West,0.0014,NONE,"built_frac, q_ratio_lag1, runoff_prev4w_sum",0.8,3.8,0.29,51,True,2.3,ok
+190544,Sissala  West,Upper West,0.001,NONE,"slope_mean, sm_start, runoff_prev4w_sum",0.6,1.5,0.32,51,True,2.3,ok
+190546,Bolgatanga Municipal,Upper East,0.0011,NONE,"built_frac, runoff_prev4w_sum, sm_start",0.0,0.6,0.27,51,True,2.3,ok
+190548,Wa West,Upper West,0.0008,NONE,"q_ratio_lag1, sm_start, runoff_prev4w_sum",0.8,2.9,0.27,51,True,2.3,ok
+190550,Sissala East,Upper West,0.0007,NONE,"q_ratio_lag1, sm_start, runoff_prev4w_sum",0.3,0.9,0.3,51,True,2.3,ok
+190553,Garu Tempane,Upper East,0.0009,NONE,"runoff_prev4w_sum, sm_start, slope_mean",0.3,0.9,0.33,51,True,2.3,ok
+190556,Jaman South,Brong Ahafo,0.0011,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",11.6,22.9,0.41,51,True,2.3,ok
+190558,Asunafo North,Brong Ahafo,0.0016,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",16.6,25.4,0.42,51,True,2.3,ok
+190560,Kintampo South,Brong Ahafo,0.0012,NONE,"q_week_max_log_lag1, runoff_prev4w_sum, sm_start",5.5,9.8,0.3,51,True,2.3,ok
+190561,Tano North,Brong Ahafo,0.0009,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",12.4,25.9,0.4,51,True,2.3,ok
+190565,Krachi East,Volta,0.0026,NONE,"q_week_max_log_lag1, perm_water_frac, sm_start",7.7,15.2,0.27,51,True,2.3,ok
+190574,Obuasi Municipal,Ashanti,0.0059,NONE,"built_frac, rain_prev4w_pct, log_pop_density",20.7,31.3,0.49,51,True,2.3,ok
+190575,Atwima Nwabiagya,Ashanti,0.0031,NONE,"built_frac, runoff_prev4w_sum, sm_start",16.7,29.6,0.45,51,True,2.3,ok
+190576,Atwima Mponua,Ashanti,0.0015,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",19.5,30.4,0.45,51,True,2.3,ok
+190577,Adansi South,Ashanti,0.0025,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",21.4,38.2,0.46,51,True,2.3,ok
+190578,Adansi North,Ashanti,0.0019,NONE,"runoff_prev4w_sum, q_ratio_lag1, sm_start",20.3,33.7,0.51,51,True,2.3,ok
+190579,Bosome Freho,Ashanti,0.0013,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",21.1,35.5,0.48,51,True,2.3,ok
+190580,Bekwai Municipal,Ashanti,0.0013,NONE,"runoff_prev4w_sum, sm_start, log_pop_density",21.5,33.5,0.5,51,True,2.3,ok
+190586,Assin North,Central,0.0048,NONE,"rain_prev4w_pct, slope_mean, q_week_max_log_lag1",25.8,44.1,0.49,51,True,2.3,ok
+190587,Assin South,Central,0.0044,NONE,"rain_prev4w_pct, slope_mean, runoff_prev4w_sum",25.8,45.1,0.47,51,True,2.3,ok
+190597,Kwahu South,Eastern,0.0021,NONE,"perm_water_frac, runoff_prev4w_sum, sm_start",12.7,21.3,0.42,51,True,2.3,ok
+190601,Atiwa,Eastern,0.0008,NONE,"runoff_prev4w_sum, sm_start, q_ratio_lag1",21.9,41.1,0.49,51,True,2.3,ok
+190603,Kwahu East,Eastern,0.0009,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",13.2,26.4,0.37,51,True,2.3,ok
+190604,Kwahu West,Eastern,0.0021,NONE,"built_frac, q_ratio_lag1, runoff_prev4w_sum",18.6,29.8,0.43,51,True,2.3,ok
+190606,Amansie Central,Ashanti,0.0036,NONE,"rain_prev4w_pct, runoff_prev4w_sum, q_week_max_log_lag1",22.1,33.6,0.49,51,True,2.3,ok
+190609,Asunafo South,Brong Ahafo,0.0023,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag3",20.6,29.9,0.45,51,True,2.3,ok
+190613,Kintampo North,Brong Ahafo,0.0019,NONE,"slope_mean, q_ratio_lag1, sm_start",2.4,5.7,0.25,51,True,2.3,ok
+190614,Atebubu Amantin,Brong Ahafo,0.001,NONE,"sm_start, runoff_prev4w_sum, q_week_max_log_lag1",5.3,13.3,0.26,51,True,2.3,ok
+190618,Gonja Central,Northern,0.002,NONE,"slope_mean, sm_start, q_ratio_lag1",1.1,3.3,0.27,51,True,2.3,ok
+190619,Pru,Brong Ahafo,0.0031,NONE,"slope_mean, perm_water_frac, sm_start",4.3,11.6,0.28,51,True,2.3,ok
+190622,South Dayi,Volta,0.0023,NONE,"perm_water_frac, runoff_prev4w_sum, sm_start",14.3,24.9,0.37,51,True,2.3,ok
+190623,Wa East,Upper West,0.0009,NONE,"q_ratio_lag1, sm_start, runoff_prev4w_sum",0.5,2.1,0.29,51,True,2.3,ok
+190628,Wenchi,Brong Ahafo,0.0013,NONE,"q_week_max_log_lag1, runoff_prev4w_sum, sm_start",12.8,19.9,0.38,51,True,2.3,ok
+190629,Tano South,Brong Ahafo,0.001,NONE,"runoff_prev4w_sum, rain_lag3, sm_start",12.8,26.4,0.39,51,True,2.3,ok
+190645,Wassa Amenfi West,Western,0.0016,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",24.4,41.2,0.5,51,True,2.3,ok
+190656,Ga South,Greater Accra,0.0201,NONE,"built_frac, perm_water_frac, elev_mean",20.9,29.1,0.54,51,True,2.3,ok
+190657,Ga West,Greater Accra,0.0053,NONE,"built_frac, log_pop_density, elev_mean",19.4,27.9,0.53,51,True,2.3,ok
+190658,Ga Central Municipal,Greater Accra,0.0067,NONE,"built_frac, elev_mean, log_pop_density",17.8,25.6,0.56,51,True,2.3,ok
+190680,East Akim,Eastern,0.0018,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",20.0,33.5,0.47,51,True,2.3,ok
+190713,Jaman North,Brong Ahafo,0.001,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",9.2,17.3,0.34,51,True,2.3,ok
+190549,Sawla/Tuna/Kalba,Northern,0.0008,NONE,"q_ratio_lag1, sm_start, runoff_prev4w_sum",1.3,4.5,0.27,51,True,2.3,ok
+190552,Bunkpurugu Yonyo,Northern,0.001,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",0.3,1.4,0.3,51,True,2.3,ok
+190554,Mamprusi East,Northern,0.0005,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",0.3,0.8,0.31,51,True,2.3,ok
+190611,Bole,Northern,0.0011,NONE,"sm_start, q_ratio_lag1, runoff_prev4w_sum",2.7,6.6,0.26,51,True,2.3,ok
+190620,Karaga,Northern,0.0016,NONE,"slope_mean, sm_start, q_ratio_lag1",0.5,1.6,0.3,51,True,2.3,ok
+190625,Gushiegu,Northern,0.0013,NONE,"slope_mean, sm_start, runoff_prev4w_sum",0.8,1.3,0.29,51,True,2.3,ok
+190626,Nanumba North,Northern,0.0014,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",1.9,7.9,0.28,51,True,2.3,ok
+190627,Nanumba South,Northern,0.0012,NONE,"runoff_prev4w_sum, sm_start, q_ratio_lag1",1.8,8.3,0.26,51,True,2.3,ok
+190541,Chereponi,Northern,0.0016,NONE,"slope_mean, sm_start, runoff_prev4w_sum",0.5,1.1,0.29,51,True,2.3,ok
+190543,Jirapa,Upper West,0.0006,NONE,"runoff_prev4w_sum, sm_start, slope_mean",0.8,3.3,0.31,51,True,2.3,ok
+190545,Lambussie Karni,Upper West,0.0006,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",0.6,1.7,0.31,51,True,2.3,ok
+190547,Kasena Nankana West,Upper East,0.001,NONE,"runoff_prev4w_sum, sm_start, slope_mean",0.0,0.3,0.24,51,True,2.3,ok
+190551,Kasena Nankana East,Upper East,0.0017,NONE,"slope_mean, q_ratio_lag1, runoff_prev4w_sum",0.0,0.6,0.22,51,True,2.3,ok
+190557,Sunyani West,Brong Ahafo,0.0008,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",12.3,21.3,0.4,51,True,2.3,ok
+190559,Nkoranza North,Brong Ahafo,0.0009,NONE,"sm_start, runoff_prev4w_sum, q_week_max_log_lag1",6.3,12.6,0.31,51,True,2.3,ok
+190562,Ketu North,Volta,0.0051,NONE,"elev_mean, built_frac, runoff_prev4w_sum",15.8,20.3,0.47,51,True,2.3,ok
+190563,Ketu South,Volta,0.0047,NONE,"built_frac, slope_mean, elev_mean",13.0,16.7,0.49,51,True,2.3,ok
+190564,Jasikan,Volta,0.0009,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",11.9,18.7,0.24,51,True,2.3,ok
+190566,Nkwanta South,Volta,0.0012,NONE,"sm_start, perm_water_frac, runoff_prev4w_sum",6.0,10.6,0.24,51,True,2.3,ok
+190567,Afigya Kwabre,Ashanti,0.0021,NONE,"built_frac, runoff_prev4w_sum, q_ratio_lag1",15.0,26.0,0.42,51,True,2.3,ok
+190568,Atwima Kwanwoma,Ashanti,0.0025,NONE,"built_frac, runoff_prev4w_sum, sm_start",18.6,33.0,0.45,51,True,2.3,ok
+190569,Afigya Sekyere,Ashanti,0.0026,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag3",14.3,24.9,0.42,51,True,2.3,ok
+190571,Sekyere Central,Ashanti,0.0008,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",12.4,22.8,0.37,51,True,2.3,ok
+190572,Offinso North,Ashanti,0.0008,NONE,"runoff_prev4w_sum, sm_start, rain_lag3",12.7,26.2,0.39,51,True,2.3,ok
+190573,Offinso Municipal,Ashanti,0.0016,NONE,"runoff_prev4w_sum, rain_lag3, sm_start",14.1,26.1,0.41,51,True,2.3,ok
+190581,Bosomtwe /Atwima / Kwanwoma,Ashanti,0.0049,NONE,"perm_water_frac, built_frac, runoff_prev4w_sum",21.7,33.8,0.53,51,True,2.3,ok
+190582,Mampong Municipal,Ashanti,0.0021,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag3",11.5,19.6,0.38,51,True,2.3,ok
+190583,Gomoa West,Central,0.0028,NONE,"elev_mean, runoff_prev4w_sum, rain_lag2",22.6,29.4,0.46,51,True,2.3,ok
+190584,Agona West,Central,0.0022,NONE,"q_ratio_lag1, runoff_prev4w_sum, log_pop_density",23.1,30.1,0.39,51,True,2.3,ok
+190585,Agona East,Central,0.002,NONE,"q_ratio_lag1, runoff_prev4w_sum, rain_lag2",19.3,31.9,0.54,51,True,2.3,ok
+190589,Gomoa East,Central,0.0065,NONE,"built_frac, elev_mean, slope_mean",18.4,25.6,0.49,51,True,2.3,ok
+190590,Ellembelle,Western,0.0043,NONE,"rain_prev4w_pct, elev_mean, runoff_prev4w_sum",37.5,53.6,0.6,51,True,2.3,ok
+190591,Prestea / Huni Valley,Western,0.0033,NONE,"rain_prev4w_pct, rain_lag2, runoff_prev4w_sum",27.3,44.4,0.47,51,True,2.3,ok
+190592,Nzema East,Western,0.0031,NONE,"rain_prev4w_pct, elev_mean, rain_lag2",30.8,43.9,0.53,51,True,2.3,ok
+190593,Tarkwa Nsuaem,Western,0.0029,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",28.7,42.3,0.49,51,True,2.3,ok
+190594,Sefwi Akontombra,Western,0.0019,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",23.9,41.7,0.49,51,True,2.3,ok
+190595,Sekondi Takoradi,Western,0.0085,NONE,"built_frac, q_week_max_log_lag1, elev_mean",19.1,28.7,0.5,51,False,2.3,ok
+190596,Akyem Mansa,Eastern,0.0047,NONE,"rain_prev4w_pct, slope_mean, runoff_prev4w_sum",22.6,39.9,0.46,51,True,2.3,ok
+190598,Birim Municipal,Eastern,0.0041,NONE,"rain_prev4w_pct, runoff_prev4w_sum, slope_mean",22.8,37.7,0.51,51,True,2.3,ok
+190599,Upper Manya,Eastern,0.0018,NONE,"perm_water_frac, sm_start, runoff_prev4w_sum",9.3,16.0,0.35,51,True,2.3,ok
+190600,Birim South,Eastern,0.0022,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",22.9,39.4,0.46,51,True,2.3,ok
+190602,Birim North,Eastern,0.0016,NONE,"runoff_prev4w_sum, q_ratio_lag1, sm_start",18.7,33.1,0.42,51,True,2.3,ok
+190605,Upper Denkyira East,Central,0.0028,NONE,"rain_prev4w_pct, runoff_prev4w_sum, q_week_max_log_lag1",19.8,34.5,0.36,51,True,2.3,ok
+190607,Upper Denkyira West,Central,0.0014,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",22.3,34.2,0.48,51,True,2.3,ok
+190608,Sefwi-Wiawso,Western,0.0016,NONE,"runoff_prev4w_sum, q_week_max_log_lag1, sm_start",21.1,33.3,0.46,51,True,2.3,ok
+190610,Nkoranza South,Brong Ahafo,0.0008,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",7.7,18.2,0.32,51,True,2.3,ok
+190612,Lower Manya,Eastern,0.0082,NONE,"perm_water_frac, rain_prev4w_pct, built_frac",13.1,21.0,0.4,51,True,2.3,ok
+190615,Kpandai,Northern,0.0023,NONE,"q_week_max_log_lag1, q_ratio_lag1, perm_water_frac",3.2,7.7,0.29,51,True,2.3,ok
+190616,Nkwanta North,Volta,0.0015,NONE,"perm_water_frac, sm_start, runoff_prev4w_sum",3.5,8.7,0.26,51,True,2.3,ok
+190617,Biakoye,Volta,0.001,NONE,"perm_water_frac, runoff_prev4w_sum, sm_start",6.5,12.7,0.23,51,True,2.3,ok
+190621,East Gonja,Northern,0.0048,NONE,"slope_mean, perm_water_frac, q_week_max_log_lag1",1.6,5.0,0.26,51,True,2.3,ok
+190624,Saboba,Northern,0.0017,NONE,"slope_mean, sm_start, runoff_prev4w_sum",0.5,1.6,0.27,51,True,2.3,ok
+190630,Sunyani Municipal,Brong Ahafo,0.0012,NONE,"built_frac, runoff_prev4w_sum, sm_start",11.5,24.0,0.38,51,True,2.3,ok
+190642,Shama,Western,0.0058,NONE,"built_frac, elev_mean, rain_lag2",20.5,30.8,0.48,51,True,2.3,ok
+190649,Twifo Lower Denkyira,Central,0.0019,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",26.4,40.4,0.48,51,True,2.3,ok
+190650,Twifo Ati-Morkwa,Central,0.0017,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",20.8,37.2,0.4,51,True,2.3,ok
+190539,Adenta,Greater Accra,0.0056,NONE,"built_frac, elev_mean, log_pop_density",15.2,21.9,0.54,51,True,2.3,ok
+190540,Ledzokuku / Krowor,Greater Accra,0.0049,NONE,"built_frac, log_pop_density, elev_mean",15.4,24.2,0.62,51,True,2.3,ok
+190555,Dormaa East,Brong Ahafo,0.0012,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",12.6,22.8,0.42,51,True,2.3,ok
+190570,Sekyere East,Ashanti,0.0016,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",15.5,28.7,0.39,51,True,2.3,ok
+190588,Effutu,Central,0.005,NONE,"built_frac, elev_mean, log_pop_density",18.4,25.6,0.53,51,True,2.3,ok
+190631,Ada East,Greater Accra,0.0066,NONE,"perm_water_frac, slope_mean, elev_mean",14.4,25.7,0.52,51,True,2.3,ok
+190632,Shai Osu Doku,Greater Accra,0.0103,NONE,"elev_mean, q_week_max_log_lag1, rain_prev4w_pct",16.6,22.8,0.43,51,True,2.3,ok
+190633,Ada West,Greater Accra,0.0044,NONE,"slope_mean, elev_mean, runoff_prev4w_sum",15.2,27.3,0.51,51,True,2.3,ok
+190634,Ningo Prampram,Greater Accra,0.0057,NONE,"slope_mean, elev_mean, built_frac",16.2,25.4,0.55,51,True,2.3,ok
+190635,La Dade Kotopon,Greater Accra,0.0037,NONE,"built_frac, log_pop_density, elev_mean",11.9,17.1,0.54,51,True,2.3,ok
+190636,Aowin,Western,0.0021,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",24.9,45.4,0.47,51,True,2.3,ok
+190637,Suaman,Western,0.0023,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",24.0,38.3,0.45,51,True,2.3,ok
+190638,Bia East,Western,0.0016,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",15.1,22.6,0.43,51,True,2.3,ok
+190639,Bia West,Western,0.0016,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",20.0,27.7,0.47,51,True,2.3,ok
+190640,Bodi,Western,0.0014,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",20.2,30.7,0.42,51,True,2.3,ok
+190641,Juabeso,Western,0.0014,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",22.1,30.6,0.5,51,True,2.3,ok
+190643,Wassa East,Western,0.0027,NONE,"rain_prev4w_pct, q_week_max_log_lag1, runoff_prev4w_sum",24.8,39.6,0.47,51,True,2.3,ok
+190644,Mpohor,Western,0.0024,NONE,"rain_prev4w_pct, q_week_max_log_lag1, runoff_prev4w_sum",22.5,33.8,0.45,51,True,2.3,ok
+190646,Wassa Amenfi Central,Western,0.001,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",22.5,34.8,0.43,51,True,2.3,ok
+190647,Mfantsiman,Central,0.0037,NONE,"elev_mean, built_frac, runoff_prev4w_sum",16.7,26.3,0.48,51,True,2.3,ok
+190648,Ekumfi,Central,0.0029,NONE,"elev_mean, runoff_prev4w_sum, perm_water_frac",17.3,27.3,0.47,51,True,2.3,ok
+190651,Awutu Senya West,Central,0.0016,NONE,"runoff_prev4w_sum, log_pop_density, rain_lag2",19.2,27.2,0.52,51,True,2.3,ok
+190652,Awutu Senya East Municipal,Central,0.0131,NONE,"built_frac, elev_mean, perm_water_frac",19.4,27.1,0.54,51,True,2.3,ok
+190653,La Nkwantanang Madina,Greater Accra,0.0079,NONE,"built_frac, log_pop_density, rain_lag1",17.7,25.4,0.55,51,True,2.3,ok
+190654,Ga East,Greater Accra,0.0061,NONE,"built_frac, log_pop_density, elev_mean",17.4,25.0,0.55,51,True,2.3,ok
+190655,Accra Metropolis,Greater Accra,0.0204,NONE,"built_frac, log_pop_density, elev_mean",13.7,19.8,0.54,51,True,2.3,ok
+190659,Krachi West,Volta,0.0019,NONE,"perm_water_frac, q_week_max_log_lag1, sm_start",5.1,12.2,0.31,51,True,2.3,ok
+190660,Krachi Nchumuru,Volta,0.0039,NONE,"perm_water_frac, rain_prev4w_pct, q_week_max_log_lag1",4.5,8.7,0.3,51,True,2.3,ok
+190661,Agotime Ziope,Volta,0.0085,NONE,"slope_mean, rain_prev4w_pct, runoff_prev4w_sum",12.8,23.1,0.42,51,True,2.3,ok
+190662,Adaklu,Volta,0.0066,NONE,"rain_prev4w_pct, slope_mean, runoff_prev4w_sum",11.0,20.1,0.42,51,True,2.3,ok
+190663,Akatsi South,Volta,0.007,NONE,"slope_mean, elev_mean, rain_prev4w_pct",13.8,24.1,0.51,51,True,2.3,ok
+190664,Akatsi North,Volta,0.0042,NONE,"rain_prev4w_pct, elev_mean, slope_mean",14.7,25.7,0.47,51,True,2.3,ok
+190665,Ho Municipal,Volta,0.0043,NONE,"built_frac, rain_prev4w_pct, log_pop_density",11.6,18.8,0.34,51,True,2.3,ok
+190666,Hohoe Municipal,Volta,0.0012,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",11.6,16.3,0.25,51,True,2.3,ok
+190667,Ho West,Volta,0.0012,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",13.7,23.8,0.36,51,True,2.3,ok
+190668,North Dayi,Volta,0.0016,NONE,"perm_water_frac, runoff_prev4w_sum, sm_start",10.9,18.4,0.34,51,True,2.3,ok
+190669,Kpando Municipal,Volta,0.003,NONE,"perm_water_frac, runoff_prev4w_sum, sm_start",10.5,17.4,0.35,51,True,2.3,ok
+190670,North Tongu,Volta,0.0155,NONE,"slope_mean, rain_prev4w_pct, elev_mean",14.3,23.3,0.46,51,True,2.3,ok
+190671,Central Tongu,Volta,0.023,NONE,"rain_prev4w_pct, slope_mean, q_week_max_log_lag1",12.6,19.4,0.46,51,True,2.3,ok
+190672,Nsawam Adoagyiri,Eastern,0.0043,NONE,"rain_prev4w_pct, built_frac, elev_mean",20.9,30.0,0.48,51,True,2.3,ok
+190673,Akwapem South,Eastern,0.0025,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",20.9,30.1,0.5,51,True,2.3,ok
+190674,Denkyembour,Eastern,0.0032,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",23.8,34.9,0.45,51,True,2.3,ok
+190675,Kwaebibirem,Eastern,0.0018,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",20.5,38.4,0.44,51,True,2.3,ok
+190676,Kwahu Afram Plains South,Eastern,0.0016,NONE,"perm_water_frac, sm_start, runoff_prev4w_sum",8.4,16.4,0.31,51,True,2.3,ok
+190677,Kwahu Afram Plains North,Eastern,0.0026,NONE,"q_week_max_log_lag1, perm_water_frac, sm_start",6.6,11.7,0.3,51,True,2.3,ok
+190678,Suhum Municipal,Eastern,0.0025,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",18.9,28.5,0.51,51,True,2.3,ok
+190679,Ayensuano,Eastern,0.0022,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",18.4,27.8,0.5,51,True,2.3,ok
+190681,Upper West Akim,Eastern,0.0022,NONE,"rain_prev4w_pct, rain_lag2, runoff_prev4w_sum",21.3,30.2,0.46,51,True,2.3,ok
+190682,West Akim,Eastern,0.0023,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",22.9,33.5,0.46,51,True,2.3,ok
+190683,Dormaa Municipal,Brong Ahafo,0.0018,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",12.2,22.2,0.42,51,True,2.3,ok
+190684,Dormaa West,Brong Ahafo,0.0021,NONE,"rain_prev4w_pct, rain_lag2, runoff_prev4w_sum",14.2,22.8,0.44,51,True,2.3,ok
+190685,Nadowli-Kaleo,Upper West,0.0008,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",0.8,2.6,0.29,51,True,2.3,ok
+190686,Daffiama Bussie,Upper West,0.0008,NONE,"q_ratio_lag1, sm_start, runoff_prev4w_sum",0.3,1.5,0.28,51,True,2.3,ok
+190687,Lawra,Upper West,0.001,NONE,"runoff_prev4w_sum, sm_start, slope_mean",0.5,1.6,0.28,51,True,2.3,ok
+190688,Nandom,Upper West,0.0011,NONE,"slope_mean, runoff_prev4w_sum, sm_start",0.5,1.6,0.31,51,True,2.3,ok
+190689,Talensi,Upper East,0.0013,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",0.3,0.6,0.32,51,True,2.3,ok
+190690,Nabdam,Upper East,0.0008,NONE,"runoff_prev4w_sum, sm_start, slope_mean",0.3,0.6,0.33,51,True,2.3,ok
+190691,Builsa South,Upper East,0.0014,NONE,"slope_mean, q_ratio_lag1, sm_start",0.3,0.5,0.31,51,True,2.3,ok
+190692,Builsa North,Upper East,0.0016,NONE,"slope_mean, q_ratio_lag1, sm_start",0.0,0.5,0.24,51,True,2.3,ok
+190693,Binduri,Upper East,0.0009,NONE,"runoff_prev4w_sum, sm_start, slope_mean",0.3,0.8,0.34,51,True,2.3,ok
+190694,Pusiga,Upper East,0.0008,NONE,"runoff_prev4w_sum, slope_mean, sm_start",0.0,0.6,0.29,51,True,2.3,ok
+190695,Bawku Municipal,Upper East,0.001,NONE,"built_frac, runoff_prev4w_sum, sm_start",0.3,0.8,0.35,51,True,2.3,ok
+190696,North Gonja,Northern,0.001,NONE,"sm_start, q_week_max_log_lag1, runoff_prev4w_sum",0.8,2.1,0.28,51,True,2.3,ok
+190697,West Gonja,Northern,0.0012,NONE,"q_week_max_log_lag1, sm_start, runoff_prev4w_sum",1.1,2.9,0.25,51,True,2.3,ok
+190698,Mion,Northern,0.0012,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",0.9,2.8,0.27,51,True,2.3,ok
+190699,Yendi Municipal,Northern,0.0009,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",0.9,3.0,0.28,51,True,2.3,ok
+190700,Tolon,Northern,0.0015,NONE,"slope_mean, sm_start, runoff_prev4w_sum",0.5,2.0,0.26,51,True,2.3,ok
+190701,Kumbumgu,Northern,0.0013,NONE,"slope_mean, sm_start, runoff_prev4w_sum",0.5,2.3,0.3,51,True,2.3,ok
+190702,West Mamprusi,Northern,0.0016,NONE,"slope_mean, q_ratio_lag1, sm_start",0.3,1.0,0.29,51,True,2.3,ok
+190703,Mamprugu Moagduri,Northern,0.0014,NONE,"slope_mean, q_ratio_lag1, sm_start",0.5,1.3,0.29,51,True,2.3,ok
+190704,Zabzugu,Northern,0.0012,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",1.6,5.8,0.28,51,True,2.3,ok
+190705,Tatale,Northern,0.0017,NONE,"q_week_max_log_lag1, q_ratio_lag1, sm_start",1.5,5.8,0.28,51,True,2.3,ok
+190706,Sene East,Brong Ahafo,0.0012,NONE,"perm_water_frac, sm_start, runoff_prev4w_sum",5.3,11.7,0.26,51,True,2.3,ok
+190707,Sene West,Brong Ahafo,0.0018,NONE,"perm_water_frac, q_week_max_log_lag1, sm_start",4.2,12.1,0.25,51,True,2.3,ok
+190708,Asutifi North,Brong Ahafo,0.0011,NONE,"q_ratio_lag1, runoff_prev4w_sum, sm_start",12.8,24.7,0.36,51,True,2.3,ok
+190709,Asutifi South,Brong Ahafo,0.0018,NONE,"rain_prev4w_pct, q_ratio_lag1, runoff_prev4w_sum",14.5,23.4,0.42,51,True,2.3,ok
+190710,Techiman Municipal,Brong Ahafo,0.0017,NONE,"built_frac, runoff_prev4w_sum, rain_lag3",11.4,19.1,0.35,51,True,2.3,ok
+190711,Techiman North,Brong Ahafo,0.0011,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",12.0,18.6,0.36,51,True,2.3,ok
+190712,Banda,Brong Ahafo,0.0007,NONE,"sm_start, runoff_prev4w_sum, woy_sin",3.6,11.4,0.25,51,True,2.3,ok
+190714,Tain,Brong Ahafo,0.0011,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",7.4,18.1,0.36,51,True,2.3,ok
+190715,Sekyere Afram Plains,Ashanti,0.0007,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",12.0,19.3,0.37,51,True,2.3,ok
+190716,Sekyere Afram Plains North,Ashanti,0.0008,NONE,"sm_start, runoff_prev4w_sum, rain_lag4",11.1,20.4,0.31,51,True,2.3,ok
+190717,Asante Akim North,Ashanti,0.0007,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",15.7,23.9,0.37,51,True,2.3,ok
+190718,Asante Akim Central Municipal,Ashanti,0.0012,NONE,"runoff_prev4w_sum, sm_start, q_ratio_lag1",17.0,29.3,0.46,51,True,2.3,ok
+190719,Asokore Mampong Municipal,Ashanti,0.0053,NONE,"built_frac, log_pop_density, slope_mean",15.6,24.5,0.41,51,True,2.3,ok
+190720,Kma,Ashanti,0.0075,NONE,"built_frac, log_pop_density, slope_mean",16.3,25.4,0.4,51,True,2.3,ok
+190721,Wassa Amenfi East,Western,0.0008,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",20.7,37.1,0.41,51,True,2.3,ok
+190722,Tema Metropolis,Greater Accra,0.003,NONE,"built_frac, elev_mean, log_pop_density",14.5,22.7,0.59,51,True,2.3,ok
+190723,Ashaiman,Greater Accra,0.0034,NONE,"built_frac, log_pop_density, elev_mean",14.7,23.0,0.58,51,True,2.3,ok
+190724,Kpone Katamanso,Greater Accra,0.006,NONE,"built_frac, elev_mean, log_pop_density",16.9,26.5,0.57,51,True,2.3,ok
+190725,Tamale North Sub Metro,Northern,0.003,NONE,"slope_mean, built_frac, q_ratio_lag1",0.5,3.0,0.29,51,True,2.3,ok
+190726,Sagnerigu,Northern,0.0018,NONE,"built_frac, log_pop_density, runoff_prev4w_sum",0.8,2.6,0.29,51,True,2.3,ok
+190727,Afadzato South,Volta,0.0013,NONE,"runoff_prev4w_sum, perm_water_frac, sm_start",12.0,19.9,0.3,51,True,2.3,ok
+16642,Bongo,Upper East,0.001,NONE,"runoff_prev4w_sum, sm_start, slope_mean",0.3,0.6,0.34,51,True,2.3,ok
+16640,Bawku West,Upper East,0.001,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",0.3,0.8,0.32,51,True,2.3,ok
+16585,Berekum,Brong Ahafo,0.0011,NONE,"runoff_prev4w_sum, sm_start, rain_lag2",10.4,19.5,0.37,51,True,2.3,ok
+33108,Keta Municipal,Volta,0.0105,NONE,"perm_water_frac, slope_mean, elev_mean",16.1,23.2,0.55,51,True,2.3,ok
+16654,Kadjebi,Volta,0.0008,NONE,"runoff_prev4w_sum, sm_start, q_week_max_log_lag1",8.2,14.4,0.23,51,True,2.3,ok
+16661,South Tongu,Volta,0.005,NONE,"slope_mean, elev_mean, runoff_prev4w_sum",15.7,22.7,0.55,51,True,2.3,ok
+16578,Kwabre,Ashanti,0.0029,NONE,"built_frac, rain_lag1, runoff_prev4w_sum",16.2,25.3,0.41,51,True,2.3,ok
+16575,Ejura Sekye Dumase,Ashanti,0.001,NONE,"runoff_prev4w_sum, sm_start, rain_lag4",8.6,16.8,0.33,51,True,2.3,ok
+16568,Ahafo Ano South,Ashanti,0.0026,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",14.0,24.6,0.37,51,True,2.3,ok
+16597,Ajumako-Enyan-Esiam,Central,0.0045,NONE,"rain_prev4w_pct, slope_mean, runoff_prev4w_sum",20.8,31.0,0.44,51,True,2.3,ok
+16598,Asikuma / Odoben / Brakwa,Central,0.0027,NONE,"rain_prev4w_pct, rain_lag2, runoff_prev4w_sum",22.1,38.0,0.48,51,True,2.3,ok
+16595,Abura / Asebu / Kwamankese,Central,0.0021,NONE,"runoff_prev4w_sum, elev_mean, log_pop_density",21.4,30.4,0.49,51,True,2.3,ok
+16665,Jomoro,Western,0.0032,NONE,"elev_mean, runoff_prev4w_sum, rain_lag2",41.1,62.9,0.59,51,True,2.3,ok
+16662,Ahanta West,Western,0.003,NONE,"elev_mean, runoff_prev4w_sum, sm_start",25.7,36.5,0.56,51,True,2.3,ok
+16607,Akwapem North,Eastern,0.0027,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",23.4,33.3,0.55,51,True,2.3,ok
+16620,Yilo Krobo,Eastern,0.0019,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag2",17.3,25.8,0.45,51,True,2.3,ok
+16617,New Juaben Municipal,Eastern,0.0051,NONE,"built_frac, rain_prev4w_pct, log_pop_density",24.5,34.9,0.55,51,True,2.3,ok
+16613,Fanteakwa,Eastern,0.0032,NONE,"perm_water_frac, runoff_prev4w_sum, sm_start",9.6,16.5,0.36,51,True,2.3,ok
+16609,Asuogyaman,Eastern,0.0084,NONE,"perm_water_frac, q_week_max_log_lag1, runoff_prev4w_sum",13.5,21.6,0.39,51,True,2.3,ok
+16664,Sefwi Bibiani-Anhwiaso Bekwai,Western,0.0024,NONE,"rain_prev4w_pct, runoff_prev4w_sum, rain_lag3",17.9,29.2,0.43,51,True,2.3,ok
+16570,Amansie West,Ashanti,0.0019,NONE,"rain_prev4w_pct, runoff_prev4w_sum, sm_start",20.7,32.6,0.46,51,True,2.3,ok
+16601,Cape Coast Metro,Central,0.0042,NONE,"built_frac, elev_mean, log_pop_density",18.2,25.9,0.5,51,True,2.3,ok
+16602,Komenda Edna Eguafo / Abirem,Central,0.0031,NONE,"elev_mean, runoff_prev4w_sum, log_pop_density",22.0,28.9,0.53,51,True,2.3,ok
+16632,Savelugu Nanton,Northern,0.0016,NONE,"slope_mean, runoff_prev4w_sum, sm_start",0.8,2.4,0.29,51,True,2.3,ok
+16572,Asante Akim South,Ashanti,0.0014,NONE,"runoff_prev4w_sum, q_ratio_lag1, sm_start",18.8,33.0,0.48,51,True,2.3,ok
+16567,Ahafo Ano North,Ashanti,0.0019,NONE,"rain_prev4w_pct, q_ratio_lag1, runoff_prev4w_sum",14.1,27.2,0.42,51,True,2.3,ok
+16576,Ejisu Juaben,Ashanti,0.002,NONE,"built_frac, q_ratio_lag1, runoff_prev4w_sum",16.4,25.6,0.41,51,True,2.3,ok
