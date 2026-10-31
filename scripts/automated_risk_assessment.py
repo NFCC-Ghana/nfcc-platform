@@ -386,10 +386,13 @@ def run(api_url: str) -> int:
                 )
 
         if fluvial_risk is not None:
+            # precipitation 0: this signal is a river/dam score, not rain -
+            # sending the score as "precipitation" made the public message
+            # read "Rainfall: 45.0mm".
             result = _assess(
                 api_url,
                 district,
-                fluvial_risk,
+                0.0,
                 "dam_river_pathway",
                 score_override=fluvial_risk,
             )

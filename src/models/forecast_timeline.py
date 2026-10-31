@@ -24,11 +24,16 @@ from src.hydrology.weather_forecast import weather_forecast
 
 
 def build_risk_timeline(current_precipitation_mm: float, forecast: Dict) -> List[Dict]:
-    """'Now' (scored directly from current_precipitation_mm) plus
-    +6h/+12h/+18h/+24h projections, each layering the real forecast's
-    cumulative rainfall on top of current_precipitation_mm and scoring
-    through calculate_score()/get_risk_tier() - the same functions every
-    other real risk figure in this platform uses, never a separate curve."""
+    """'Now' (scored from current_precipitation_mm, the rainfall the caller
+    is assessing) plus +6h/+12h/+18h/+24h points scored from the forecast's
+    cumulative rainfall up to each hour, through calculate_score()/
+    get_risk_tier() like every other risk figure.
+
+    The projection used to ADD the forecast to current_precipitation_mm.
+    Most callers (dashboard, kiosk, copilot) pass the 24 h forecast itself
+    as current_precipitation_mm, so the +24h point scored twice the
+    forecast. Each projected point is now the forecast's own accumulation,
+    so with the forecast as input the +24h point equals 'Now'."""
     cumulative = forecast.get("cumulative_6h", {})
     score_now = calculate_score(current_precipitation_mm)
     timeline = [
@@ -39,7 +44,7 @@ def build_risk_timeline(current_precipitation_mm: float, forecast: Dict) -> List
         # values would look like a real "no change" forecast.
         return timeline
     for h in (6, 12, 18, 24):
-        future_precip = current_precipitation_mm + cumulative.get(str(h), 0.0)
+        future_precip = cumulative.get(str(h), 0.0)
         future_score = calculate_score(future_precip)
         timeline.append(
             {

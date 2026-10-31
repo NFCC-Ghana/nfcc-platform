@@ -390,7 +390,7 @@ def _describe_pathway(name: str, result: FusionResult) -> Optional[str]:
         level = "elevated"
     else:
         level = "low"
-    return f"{name} is {level} ({result.unified_risk:.0f}%)"
+    return f"{name} is {level} ({result.unified_risk:.0f}/100)"
 
 
 def _describe_risk_attribution(
