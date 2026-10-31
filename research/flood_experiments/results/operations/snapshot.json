@@ -1,0 +1,203 @@
+{
+ "taken_at": "2026-10-31T03:39:59+00:00",
+ "api": "https://nfcc-platform-355353600602.europe-west1.run.app",
+ "review_queue": {
+  "total": 58,
+  "created": {
+   "first": "2026-09-19T15:17:35.756660",
+   "last": "2026-10-16T23:22:40.128226"
+  },
+  "by_status": {
+   "pending": 56,
+   "approved": 2
+  },
+  "by_basis": {
+   "antecedent_3d_observed_fallback": 41,
+   "dam_river_pathway": 11,
+   "forecast_next_24h": 6
+  },
+  "by_tier": {
+   "MODERATE": 48,
+   "HIGH": 8,
+   "EXTREME": 2
+  },
+  "by_cap_status": {
+   "Actual": 54,
+   "Exercise": 4
+  },
+  "by_district": {
+   "Tamale": 29,
+   "Kumasi": 11,
+   "Ho": 11,
+   "Sunyani": 5,
+   "Accra West": 1,
+   "Accra Central": 1
+  },
+  "reviewed_by_a_person": 0,
+  "last_created_by_basis": {
+   "dam_river_pathway": "2026-09-21T12:25:14.168136",
+   "antecedent_3d_observed_fallback": "2026-10-16T23:22:40.128226",
+   "forecast_next_24h": "2026-09-30T00:12:03.666396"
+  }
+ },
+ "alerts_sent": {
+  "records": 4,
+  "delivered": 1,
+  "by_provider": {
+   "telegram": 2,
+   "whatsapp": 2
+  }
+ },
+ "subscribers": 0,
+ "community_reports": {
+  "total": 4,
+  "validated": 0,
+  "created": {
+   "first": "2026-09-21 04:22:17",
+   "last": "2026-09-21 13:08:04"
+  }
+ },
+ "prediction_ledger": {
+  "total": 1025,
+  "predicted": {
+   "first": "2026-09-19T15:14:34.606733",
+   "last": "2026-10-30T22:05:53.322533"
+  },
+  "by_risk_tier": {
+   "LOW": 1024,
+   "MODERATE": 1
+  },
+  "by_fused_tier": {
+   "LOW": 1013,
+   "MODERATE": 10,
+   "HIGH": 2
+  },
+  "by_outcome": {
+   "flood_confirmed": 940,
+   "None": 82,
+   "no_evidence_found": 3
+  },
+  "by_outcome_source": {
+   "ReliefWeb": 923,
+   "None": 82,
+   "ReliefWeb,GDELT": 17,
+   "automated_check_no_signal": 3
+  }
+ },
+ "observation_archive": {
+  "dam_river_pathway": {
+   "rows": 1027,
+   "with_value": 21,
+   "last_with_value": "2026-09-21T12:25:14.674808"
+  },
+  "antecedent_3d_observed_fallback": {
+   "rows": 925,
+   "with_value": 925,
+   "last_with_value": "2026-10-30T22:05:47.846273"
+  },
+  "forecast_next_24h": {
+   "rows": 1027,
+   "with_value": 760,
+   "last_with_value": "2026-10-30T22:05:47.721037"
+  },
+  "antecedent_3d_accumulation": {
+   "rows": 102,
+   "with_value": 0,
+   "last_with_value": null
+  }
+ },
+ "risk_history": {
+  "rows": 762,
+  "recorded": {
+   "first": "2026-09-19T03:27:25.654227",
+   "last": "2026-10-30T22:05:47.587115"
+  }
+ },
+ "workflow_runs": {
+  "automated_risk_assessment.yml": {
+   "runs": 178,
+   "by_conclusion": {
+    "success": 178
+   },
+   "scheduled": 173,
+   "created": {
+    "first": "2026-09-16T20:08:26Z",
+    "last": "2026-10-30T22:03:19Z"
+   }
+  },
+  "verify_predictions.yml": {
+   "runs": 42,
+   "by_conclusion": {
+    "success": 41,
+    "failure": 1
+   },
+   "scheduled": 42,
+   "created": {
+    "first": "2026-09-19T10:06:58Z",
+    "last": "2026-10-30T11:57:51Z"
+   }
+  },
+  "daily_chirps.yml": {
+   "runs": 161,
+   "by_conclusion": {
+    "failure": 112,
+    "success": 48,
+    "cancelled": 1
+   },
+   "scheduled": 157,
+   "created": {
+    "first": "2026-05-27T11:36:22Z",
+    "last": "2026-10-30T14:47:57Z"
+   }
+  },
+  "model_validation.yml": {
+   "runs": 1,
+   "by_conclusion": {
+    "success": 1
+   },
+   "scheduled": 1,
+   "created": {
+    "first": "2026-10-01T14:14:54Z",
+    "last": "2026-10-01T14:14:54Z"
+   }
+  },
+  "weekly_shadow_forecast.yml": {
+   "runs": 3,
+   "by_conclusion": {
+    "success": 1,
+    "cancelled": 1,
+    "failure": 1
+   },
+   "scheduled": 0,
+   "created": {
+    "first": "2026-10-30T22:27:22Z",
+    "last": "2026-10-31T01:39:22Z"
+   }
+  },
+  "elite-resilience.yml": {
+   "runs": 523,
+   "by_conclusion": {
+    "failure": 307,
+    "success": 216
+   },
+   "scheduled": 159,
+   "created": {
+    "first": "2026-05-24T19:10:20Z",
+    "last": "2026-10-31T03:39:07Z"
+   }
+  },
+  "ci.yml": {
+   "runs": 358,
+   "by_conclusion": {
+    "success": 220,
+    "failure": 137,
+    "": 1
+   },
+   "scheduled": 0,
+   "created": {
+    "first": "2026-05-05T00:06:00Z",
+    "last": "2026-10-31T03:39:07Z"
+   }
+  }
+ }
+}
