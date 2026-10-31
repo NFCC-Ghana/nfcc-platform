@@ -1,6 +1,6 @@
 # NFCC flood early-warning system: critical review and upgrade
 
-*30 October 2026 (status updated the same evening). For the NFCC team and the PhD supervisory committee.*
+*30 October 2026 (status updated 31 October). For the NFCC team and the PhD supervisory committee.*
 
 ## Bottom line
 
@@ -52,7 +52,7 @@ What remains needs partners, not code:
 | D1 | Flood records came from MODIS only (Global Flood Database): 203 onsets in 19 years, none in 2012–2014 or 2016–2017 | MODIS misses most urban and flash floods; too few events to train or test | Main study switched to Groundsource news-reported floods (Google, 2026): 2,527 placed events | Done |
 | D2 | News records follow media coverage | A model can learn where floods get reported instead of where they happen | Radar audit of every reported onset against matched no-flood weeks | Done. Rural confirmed (32.5% vs 16–17%); urban unverifiable by radar (9.4% vs 9–10%) |
 | D3 | No ground-truth flood or impact records | Nobody can verify urban floods or train impact warnings | NADMO request letter and loader (`nadmo_data_request.md`, `nadmo.py`) | Letter not yet sent |
-| D4 | Antecedent rain in production reads CHIRPS, which ends on 30 September in Earth Engine | The live "last 3 days" rain signal is a month old | Shadow run uses GPM IMERG (2 days behind), rescaled per district to CHIRPS | Done: production switched to IMERG in PR #60 (merged; live after the next deploy) |
+| D4 | Antecedent rain in production reads CHIRPS, which ends on 30 September in Earth Engine | The live "last 3 days" rain signal is a month old | Shadow run uses GPM IMERG (2 days behind), rescaled per district to CHIRPS | Done: production switched to IMERG in PR #60 (deployed 30 Oct, revision 00079) |
 | D5 | District-mean rain dilutes storms | Flash floods come from convective cells | Wettest-pixel (95th percentile) rain per district | Done |
 | D6 | Discharge read at district centroids | Often nowhere near the flooding river | Read at each district's main river (largest MERIT Hydro upstream area) | Done |
 | D7 | Station rain, river gauges and dam releases never obtained | The strongest predictors of river and dam floods are missing; Bagre spillage drives Upper East and Northern floods | Not solvable with open data | Needs GMet, TAHMO, HSD, VRA and SONABEL |
@@ -74,8 +74,8 @@ What remains needs partners, not code:
 
 | # | Problem | Status |
 | --- | --- | --- |
-| P1 | When Open-Meteo failed, the platform **invented rainfall** (15 mm plus a random draw in rainy months). It reached users, the risk timeline and the AI Copilot's risk tools | Fixed in PR #58 (merged; live after the next deploy): an outage now returns "unavailable" with every value null |
-| P2 | Antecedent rain is a month stale (D4) | Fixed in PR #60 (merged; live after the next deploy): rain now 3 days old instead of about 30 |
+| P1 | When Open-Meteo failed, the platform **invented rainfall** (15 mm plus a random draw in rainy months). It reached users, the risk timeline and the AI Copilot's risk tools | Fixed in PR #58 (deployed 30 Oct, revision 00079): an outage now returns "unavailable" with every value null |
+| P2 | Antecedent rain is a month stale (D4) | Fixed in PR #60 (deployed 30 Oct, revision 00079): rain now 3 days old instead of about 30 |
 | P3 | Single deterministic forecast, no uncertainty | Weekly ensemble shadow run scheduled (PR #61; network-retry fix in PR #63). Production adoption after a shadow season |
 | P4 | Verification ledger outcomes come from ReliefWeb keyword search; 881 of 982 marked "confirmed" | Replace with Groundsource and the radar audit, and NADMO when available |
 | P5 | Live system tracks 9 districts; the research covers 216 | The shadow run covers all 216 |
@@ -219,12 +219,15 @@ yet.
 1. **Done:** PR #58 merged (the system never invents data) and the
    leaked API key rotated. **Still to do:** activate the alert-approval
    key.
-2. **Scheduled:** `operational.py shadow` runs every Monday (PR #61). The
-   first run hit a network timeout; PR #63 adds retries. Keep it running
-   through the 2027 rainy season, and compare it with the live rule and
-   with what happened.
+2. **Working:** `operational.py shadow` runs every Monday (PR #61). The
+   first two runs failed on slow Open-Meteo responses from GitHub's
+   servers. Retries (PR #63) and batched requests (PR #65, 432 calls down
+   to 12) fixed it: on 31 Oct it scored all 216 districts in under 4
+   minutes and saved the results to the `shadow-log` branch. Keep it
+   running through the 2027 rainy season, and compare it with the live
+   rule and with what happened.
 3. **Done:** production antecedent rain switched to IMERG (PR #60).
-4. **Deploy** once, so PRs #58 and #60 go live.
+4. **Done:** deployed 30 Oct (revision 00079); PRs #58 and #60 are live.
 5. **Send the NADMO request.**
 
 **Next season, with partners:**
