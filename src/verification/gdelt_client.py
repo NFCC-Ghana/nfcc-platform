@@ -38,6 +38,8 @@ from typing import Dict, List
 
 import requests
 
+from src.verification.place_names import search_place
+
 logger = logging.getLogger("nfcc.verification.gdelt")
 
 _BASE_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
@@ -66,7 +68,9 @@ def search_flood_news(district: str, start_date: str, end_date: str) -> Dict:
         resp = requests.get(
             _BASE_URL,
             params={
-                "query": f"flood Ghana {district}",
+                # Quoted, so a two-word district is matched as a phrase
+                # rather than as two independent words anywhere.
+                "query": f'flood Ghana "{search_place(district)}"',
                 "format": "json",
                 "mode": "artlist",
                 "maxrecords": 10,
