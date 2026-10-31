@@ -21,12 +21,20 @@ EXP = ROOT / "research" / "flood_experiments"
 V2 = json.loads((EXP / "results" / "v2" / "results.json").read_text())
 V1 = json.loads((EXP / "results" / "v1_gfd" / "results.json").read_text())
 META = json.loads((EXP / "model" / "meta.json").read_text())
+ST = json.loads((EXP / "results" / "station_check" / "results.json").read_text())
+OPS = json.loads((EXP / "results" / "operations" / "snapshot.json").read_text())
 
 
 def f(x, nd=3):
     if x is None or (isinstance(x, float) and x != x):
         return "–"
     return f"{x:.{nd}f}"
+
+
+def rng(a, b, nd=2):
+    """'a–b', or a single value when both round the same."""
+    lo, hi = sorted((a, b))
+    return f(lo, nd) if f(lo, nd) == f(hi, nd) else f"{f(lo, nd)}–{f(hi, nd)}"
 
 
 def ci(c, nd=3):
@@ -118,16 +126,20 @@ md = []
 w = md.append
 
 # --------------------------------------------------------------- front
-w("""# NFCC flood early-warning system: technical reference for the manuscript
+w("""# NFCC flood early-warning system: full system report
 
-*State of the system on 31 October 2026. Prepared for the NFCC manuscript team. Every number in the results sections is generated directly from the project's result files (`research/flood_experiments/results/`), not transcribed.*
+*State of the system on 31 October 2026. Prepared for the NFCC manuscript team. This is a complete technical description and critical review of the whole system: the deployed platform, its data, models, software, infrastructure, operating record and research framework. Every results number is generated from the project's result files (`research/flood_experiments/results/`); the operating record is generated from a snapshot of the production database (`results/operations/snapshot.json`, aggregate counts only).*
+
+**How the review was done.** Every module of the platform (`src/`, 90 modules), the dashboard, the scheduled jobs and the infrastructure configuration were read; every one of the 54 API operations was listed from the OpenAPI specification with its access control; the production database, logs and job history were queried; and data flows were checked against the live external services. The review is organised the way operational early-warning systems are assessed and published: the four pillars of the WMO/UNDRR Multi-Hazard Early Warning Systems (MHEWS) checklist (risk knowledge; detection, monitoring and forecasting; warning dissemination; preparedness and response), with the forecasting models reported against TRIPOD+AI (Collins et al. 2024), model cards (Mitchell et al. 2019) and datasheets for datasets (Gebru et al. 2021). Defects found are listed with evidence and status in section 9.
 
 ## How to read this document
 
 NFCC has two parts, and the manuscript should keep them distinct:
 
-1. **The operational platform:** the live, rule-based flood-risk and alerting system. It runs on Google Cloud Run for 9 tracked districts and is used through a Streamlit dashboard. It is described in section 2.
+1. **The operational platform:** the live, rule-based flood-risk and alerting system. It runs on Google Cloud Run for 9 tracked districts and is used through a Streamlit dashboard. It is described in section 2 and its operating record in section 8.
 2. **The research and forecasting framework:** a reproducible machine-learning study on all 216 districts of Ghana (FAO GAUL 2015 boundaries), with an operational model that runs weekly in *shadow mode* (scored and logged, never used for alerts). It is described in sections 3–5.
+
+Section 1 summarises the system and its readiness; section 9 is the critical review (every defect found, with evidence); section 10 maps the document to the MHEWS pillars and to TRIPOD+AI.
 
 **Terms used throughout:**
 
@@ -144,10 +156,35 @@ NFCC has two parts, and the manuscript should keep them distinct:
 | # | Question | Answer |
 | --- | --- | --- |
 | 1 | Did we use only XGBoost, or other models? | **No.** The study compares 11 models: two baselines (climatology, persistence), the NFCC rainfall rule, a river-discharge benchmark, logistic regression, random forest and five XGBoost variants. It also compares 4 ways of fusing data sources. The best is M11 (XGBoost on multi-source data plus local-climate rainfall features). The model deployed in shadow mode is a calibrated XGBoost using only inputs known when the week starts. The live alert system is rule-based. Full catalogue: section 4.1. |
-| 2 | Is the dashboard connected to all data sources? | **Partly.** It is connected to 10 real sources: GPM IMERG V07, CHIRPS v2.0, Open-Meteo forecast, GloFAS v4, NASA SMAP L4, Sentinel-1 GRD, DAHITI altimetry (Lake Volta, White Volta, Nakambé), ReliefWeb, GDELT and citizen reports. It is **not** connected to Ghana Hydrological Authority river gauges, VRA or SONABEL dam operator data, Google Flood Hub, TAHMO or GMet; those require data agreements or API approval (section 6). All external APIs and services are listed in section 2.6. "Phase 2" items in the project plan (nowcasting, inundation model, insurance trigger API, SMS at scale) are not built. Section 2.2. |
+| 2 | Is the dashboard connected to all data sources? | **Partly.** It is integrated with 10 real sources (one of them, DAHITI, has returned no data since 22 Sep 2026 because its API key is rejected; section 9, F3): GPM IMERG V07, CHIRPS v2.0, Open-Meteo forecast, GloFAS v4, NASA SMAP L4, Sentinel-1 GRD, DAHITI altimetry (Lake Volta, White Volta, Nakambé), ReliefWeb, GDELT and citizen reports. It is **not** connected to Ghana Hydrological Authority river gauges, VRA or SONABEL dam operator data, Google Flood Hub, TAHMO or GMet; those require data agreements or API approval (section 6). All external APIs and services are listed in section 2.6. "Phase 2" items in the project plan (nowcasting, inundation model, insurance trigger API, SMS at scale) are not built. Section 2.2. |
 | 3 | Do the experiments cover Accra alone or many districts? | **All 216 districts in all 10 (2015) regions**, for 2015–2025 (main study) and 2000–2018 (sensitivity study). The live platform tracks 9 districts. Sections 3.1 and 5.1. |
 | 4 | Were TAHMO, GMet and river-gauge data available? | **No.** None was obtained. Open satellite and reanalysis products were used instead (CHIRPS, IMERG, ERA5-Land, GloFAS). Section 6. |
 | 5 | What models, datasets and results are accessible? | Everything in this document is in the public repository **NFCC-Ghana/nfcc-platform** and can be regenerated from open data. Section 7 lists each item and where it is. |
+""")
+
+m3 = next(r for r in e1 if r["model"].startswith("Rainfall threshold"))
+clim = next(r for r in e1 if r["model"] == "Climatology")
+sd, sw, sw2 = ST["strict"]["daily"], ST["strict"]["weekly"], ST["i_as_dry"]["weekly"]
+rq, led = OPS["review_queue"], OPS["prediction_ledger"]
+w(f"""## 1. Executive summary and readiness
+
+**What the system is.** NFCC is a flood early-warning system for Ghana in two parts. The *operational platform* computes a rule-based flood-risk score from rainfall for 9 tracked districts every few hours, combines it with river, reservoir, satellite-radar and citizen evidence, and places any assessment of MODERATE risk or above in a review queue; a person must approve an alert before it is sent by WhatsApp or Telegram, and every alert is also available in the OASIS Common Alerting Protocol (CAP 1.2). The *research framework* is a reproducible study of weekly flood-onset prediction for all 216 districts (2015–2025), comparing 11 models and 4 data-fusion methods, with a calibrated XGBoost model running weekly in shadow mode.
+
+**What the evidence supports.**
+
+- **Forecast skill (research, test years 2018–2025).** The best model (M11, multi-source XGBoost with local-climate rainfall) reaches PR-AUC {f(best['pr_auc'])} against a base rate of {f(best['base_rate'], 4)} ({best['pr_auc'] / best['base_rate']:.1f}× chance) and SEDI {f(best['sedi'], 2)}. The live platform's rainfall rule (M3) reaches PR-AUC {f(m3['pr_auc'])} ({m3['pr_auc'] / m3['base_rate']:.1f}× chance), below the seasonal climatology baseline ({f(clim['pr_auc'])}). For *timing* within a district the rule is as good as any model (within-district AUC {f(m3['within_district_auc'], 2)} vs {f(best['within_district_auc'], 2)}); M11's advantage is mostly in knowing *which* districts flood (section 5.3).
+- **Rainfall inputs.** At Ghana's 22 synoptic stations, satellite rainfall agrees poorly with gauges day by day (Pearson r {f(sd['chirps']['pearson_r'], 2)} CHIRPS, {f(sd['imerg']['pearson_r'], 2)} IMERG) and detects under a third of ≥20 mm gauge days, but agrees well week by week (r {rng(sw['chirps']['pearson_r'], sw['imerg']['pearson_r'])} on fully reported gauge weeks; {rng(sw2['chirps']['pearson_r'], sw2['imerg']['pearson_r'])} when days without a rain report are counted as dry). This supports the study's weekly design and argues against daily heavy-rain thresholds on satellite rain (section 5.11).
+- **Operational use.** The platform has run in production since September 2026 but has not yet been used operationally: {rq['total']} assessments queued, none reviewed by an operator; {OPS['subscribers']} alert subscribers; {OPS['community_reports']['total']} citizen reports, all tests (section 8).
+
+**Readiness.** The platform is a working, documented prototype, not yet an operational warning service. The review found defects that must be corrected or disclosed before any operational or published claim (section 9), most importantly:
+
+1. the outcome labels in the live prediction log are invalid ({led['by_outcome'].get('flood_confirmed', 0)} of the {sum(v for k, v in led['by_outcome'].items() if k != 'None')} predictions checked so far were marked "flood confirmed" on evidence that did not concern the district);
+2. the live rainfall forecast input read only large-scale rain, 35–44% of total precipitation in Ghana;
+3. the river and dam pathway has had no data since 22 September 2026 (the DAHITI API key is rejected);
+4. the dashboard opened on a fixed 75 mm "EXTREME" scenario, and showed illustrative impact figures on dry days;
+5. citizen reporters' phone numbers were publicly readable through the API.
+
+Fixes for 1, 2, 4 and 5 are written and tested (pull requests #68–#72, awaiting merge and deployment); 3 needs a new DAHITI key from the account owner.
 """)
 
 # --------------------------------------------------------------- platform
@@ -177,14 +214,14 @@ The dashboard reads all data through the platform API; a source counts as connec
 | --- | --- | --- | --- | --- | --- |
 | 1 | GPM IMERG V07 half-hourly precipitation (`NASA/GPM_L3/IMERG_V07`) | NASA, via Google Earth Engine | 0.1°; about 2–4 days behind real time | Rain in the last 3 days (antecedent rainfall), rescaled to CHIRPS per location with the CHIRPS/IMERG ratio of a past year | Connected |
 | 2 | CHIRPS v2.0 daily (`UCSB-CHG/CHIRPS/DAILY`) | Climate Hazards Center, via Earth Engine | 0.05°; final product lags by weeks | Historical backtest and rare-event verification (1981–present); CHIRPS v3 near-real-time as fallback for source 1 | Connected |
-| 3 | Open-Meteo Forecast API (`api.open-meteo.com/v1/forecast`, default "best match" model selection) | Open-Meteo | Hourly; 3-day horizon | 24/48/72-hour rainfall forecast, rain probability, current weather | Connected. Reports "unavailable" with no values when unreachable |
+| 3 | Open-Meteo Forecast API (`api.open-meteo.com/v1/forecast`, default "best match" model selection) | Open-Meteo | Hourly; 3-day horizon | 24/48/72-hour rainfall forecast, rain probability, current weather | Connected. Reports "unavailable" with no values when unreachable. Defect: reads the `rain` variable (large-scale rain only) instead of `precipitation`, and counts hours from 00:00 GMT; fix in PR #68 (section 9, F2) |
 | 4 | GloFAS v4 river discharge (`flood-api.open-meteo.com/v1/flood`) | Copernicus Emergency Management Service, via Open-Meteo | 0.05°; daily | River pathway: discharge relative to the day's long-term mean (≥1.5× = elevated; illustrative, not a calibrated flood stage) | Connected |
 | 5 | NASA SMAP L4 surface and root-zone soil moisture (`NASA/SMAP/SPL4SMGP/008`) | NASA, via Earth Engine | 9 km, 3-hourly; 2–3 days latency | Soil saturation | Connected |
 | 6 | Sentinel-1 GRD C-band SAR (`COPERNICUS/S1_GRD`), IW mode, VV and VH | ESA Copernicus, via Earth Engine | 10 m; revisit 6–12 days over Ghana | Flood detection by change detection (section 2.4) | Connected. Reports "unavailable" (no detection, no area) when Earth Engine is unreachable or there is no image in the last 12 days |
-| 7 | DAHITI satellite altimetry (`dahiti.dgfi.tum.de`, API v2; requires an API key) | DGFI-TUM | Water-level time series per target, at each satellite overpass | Three targets: Lake Volta, for Akosombo Dam (target 97); White Volta river level for Tamale only (target 9087, about 45.5 km away); Nakambé River (target 19006, about 22.4 km from Bagre Dam, Burkina Faso), an upstream proxy for Bagre releases, reported separately from the dam's own (unavailable) status | Connected (three targets) |
-| 8 | ReliefWeb API v2 (`api.reliefweb.int/v2/reports`) | UN OCHA | Reports, country-tagged | Post-event outcome evidence | Connected (country-level only) |
-| 9 | GDELT DOC 2.0 API (`api.gdeltproject.org/api/v2/doc/doc`) | GDELT Project | News articles | Post-event outcome evidence | Connected (country-level only) |
-| 10 | Citizen flood reports | NFCC community reporting (database `community_reports`) | Event-level | Direct-observation pathway, after verification | Connected |
+| 7 | DAHITI satellite altimetry (`dahiti.dgfi.tum.de`, API v2; requires an API key) | DGFI-TUM | Water-level time series per target, at each satellite overpass | Three targets: Lake Volta, for Akosombo Dam (target 97); White Volta river level for Tamale only (target 9087, about 45.5 km away); Nakambé River (target 19006, about 22.4 km from Bagre Dam, Burkina Faso), an upstream proxy for Bagre releases, reported separately from the dam's own (unavailable) status | **Not working since 22 Sep 2026:** the API key is rejected (HTTP 403, "Login failed"), so no river or dam level has been read since (section 9, F3) |
+| 8 | ReliefWeb API v2 (`api.reliefweb.int/v2/reports`) | UN OCHA | Reports, country-tagged | Post-event outcome evidence | Connected. Defect: the query matched unrelated reports, so its outcome labels are invalid; fix in PR #69 (section 9, F1). After the fix it can confirm a district only when a report title names the town |
+| 9 | GDELT DOC 2.0 API (`api.gdeltproject.org/api/v2/doc/doc`) | GDELT Project | News articles | Post-event outcome evidence | Connected (city-level at best) |
+| 10 | Citizen flood reports | NFCC community reporting (database `community_reports`) | Event-level | Direct-observation pathway, after verification | Connected; no real report received yet (4 test reports, none verified) |
 | – | Urban drainage table | NFCC (static) | Accra Central, West and East only | Risk multiplier (section 2.3) | Static values with no cited source |
 | – | Google Flood Hub (Flood Forecasting API) | Google | – | River forecasts | Client implemented; no API access (pilot waitlist) |
 | – | Ghana Hydrological Authority (HSD) river gauges | – | – | River levels | Not connected |
@@ -230,6 +267,10 @@ The live risk score `S` (0–100) is a piecewise-linear function of rainfall `P`
 
 (`src/config/settings.py`)
 
+**Where the drainage multiplier applies.** Only the dashboard's `/situation` call passes the district to `calculate_score`. The 3-hourly assessment (`/v1/alerts/assess`), `/score`, `/v1/districts/{district}/risk` and the risk history score the same rainfall without it, so for the three Accra districts the dashboard and the alert queue can show different scores for the same rain (section 9, F10).
+
+**What the input rainfall is.** The 3-hourly assessment scores three signals separately for each district: (a) the next-24-hour Open-Meteo forecast; (b) the 3-day antecedent total, from GPM IMERG via the API (since 30 Oct 2026; before that CHIRPS, which was 18–30 days out of date, so every assessment fell back to Open-Meteo's past-72-hour model rainfall); and (c) the river/dam pathway score. The review threshold S ≥ 30 corresponds to 10 mm of rain in 24 hours, a common wet-season amount.
+
 ### 2.4 Multi-source evidence fusion
 
 The decision card fuses evidence in two stages (`src/models/multi_source_confidence.py`):
@@ -264,25 +305,30 @@ These weights are expert-set priors, not learned or skill-weighted. Only a real 
 
 > index = 0.5 × rainfall score + 0.3 × reservoir score + 0.2 × inflow score
 
-where rainfall is normalised over 0–200 mm, reservoir level over 0–100% and inflow over 0–500 m³/s. It is a formula, not a fitted model.
+where rainfall is normalised over 0–200 mm, reservoir level over 0–100% and inflow over 0–500 m³/s. It is a formula, not a fitted model. It is exposed only through `/api/dam/spillage`, which, with no inputs supplied, evaluates fixed defaults (180 mm, 95%, 450 m³/s for Akosombo), so it returns the same result on every call; it is not used in the risk score or the alerts.
+
+**River and dam pathway score** (`src/hydrology/fluvial_pathway.py`, `altimetry_thresholds.py`). Each DAHITI water body is classified against percentiles of its own history and mapped to a score: below the 75th percentile NORMAL = 15; 75th–90th WARNING = 45; 90th–95th DANGER = 75; above the 95th FLOOD = 95. Because WARNING (45) exceeds the review threshold (30), any river or lake above its 75th percentile, a normal wet-season level, queues a MODERATE alert (section 9, F9).
 
 ### 2.5 Alerting, explanation and infrastructure
 
 - **Human-in-the-loop alerting:** risk assessments create *pending* alerts, which an operator approves, dismisses or retracts on the dashboard.
-- **Alert channels:** WhatsApp and SMS (Twilio), Telegram (Bot API) and email (SMTP).
+- **Alert channels:** WhatsApp (Twilio) and Telegram (Bot API) are configured in production; SMS (Twilio) and email (SMTP) are implemented but disabled. Recipients are a configured list plus citizens who opted in by sending "ALERTS ON" on WhatsApp or Telegram.
+- **Approval:** approving, cancelling or dismissing a real alert needs the API key and, when configured, a second alert-approval key. Approving an exercise alert never reaches the sending code.
 - **Alert format:** each alert is also served as an OASIS Common Alerting Protocol (CAP 1.2) document.
 - **Exercise mode:** produces practice alerts that are never sent.
 - **AI copilot:** answers questions about districts by calling the platform's own tools. Model: Google Gemini (`gemini-flash-lite-latest`).
-- **Hosting:** FastAPI service on Google Cloud Run (europe-west1, one instance), with SQLite databases continuously replicated to Google Cloud Storage by Litestream. API rate limits are shared through Upstash Redis.
+- **Hosting:** FastAPI service on Google Cloud Run (europe-west1; exactly one instance, 1 vCPU, 2 GiB, 4 uvicorn workers; CPU allocated only during requests), with two SQLite databases (`alerts.db`, `community_reports.db`, WAL mode) continuously replicated to Google Cloud Storage by Litestream 0.5.17. API rate limits and alert cooldowns are designed to be shared through Upstash Redis; the Redis database no longer exists, so each worker currently keeps its own in-memory counters (section 9, F7).
 - **Dashboard:** Streamlit, on Streamlit Community Cloud.
 
 **Scheduled jobs (GitHub Actions):**
 
 | Job | Schedule |
 | --- | --- |
-| Risk assessment for all tracked districts | Every 3 hours |
+| Risk assessment for all tracked districts | Every 3 hours (about 4 runs a day actually execute; GitHub drops scheduled runs) |
 | Prediction outcome verification | Daily, 06:00 UTC |
-| CHIRPS ingestion | Daily, 08:00 UTC |
+| CHIRPS ingestion (Accra box, saved as a build artifact; not read by the platform) | Daily, 08:00 UTC |
+| Rule validation report | Monthly, 1st, 07:00 UTC |
+| Resilience tests | Daily, 02:00 UTC |
 | Weekly shadow flood forecast (section 5.10) | Mondays, 05:17 UTC |
 
 ### 2.6 Complete list of external APIs and services
@@ -311,6 +357,64 @@ where rainfall is normalised over 0–200 mm, reservoir level over 0–100% and 
 - **Akosombo (Volta, Ghana):** Lake Volta level from DAHITI; no VRA operator data.
 - **Bagre (Nakambé, Burkina Faso):** no operator data; DAHITI upstream river proxy only.
 - **Kompienga (Burkina Faso):** no data source.
+
+### 2.7 Software architecture and code base
+
+| Component | Location | Size (lines of Python) | Role |
+| --- | --- | --- | --- |
+| Platform API (FastAPI) | `src/` (90 modules) | 14,513 | Scoring, evidence fusion, data adapters, alerting, verification, copilot |
+| Operations dashboard (Streamlit) | `hackathon/app/pages/dashboard.py`, `modules/v4/` | 4,795 | Operator interface, public kiosk view, alert review queue |
+| Scheduled jobs and tools | `scripts/` | 2,423 | 3-hourly assessment, outcome verification, CHIRPS ingestion, validation reports |
+| Research framework | `research/flood_experiments/` | 4,685 | Dataset building, experiments, operational model, this report |
+| Tests | `tests/` | 12,082 | 623 test functions |
+
+The repository has 283 commits between 3 May and 31 October 2026. The platform API is organised in layers: data adapters (`src/hydrology/`: one module per external source, each returning an explicit "unavailable" result instead of a substitute value when its source fails), models (`src/models/`: score timelines, evidence fusion, verification), exposure data (`src/exposure/`), alerting (`src/alerts/`: tiering, cooldown, rate limit, providers), persistence (`src/database/`), verification (`src/verification/`) and HTTP routes (`src/api/`).
+
+**Data flow of an alert.** GitHub Actions job (every 3 h) → fetch forecast (Open-Meteo), antecedent rain and river/dam score (platform API) → `POST /v1/alerts/assess` per signal → if S ≥ 30, a row in `pending_alerts` with CAP severity, urgency and certainty, affected communities and response guidance → operator approves in the dashboard → `AlertEngine.process` checks cooldown (30 min) and rate limit (3 alerts per district per hour) → WhatsApp/Telegram providers → row in `alerts`. Each run also writes a risk-history point, three observation-archive rows and one prediction-ledger entry per district.
+
+### 2.8 API and access control
+
+The API has **54 operations** (OpenAPI specification generated from `src/api/main.py`). Access control:
+
+- **API key required (17):** every operation that writes data or can send, approve, cancel or dismiss an alert; the alert queue and CAP export; the alert subscriber list; the copilot; and `POST /situation` and `POST /decision/card`.
+- **Second key (alert-approval key):** additionally required to approve, cancel or dismiss a real (non-exercise) alert, when configured.
+- **Signed webhooks (2):** `POST /webhooks/whatsapp` checks Twilio's request signature; `POST /webhooks/telegram` checks Telegram's secret token (constant-time comparison).
+- **Public (35):** health checks, district registry, read-only risk, forecast, evidence, resources, decision, history, observations, predictions, data quality, verification and backtest results, the public scoring and explanation endpoints, and the dam spillage endpoints.
+
+Request rate limits (slowapi) are set on only two operations: `/situation` (30 per minute) and `/v1/copilot/ask` (10 per minute). Public operations that run the full evidence pipeline (for example `GET /v1/districts/{district}/decision`) are not limited (section 9, F15). If `API_KEY` is not set, the key check accepts every request; production has it set (F14).
+
+### 2.9 Data stores
+
+All tables are SQLite, in `data/alerts.db` except community reports (`data/community_reports.db`).
+
+| Table | Content | Written by |
+| --- | --- | --- |
+| `pending_alerts` | Review queue: district, score, tier, rainfall, message, CAP severity/urgency/certainty/status, affected communities, response guidance, signal (basis), review status and reviewer | `POST /v1/alerts/assess`, `/exercise` |
+| `alerts` | Every send attempt: district, score, tier, rainfall, sent flag, provider, recipient | Alert engine |
+| `channel_subscriptions` | Citizen opt-ins: channel, identifier (phone number or chat id), district, minimum tier, active | WhatsApp/Telegram webhooks |
+| `risk_history` | Time series of score and tier per district | 3-hourly job |
+| `observation_history` | Every raw reading fetched by the 3-hourly job, with unit and quality flag | 3-hourly job |
+| `prediction_ledger` | Full decision-card snapshot per district per run, with outcome, outcome source and time once verified | 3-hourly job; outcome verifier |
+| `community_reports` | Citizen reports: district, community, type, depth, description, reporter contact, time, location, urgency, validation | Webhooks; operator validation |
+
+### 2.10 Operator dashboard and AI copilot
+
+**Dashboard panels** (`hackathon/app/pages/dashboard.py`): header and data-source status; control panel (district, rainfall); executive summary; national map; evidence and confidence; impact assessment; operations (shelters, resources); decision centre (decision card); risk timeline (+6/+12/+18/+24 h); recorded risk history; AI copilot; alert review queue (approve, dismiss, retract, CAP download, exercise alerts); community-report triage; a full-screen public kiosk view (live forecast, auto-refreshing); and a demonstration mode that plays a scripted sequence of rainfall values through the real API.
+
+**What the dashboard's figures mean.** Every panel except the kiosk is computed from the rainfall value in the control panel, so the dashboard is a scenario tool around the live forecast, not a display of measured conditions. The slider opened at a fixed 75 mm (score 100, EXTREME) whatever the weather; it now opens at the live 24-hour forecast and labels any other value "SCENARIO" (PR #72). The impact panel's illustrative generator (`state_fallback.py`) was shown whenever the real estimate was zero, that is on every dry day; it is now shown only when the API returns no estimate (PR #71).
+
+**Impact estimate** (`src/exposure/impact_estimator.py`). Population exposed = district population × (S/100) × 0.6; children, elderly, disabled and pregnant shares and school, hospital and market counts are project planning estimates; power substations = population/75,000. Populations for Tema, Kumasi, Tamale, Cape Coast, Ho and Sunyani are 2021 census figures; the three Accra districts are project estimates (they are not official units). It is a score-proportional planning heuristic, not an exposure model (no hazard map is overlaid on population).
+
+**AI copilot** (`src/copilot/`). Google Gemini through the `google-genai` SDK, model alias `gemini-flash-lite-latest` (not a pinned version), with 8 tools that call the platform's own data (tracked districts, risk overview, decision card, evidence, forecast, resources, data-source health, data quality), at most 8 tool calls per question. The system instruction forbids stating any figure not returned by a tool in the same conversation. The answer is returned with the list of tool calls that produced it. Its accuracy and grounding have not been evaluated (F20).
+
+### 2.11 Data quality control
+
+`GET /v1/data-quality` applies tests from the QARTOD real-time quality-control manuals (US IOOS): a gross-range test (rainfall 0–500 mm/day; soil moisture 0–0.9 m³/m³; water level −50–500 m) and a freshness test (altimetry 35 days + 2 days processing; SMAP 72 h), for the Open-Meteo forecast (Accra Central), the Tamale river level, the Lake Volta level and SMAP soil moisture. Flat-line and spike tests are implemented (`src/data_quality/quality_checks.py`) but not applied, and IMERG, GloFAS and Sentinel-1 are not checked (F16). `GET /v1/health/data-sources` reports whether each source is configured; it does not test that a configured key still works, so DAHITI shows "configured" while every call fails (F3).
+
+### 2.12 Verification and archives
+
+- **Rule validation** (`src/models/rare_event_verification.py`, `historical_backtest.py`; `GET /v1/verification`, `/v1/backtest`): the rule scored on 36.7 years of CHIRPS rainfall at each district, and its behaviour before 8 documented floods (2007–2023, `src/hydrology/flood_polygons.py`). These are descriptive checks; the skill of the rule is measured properly in the research framework (M3, sections 5.2–5.4).
+- **Prediction ledger and outcome verifier** (`src/verification/outcome_verifier.py`): 3–30 days after each prediction, four sources are searched for a flood in that district in the following 14 days (ReliefWeb, GDELT news, at least 3 verified citizen reports, a Sentinel-1 detection); any one confirms. The ReliefWeb search matched unrelated reports, so the recorded outcomes are invalid (F1). Even when correct, the design gives a weak verification sample: a prediction every 3 hours with overlapping 14-day windows, and evidence sources that mostly cannot resolve a district (F22).
 """)
 
 # --------------------------------------------------------------- research design
@@ -834,6 +938,93 @@ For the week of 2 November 2026, no district reached WATCH. The highest probabil
 """
 )
 
+# --------------------------------------------------------------- station check
+
+
+def st_rows(res):
+    rows = []
+    for p, name in (("chirps", "CHIRPS v2.0"), ("imerg", "GPM IMERG V07")):
+        d, wk = res["daily"][p], res["weekly"][p]
+        rows.append([
+            name,
+            f(d["pearson_r"], 2),
+            f(d["spearman_r"], 2),
+            f(d["volume_ratio"], 2),
+            f"{f(d['rain_1mm']['pod'], 2)} / {f(d['rain_1mm']['far'], 2)} / {f(d['rain_1mm']['csi'], 2)}",
+            f"{f(d['heavy_20mm']['pod'], 2)} / {f(d['heavy_20mm']['far'], 2)}",
+            f"{f(d['heavy_own_p95']['pod'], 2)} / {f(d['heavy_own_p95']['far'], 2)}",
+            f(wk["pearson_r"], 2),
+            f(res["weekly_anomaly_r"][p], 2),
+            f"{f(wk['wet_week_own_p90']['pod'], 2)} / {f(wk['wet_week_own_p90']['far'], 2)}",
+        ])
+    return rows
+
+
+ST_HEAD = ["Product", "Daily r", "Daily ρ", "Volume ratio (sat ÷ gauge)", "Rain ≥1 mm POD / FAR / CSI",
+           "≥20 mm POD / FAR", "Own 95th pct POD / FAR", "Weekly r", "Weekly anomaly r", "Wettest 10% of weeks POD / FAR"]
+s1, s2 = ST["strict"], ST["i_as_dry"]
+qc = s1["gauge_qc"]
+w(f"""### 5.11 Satellite rainfall against station gauges
+
+**Why.** Every rainfall input in the study (CHIRPS v2.0) and the live platform (GPM IMERG V07 for antecedent rain) is satellite-based. Neither TAHMO nor GMet data were available (section 6), but GMet's synoptic stations are exchanged internationally through the WMO and republished by NOAA in the Global Surface Summary of the Day (GSOD). This checks both products against those gauges.
+
+**Data and method** (`research/flood_experiments/station_check.py`):
+
+- **Gauges:** NOAA GSOD daily precipitation for the {s1['stations_used']} Ghana stations active since 2015, {ST['period']}.
+- **Gauge quality control:** of {qc['station_days_total']:,} station-days, only complete 24-hour totals are used (flags D, F, G: {qc['complete_days']:,} days). Flag I ({qc['flags'].get('I', 0):,} days) means no precipitation report, not a measured zero; A, B, C, E and H are partial-day sums; 99.99 is missing.
+- **Satellite:** the value of the 0.05° CHIRPS cell and the 0.1° IMERG cell containing each station (IMERG daily total = sum of the 48 half-hourly rates × 0.5 h; days with fewer than 48 half-hours dropped).
+- **Day alignment:** a lag test gave correlations of {ST['strict']['lag_test']['0']['imerg']:.2f} (same day) and {ST['strict']['lag_test']['1']['imerg']:.2f} (gauge day matched to the previous satellite day) for IMERG, so the gauge's 24-hour total ends in the morning and gauge day *d* is compared with satellite day *d* − 1.
+- **Weeks:** Monday-to-Sunday totals, only for weeks with all 7 gauge days.
+- **Two gauge definitions:** *strict* (D/F/G only) and *I as dry* (also counting flag I as 0 mm). The stations send the 24-hour group mainly on rainy days (3% of January days have a complete flag, 45% of September days), so strict days are skewed wet and give few complete weeks ({s1['complete_weeks']}); counting I as dry gives {s2['complete_weeks']:,} weeks. On I days both products average about 1.5 mm, against about 4.6 mm on strict 0.0 mm days, so I days are mostly, but not all, dry.
+- **Metrics:** Pearson r and Spearman ρ; volume ratio (satellite total ÷ gauge total); POD, FAR and CSI for rain ≥ 1 mm, for ≥ 20 mm, and for each series' own station-wise 95th percentile of wet days (a detection test that a volume bias cannot distort); for weeks, r, the correlation of anomalies from each station's week-of-year mean, and detection of each series' own wettest 10% of weeks.
+
+**Results: strict gauges** ({s1['paired_days']:,} station-days, {s1['complete_weeks']} complete weeks):
+
+""")
+w(table(ST_HEAD, st_rows(s1)))
+w(f"""
+**Results: flag I counted as dry** ({s2['paired_days']:,} station-days, {s2['complete_weeks']:,} complete weeks):
+
+""")
+w(table(ST_HEAD, st_rows(s2)))
+zone_rows = []
+for z, d in s1["by_zone"].items():
+    wz = s2["by_zone"][z]
+    zone_rows.append([z, d["stations"], f(d["chirps"]["daily_r"], 2), f(d["imerg"]["daily_r"], 2),
+                      f(wz["chirps"]["weekly_r"], 2), f(wz["imerg"]["weekly_r"], 2),
+                      f(d["chirps"]["volume_ratio"], 2), f(d["imerg"]["volume_ratio"], 2)])
+w("""
+**By climate zone** (daily and volume ratio: strict; weekly: I as dry):
+
+""")
+w(table(["Zone", "Stations", "CHIRPS daily r", "IMERG daily r", "CHIRPS weekly r", "IMERG weekly r",
+         "CHIRPS volume ratio", "IMERG volume ratio"], zone_rows))
+name_to = {r["station"]: r for r in s2["by_station"]}
+dist_rows = []
+for dist, stn in ST["district_stations"].items():
+    a = next(r for r in s1["by_station"] if r["station"] == stn)
+    b = name_to[stn]
+    dist_rows.append([dist, stn.title(), a["days"], f(a["chirps_daily_r"], 2), f(a["imerg_daily_r"], 2),
+                      b["weeks"], f(b["chirps_weekly_r"], 2), f(b["imerg_weekly_r"], 2)])
+w("""
+**Stations nearest the tracked districts** (Cape Coast has no synoptic station; Saltpond is 30 km east). Per-station results for all 22 stations: `results/station_check/by_station.csv`.
+
+""")
+w(table(["District", "Station", "Gauge days (strict)", "CHIRPS daily r", "IMERG daily r", "Weeks (I as dry)",
+         "CHIRPS weekly r", "IMERG weekly r"], dist_rows))
+w(f"""
+**Interpretation.**
+
+1. **Daily point agreement is low** for both products (r about {rng(s1['daily']['chirps']['pearson_r'], s1['daily']['imerg']['pearson_r'])}), and heavy-rain days are poorly detected: of gauge days with ≥ 20 mm, CHIRPS also had ≥ 20 mm on {f(s1['daily']['chirps']['heavy_20mm']['pod'] * 100, 0)}% and IMERG on {f(s1['daily']['imerg']['heavy_20mm']['pod'] * 100, 0)}%, with false-alarm ratios of {f(s1['daily']['chirps']['heavy_20mm']['far'], 2)} and {f(s1['daily']['imerg']['heavy_20mm']['far'], 2)}. Part of this is the mismatch between a rain gauge (a point) and a 5–11 km grid cell during convective storms, not satellite error alone.
+2. **Weekly agreement is good** (r {rng(s1['weekly']['chirps']['pearson_r'], s1['weekly']['imerg']['pearson_r'])} strict, {rng(s2['weekly']['chirps']['pearson_r'], s2['weekly']['imerg']['pearson_r'])} with I as dry) and survives removal of the seasonal cycle (anomaly r {rng(s2['weekly_anomaly_r']['chirps'], s2['weekly_anomaly_r']['imerg'])}). This supports the district-week design of the study.
+3. **IMERG matches the gauges at least as well as CHIRPS** on every daily measure, which supports using IMERG for the platform's live antecedent rainfall.
+4. **Volume:** on strict days the satellite totals are close to the gauges (ratio {f(s1['daily']['chirps']['volume_ratio'], 2)} CHIRPS, {f(s1['daily']['imerg']['volume_ratio'], 2)} IMERG). With flag I counted as dry the satellites exceed the gauges by about 40%, which is the upper bound of the bias, since some I days had rain.
+5. **For the live rule:** a daily threshold applied to satellite or model rainfall (the rule's 10 mm review threshold) will miss most heavy local rain and raise many false alarms at the scale of a town.
+
+**Caveats.** CHIRPS blends GTS station reports, which include these stations, so its agreement is partly built in; IMERG Final is adjusted to monthly GPCC gauge totals. Neither comparison is fully independent; IMERG is the closer to it. GSOD ends on 24 Aug 2025 for most stations and has no data for Ada after 2022.
+
+""")
+
 # --------------------------------------------------------------- data, inventory, limits
 w("""## 6. Partner data: availability
 
@@ -842,7 +1033,7 @@ None of these datasets has a public, real-time interface. Each needs a data-shar
 | Dataset | Availability | What connecting it requires | Open substitute used |
 | --- | --- | --- | --- |
 | TAHMO station rainfall (Trans-African Hydro-Meteorological Observatory) | Not obtained | A research data agreement with TAHMO; TAHMO then issues API credentials | CHIRPS v2.0 (training), GPM IMERG V07 (live), ECMWF IFS (forecasts) |
-| Ghana Meteorological Agency (GMet) station records | Not obtained | A data-sharing request to GMet | Same as above. GMet's main synoptic stations (e.g. Accra Kotoka, Tamale) are also exchanged internationally through the WMO and republished by NOAA (Global Surface Summary of the Day). That copy ends on 24 Aug 2025, so it can serve for historical validation but not as a live feed |
+| Ghana Meteorological Agency (GMet) station records | Not obtained | A data-sharing request to GMet | Same as above. GMet's main synoptic stations (e.g. Accra Kotoka, Tamale) are also exchanged internationally through the WMO and republished by NOAA (Global Surface Summary of the Day). That copy ends on 24 Aug 2025, so it serves for historical validation (section 5.11) but not as a live feed |
 | Ghana Hydrological Authority river gauges | Not obtained | A data-sharing agreement with the Ghana Hydrological Authority | GloFAS v4 discharge; DAHITI altimetry |
 | VRA dam data (Akosombo, Kpong) and SONABEL data (Bagre, Kompienga; Burkina Faso) | Not obtained | Data agreements with the Volta River Authority and SONABEL, or through the Volta Basin Authority | DAHITI Lake Volta level and Nakambé river level (Bagre proxy). The dam spillage index is a fixed formula. E2 "+ Dam" not run |
 | Google Flood Hub forecasts | API not issued | Approval for the Google Flood Forecasting API pilot. The platform's client is already implemented and activates once an API key is set | GloFAS v4 discharge |
@@ -863,8 +1054,258 @@ Repository: **github.com/NFCC-Ghana/nfcc-platform** (public).
 | Weekly shadow forecasts | Branch `shadow-log` | GitHub Actions *Weekly Shadow Flood Forecast* |
 | Live platform code | `src/` (API), `hackathon/app/` (dashboard) | – |
 | Documented flood events (8, 2007–2023) | `src/hydrology/flood_polygons.py` | – |
+| Station-rainfall check | `research/flood_experiments/results/station_check/` (`results.json`, `by_station.csv`) | `python -m research.flood_experiments.station_check fetch`, `extract`, `analyse` |
+| Operating record of the deployed platform | `research/flood_experiments/results/operations/snapshot.json` (aggregate counts only) | `python scripts/operations_snapshot.py` (needs the API key) |
+| This report | `docs/MANUSCRIPT_REFERENCE.md` | `python -m research.flood_experiments.reference` |
 
-## 8. Limitations to state in the manuscript
+""")
+
+# --------------------------------------------------------------- operating record
+rq, al, cr, led = OPS["review_queue"], OPS["alerts_sent"], OPS["community_reports"], OPS["prediction_ledger"]
+arc, wf = OPS["observation_archive"], OPS["workflow_runs"]
+
+
+def kv(d):
+    return "; ".join(f"{k or 'in progress'} {v}" for k, v in d.items())
+
+
+def day(x):
+    return (x or "")[:10]
+
+
+BASIS = {
+    "forecast_next_24h": "Next-24 h forecast (Open-Meteo)",
+    "antecedent_3d_accumulation": "3-day antecedent rain via API (CHIRPS, then IMERG)",
+    "antecedent_3d_observed_fallback": "3-day antecedent rain, Open-Meteo fallback",
+    "dam_river_pathway": "River/dam pathway score (DAHITI)",
+}
+arc_rows = [
+    [BASIS.get(k, k), v["rows"], v["with_value"], f"{100 * v['with_value'] / v['rows']:.0f}%" if v["rows"] else "–",
+     day(v["last_with_value"]) or "never"]
+    for k, v in arc.items()
+]
+WF = {
+    "automated_risk_assessment.yml": "3-hourly risk assessment",
+    "verify_predictions.yml": "Outcome verification (daily)",
+    "daily_chirps.yml": "CHIRPS ingestion (daily)",
+    "model_validation.yml": "Rule validation report (monthly)",
+    "weekly_shadow_forecast.yml": "Weekly shadow forecast",
+    "elite-resilience.yml": "Resilience tests (daily and on pull requests)",
+    "ci.yml": "Continuous integration (on push / pull request)",
+}
+wf_rows = [[WF[k], v["runs"], v["scheduled"], kv(v["by_conclusion"]), day(v["created"]["first"]), day(v["created"]["last"])]
+           for k, v in wf.items()]
+w(f"""## 8. Operating record of the deployed platform
+
+Snapshot of the production database and job history taken {OPS['taken_at'][:16].replace('T', ' ')} UTC (`results/operations/snapshot.json`, produced by `scripts/operations_snapshot.py`; aggregate counts only).
+
+**Alert review queue.** {rq['total']} assessments were queued between {day(rq['created']['first'])} and {day(rq['created']['last'])}:
+
+- by signal: {kv({BASIS.get(k, k): v for k, v in rq['by_basis'].items()})};
+- by tier: {kv(rq['by_tier'])};
+- by district: {kv(rq['by_district'])};
+- by CAP status: {kv(rq['by_cap_status'])} (Exercise = training drills);
+- by review status: {kv(rq['by_status'])}. The {rq['by_status'].get('approved', 0)} approvals were made during deployment testing; **{rq['reviewed_by_a_person']} real assessments have been reviewed by an operator**.
+
+No assessment has been queued since {day(rq['created']['last'])}. Rainfall eased, but two defects also suppressed assessments: the river/dam pathway has had no data since 22 September, and the forecast input read under half of the rain (section 9, F2, F3).
+
+**Alerts sent.** {al['records']} send attempts are recorded ({kv(al['by_provider'])}), of which {al['delivered']} was delivered, during testing. **Alert subscribers: {OPS['subscribers']}.**
+
+**Citizen reports.** {cr['total']} reports ({day(cr['created']['first'])}), all from deployment tests; {cr['validated']} validated.
+
+**Prediction ledger.** {led['total']} decision snapshots from {day(led['predicted']['first'])} to {day(led['predicted']['last'])}. Risk tier: {kv(led['by_risk_tier'])}; fused tier: {kv(led['by_fused_tier'])}. Recorded outcomes: {kv(led['by_outcome'])}, by source {kv(led['by_outcome_source'])}. These outcomes are invalid (F1).
+
+**Observation archive** (one row per signal per district per run):
+
+""")
+w(table(["Signal", "Rows", "With a value", "Share", "Last value"], arc_rows))
+w(f"""
+**Risk history:** {OPS['risk_history']['rows']} points, {day(OPS['risk_history']['recorded']['first'])} to {day(OPS['risk_history']['recorded']['last'])}.
+
+**Scheduled and automated jobs** (GitHub Actions, all runs on record):
+
+""")
+w(table(["Job", "Runs", "Scheduled runs", "Outcome", "First", "Last"], wf_rows))
+w("""
+The 3-hourly assessment should run 8 times a day; about 4 a day actually ran, because GitHub delays and drops scheduled runs at busy times. All CHIRPS-ingestion failures date from before 15 September 2026; every run since has succeeded. The most recent resilience-test failures are on automated dependency-update pull requests, not on the main branch.
+""")
+
+# --------------------------------------------------------------- findings register
+FINDINGS = [
+    ("F1", "Verification", "Critical",
+     "The outcome verifier's ReliefWeb search used the default OR operator, so \"Ghana flood <district>\" matched any report containing any one word. 940 of 943 checked predictions were marked \"flood confirmed\" (923 by ReliefWeb alone), in all nine districts, 939 of them LOW-tier.",
+     "Production ledger; live query for Sunyani, 1–14 Oct 2026, returned Somali river-flood advisories and Ghanaian vaccine news",
+     "Fix written and tested (PR #69). After deployment, `scripts/verify_predictions.py --reverify-news` replaces the labels"),
+    ("F2", "Monitoring", "High",
+     "The live rainfall forecast read Open-Meteo's `rain` (large-scale rain only) instead of `precipitation` (rain + convective showers), and counted hours from 00:00 GMT rather than from now. Over 67 days `rain` held 44% of the total at Accra, 36% at Kumasi, 35% at Tamale.",
+     "Open-Meteo API, 60 past + 7 forecast days at three districts",
+     "Fix written and tested (PR #68)"),
+    ("F3", "Monitoring", "High",
+     "The DAHITI API key is rejected (HTTP 403 \"Login failed\") for every request, so the Tamale river level, Lake Volta level and Bagre proxy have returned nothing since 22 Sep 2026. The data-source health check still reports DAHITI \"configured\".",
+     "Production logs; observation archive (21 values, last 21 Sep); direct test of the stored key",
+     "Needs the account owner: a new key from dahiti.dgfi.tum.de, stored in Secret Manager (`dahiti-api-key`)"),
+    ("F4", "Security / privacy", "High",
+     "`GET /v1/community-reports` was public and returned reporters' phone numbers, names and emails (personal data under Ghana's Data Protection Act, 2012, Act 843).",
+     "Unauthenticated production request returned a phone number",
+     "Fix written and tested (PR #70)"),
+    ("F5", "Dissemination", "High",
+     "The dashboard opened every panel on a fixed 75 mm rainfall (score 100, EXTREME) whatever the weather, with no indication that the figures were a scenario.",
+     "`render_control_panel` default; headless render",
+     "Fix written and tested (PR #72)"),
+    ("F6", "Dissemination", "High",
+     "The impact panel treated a real estimate of 0 people exposed (any dry day) as \"API unavailable\" and showed invented figures from `state_fallback.py` (from 10% of the population); `/situation` reported ≥1 power substation affected with nobody exposed.",
+     "`render_impact_panel`; `impact_estimator.estimate_impact`",
+     "Fix written and tested (PR #71)"),
+    ("F7", "Infrastructure / security", "Medium",
+     "The Upstash Redis database no longer exists (hostname does not resolve), so rate limits and alert cooldowns are kept per worker in memory (4 workers). `REDIS_URL`, which contains the password, is a plain Cloud Run environment value rather than a Secret Manager reference.",
+     "`/health` (redis available: false); connection test",
+     "Needs the account owner: new Redis database; URL into Secret Manager"),
+    ("F8", "Dissemination", "Medium",
+     "The review queue has no de-duplication or expiry: each run can queue three entries per district (one per signal), and entries stay pending indefinitely (56 pending, the oldest from 19 Sep).",
+     "`pending_alerts`; `alert_review.assess_district`",
+     "Open"),
+    ("F9", "Forecasting", "Medium",
+     "River/dam WARNING (above the 75th percentile of a water body's own record, a normal wet-season level) scores 45, above the review threshold, so it queues a MODERATE alert.",
+     "`fluvial_pathway.ALTIMETRY_STATUS_RISK`; 11 queued river/dam alerts",
+     "Open: bands need calibration against flood dates"),
+    ("F10", "Forecasting", "Medium",
+     "The urban drainage multiplier is applied only by `/situation`; other routes score the same rain without it, so Accra scores differ between the dashboard and the alert queue. The drainage values have no cited source.",
+     "Call sites of `calculate_score`",
+     "Open"),
+    ("F11", "Monitoring", "Medium",
+     "Until 30 Oct 2026 the primary antecedent source (CHIRPS) was 18–30 days out of date, so all antecedent assessments used Open-Meteo's past-72-hour values, which are model output rather than observations.",
+     "Job logs; observation archive (0 values from the primary source)",
+     "Resolved by GPM IMERG (deployed 30 Oct); monitor"),
+    ("F12", "Infrastructure", "Medium",
+     "GitHub Actions ran about half of the scheduled 3-hourly assessments, and 26% of the forecast fetches from the job failed (760 of 1,027 rows have a value).",
+     "Workflow history; observation archive",
+     "Open: move the schedule to Cloud Scheduler; add retries"),
+    ("F13", "Infrastructure", "Medium",
+     "Cloud Run allocates CPU only during requests, so Litestream's background replication can stall between requests; writes made just before an instance is replaced can be lost.",
+     "Cloud Run service configuration",
+     "Owner decision: always-allocated CPU (small cost increase)"),
+    ("F14", "Security", "Low",
+     "If `API_KEY` is unset, the key check accepts every request (fails open). Production sets it.",
+     "`src/api/auth.py`",
+     "Open: fail closed in production"),
+    ("F15", "Security", "Low",
+     "Rate limits cover only `/situation` and the copilot; public operations that run the full evidence pipeline (decision, evidence, `/score/batch`) are unlimited.",
+     "OpenAPI inventory; `@limiter.limit` call sites",
+     "Open"),
+    ("F16", "Monitoring", "Low",
+     "QARTOD flat-line and spike tests are implemented but not applied; IMERG, GloFAS and Sentinel-1 have no quality checks; the forecast is checked for one district only.",
+     "`/v1/data-quality`",
+     "Open"),
+    ("F17", "Monitoring", "Low",
+     "The daily CHIRPS ingestion job saves an Accra-box file as a build artifact that nothing reads.",
+     "`scripts/daily_chirps_pull.py`",
+     "Open: remove or connect"),
+    ("F18", "Forecasting", "Medium",
+     "`/api/dam/spillage` returns a fixed result from default inputs, and its \"validation\" uses three spill events with unmeasured input values and no non-spill cases (\"100% accuracy\").",
+     "`src/api/dam_router.py`, `src/models/dam_spillage.py`",
+     "Must not be cited; remove or label as illustrative"),
+    ("F19", "Risk knowledge", "Medium",
+     "Exposure is a score-proportional heuristic (population × S/100 × 0.6); facility counts and vulnerable-group shares are project estimates; Accra populations are project estimates; the estimator's own tier cut-offs (20/40/60/80) differ from the platform's (30/50/70/85).",
+     "`src/exposure/impact_estimator.py`",
+     "Open: overlay a hazard map on WorldPop / census data"),
+    ("F20", "Preparedness", "Low",
+     "The copilot uses an unpinned model alias (`gemini-flash-lite-latest`), so its behaviour can change without a code change, and its answers have not been evaluated for accuracy or grounding.",
+     "`src/copilot/engine.py`",
+     "Open: pin a version; build a question set with expected answers"),
+    ("F21", "Forecasting", "Medium",
+     "The live rule's review threshold (S ≥ 30, i.e. 10 mm in 24 h) is crossed by ordinary wet-season rain, and the rule has little skill at district-week scale (section 5.2) and almost none on real forecasts (section 5.4).",
+     "Research results M3",
+     "Open: the shadow model M12 is the candidate replacement"),
+    ("F22", "Verification", "Medium",
+     "Even with correct searches, the ledger is a weak verification sample: a prediction every 3 hours with overlapping 14-day windows, and evidence sources that rarely resolve a district.",
+     "`outcome_verifier.py` design",
+     "Open: verify weekly forecasts against NADMO records or Sentinel-1"),
+    ("F23", "Documentation", "Low",
+     "`/v1/health/data-sources` still says unavailable sources fall back to \"simulated\" readings; the code no longer simulates any value.",
+     "`src/api/v1/health.py`",
+     "Open"),
+]
+SEV = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+w("""## 9. Critical review: findings register
+
+Severity: **Critical**, makes a reported result wrong; **High**, a live output is wrong or personal data is exposed; **Medium**, weakens validity or reliability; **Low**, hygiene. "Fix written and tested" means the change is in an open pull request with passing tests and is not yet deployed.
+
+""")
+w(table(["ID", "Area", "Severity", "Finding", "Evidence", "Status"],
+        [list(x) for x in sorted(FINDINGS, key=lambda x: SEV[x[2]])]))
+w("""
+**Strengths found by the review.** Every data adapter reports "unavailable" with a reason instead of inventing a value; no alert can be sent without a person approving it, and exercise alerts are separated from the sending code; alerts follow CAP 1.2; webhooks are signature-checked; secrets are in Secret Manager (except F7); the test suite (623 tests, coverage gate 80%) blocks merges; and the research framework is reproducible end to end from open data with time-separated validation.
+""")
+
+# --------------------------------------------------------------- checklists
+w("""## 10. Reporting-guideline map
+
+### 10.1 WMO/UNDRR Multi-Hazard Early Warning Systems: the four pillars
+
+| Pillar | What the system has | Main gaps |
+| --- | --- | --- |
+| 1. Disaster risk knowledge | District registry with census populations (9 districts); 8 documented historical floods; flood labels for 216 districts 2015–2025 (news-derived, radar-audited); built-up share, terrain and river-network features; named communities and candidate shelters | No flood-hazard or inundation map; exposure is a heuristic (F19); Accra sub-districts are not official units; no vulnerability data beyond planning shares |
+| 2. Detection, monitoring, analysis and forecasting | Rainfall forecast, IMERG antecedent rain, GloFAS discharge, SMAP soil moisture, Sentinel-1 change detection, DAHITI water levels; rule-based score with multi-pathway fusion; research models with real-forecast hindcasts; weekly shadow forecast | No gauge, dam-operator or station data (section 6); DAHITI down (F3); forecast input defect (F2); rule has low skill (F21) |
+| 3. Warning dissemination and communication | Human-approved alerts on WhatsApp and Telegram; CAP 1.2; tier-specific messages and response guidance; affected-community names; opt-in by chat; public kiosk view | No subscribers or institutional recipients yet; no SMS at scale; local-language messages not reviewed; queue not de-duplicated (F8) |
+| 4. Preparedness and response capabilities | Exercise (drill) alerts; decision card with recommended action; copilot over platform data; candidate shelters (OpenStreetMap) | No standard operating procedures or agreed roles with NADMO; no drills held with responders; copilot not evaluated (F20) |
+
+### 10.2 TRIPOD+AI (Collins et al. 2024) for the forecasting models
+
+TRIPOD+AI was written for clinical prediction models; "participants" here are district-weeks and "outcome" is flood onset. Status: **Reported** (in this document), **Partly**, **Gap** (the manuscript must add it), **Team** (information only the authors can give).
+
+| Item | Topic | Where / status |
+| --- | --- | --- |
+| 1 | Title: development and evaluation, population, outcome | Team (suggested: development and evaluation of weekly flood-onset prediction for Ghana's districts) |
+| 2 | Abstract (TRIPOD+AI for Abstracts) | Team |
+| 3a | Context and rationale; existing models | Partly: sections 1, 4.1 (GloFAS-style river benchmark M4); the manuscript needs a literature review of African flood early warning |
+| 3b | Target population, intended use and users | Reported: section 1, 2.5, 5.10 (district emergency operators; shadow use) |
+| 3c | Known inequalities between groups | Gap: urban/rural and north/south differences in label coverage (section 11, item 1) should be discussed as inequality |
+| 4 | Objectives: development and/or validation | Reported: sections 3.1, 4.4 |
+| 5a | Data sources for development and evaluation; representativeness | Reported: sections 3.2, 3.3, 5.1, 5.11 |
+| 5b | Dates of data | Reported: sections 3.1, 5.1 |
+| 6a | Setting; number and location of centres | Reported: 216 districts, 10 regions (sections 3.1, 5.1) |
+| 6b | Eligibility criteria | Reported: all GAUL 2015 districts, all weeks (section 3.1) |
+| 6c | Treatments (here: interventions such as dam releases) | Partly: dam operations not observed (section 6) |
+| 7 | Data pre-processing and quality checking | Reported: sections 3.3, 3.4, 5.8, 5.11 |
+| 8a | Outcome definition, time horizon, how assessed | Reported: sections 3.2, terms (onset, district-week) |
+| 8b | Qualifications of outcome assessors | Partly: Groundsource events are extracted from news automatically (Mayo et al. 2026); state this |
+| 8c | Blinding of outcome assessment | Gap: state that labels were assigned independently of predictors (news vs satellite) |
+| 9a | Choice of predictors | Reported: sections 3.3, 3.4 |
+| 9b | Definition and timing of all predictors | Reported: section 3.4; forecast-mode inputs, section 5.4 |
+| 9c | Subjective predictor assessment | Not applicable (all predictors are instrumental) |
+| 10 | Sample size justification | Gap: report the number of onsets per model parameter / events per fold (898 onsets, section 5.1) |
+| 11 | Missing data | Partly: degradation experiment E6 (section 5.6); state missing-data handling per source |
+| 12a | Data use and partitioning | Reported: section 4.2 (forward-chaining years; leave-region-out separated in time) |
+| 12b | Predictor handling (transformations) | Reported: section 3.4 (local-climate percentiles, monotone constraints) |
+| 12c | Model type, building steps, tuning, internal validation | Reported: sections 4.1, 4.2 |
+| 12d | Heterogeneity across clusters | Reported: E4 regional transfer (section 5.6) |
+| 12e | Performance measures and model comparison | Reported: section 4.3 |
+| 12f | Model updating (recalibration) | Reported: Platt calibration of M12 (section 5.7, 5.10) |
+| 12g | How predictions were calculated | Reported: code and model file (section 7) |
+| 13 | Class imbalance methods | Partly: state that no resampling was used and metrics were chosen for rare events (PR-AUC, SEDI) |
+| 14 | Fairness | Gap: report performance by region and urban/rural class |
+| 15 | Model output and thresholds | Reported: probabilities; WATCH ≥ 5%, WARNING ≥ 20% (section 5.10) |
+| 16 | Differences between development and evaluation data | Reported: v1 vs v2 labels (section 5.9); real vs perfect forecasts (5.4) |
+| 17 | Ethical approval | Team: no human participants; public data only; state the waiver or that approval was not required |
+| 18a–f | Funding; conflicts of interest; protocol; registration; data sharing; code sharing | Team for 18a–d; 18e–f reported (section 7) |
+| 19 | Patient and public involvement (here: stakeholder involvement) | Team: NADMO or community engagement, or state none |
+| 20a | Flow of units and events | Reported: section 5.1 |
+| 20b | Characteristics of the data | Reported: section 5.1 |
+| 20c | Evaluation vs development distributions | Partly: test-period base rate vs training (section 5.1); add predictor distributions |
+| 21 | Numbers of units and events in each analysis | Reported: section 5.1, per-experiment tables |
+| 22 | Full model specification | Reported: `model/model.json`, model card (section 7) |
+| 23a | Performance with confidence intervals | Reported: bootstrap 90% intervals (sections 5.2–5.9) |
+| 23b | Heterogeneity in performance across clusters | Reported: E4 (section 5.6) |
+| 24 | Results of model updating | Reported: calibration before and after Platt scaling (section 5.7) |
+| 25 | Interpretation, including fairness | Team, drawing on sections 1, 5.3, 11 |
+| 26 | Limitations | Reported: section 11 |
+| 27a | Handling poor or unavailable inputs in use | Reported: E6 degradation; platform "unavailable" behaviour (sections 5.6, 2.11) |
+| 27b | User interaction and expertise needed | Reported: human review of every alert (sections 2.5, 2.10) |
+| 27c | Next steps | Team, drawing on sections 6 and 9 |
+""")
+
+
+w("""## 11. Limitations to state in the manuscript
 
 1. **Label completeness and bias.**
    - News-derived labels follow media coverage: urban districts and recent years are over-represented (Groundsource has 124 Ghana events in 2015 and 338 in 2022).
@@ -876,24 +1317,33 @@ Repository: **github.com/NFCC-Ghana/nfcc-platform** (public).
 5. **Boundaries.** FAO GAUL 2015 (216 districts). Ghana has had 261 districts since 2018.
 6. **Missing drivers.** Dam releases, station rainfall and river gauges are unavailable (section 6).
 7. **Rare events.** 898 onsets (v2) and 203 (v1). Intervals are wide, especially for single years and the E3c two-year test.
-8. **Expert-set parts of the live platform.** The live platform's fusion weights, the drainage factors and the dam formula are expert-set, not validated.
+8. **Expert-set parts of the live platform.** The live platform's fusion weights, the drainage factors, the river/dam percentile bands and the dam formula are expert-set, not validated.
+9. **Rainfall at the scale of a town.** Satellite rainfall agrees with station gauges week by week but poorly day by day, and detects under a third of heavy-rain gauge days (section 5.11).
+10. **No operational record.** The platform has not yet been used by operators or the public (section 8); no claim about warning delivery, response or impact can be made.
+11. **Verification of live predictions.** The live prediction log has no valid outcomes (section 9, F1); live skill can only be claimed from the research hindcasts.
 
-## 9. Results that must not be cited
+## 12. Results that must not be cited
 
 - **R² = 0.993 for the early Accra XGBoost regressor** (notebook `04_flood_risk_model.ipynb`). Its target was a formula built from its own inputs, so the figure is circular; that model is not part of the system.
 - **"100% accuracy" of the dam spillage formula.** It rests on 3 spill events and no non-spill cases.
-- **Outcome labels in the live prediction log.** The ReliefWeb keyword search matches national reports to every district.
+- **Outcome labels in the live prediction log** (any hit rate or calibration figure computed from them). The ReliefWeb search matched unrelated reports and marked 940 of 943 checked predictions "flood confirmed" (section 9, F1).
+- **Dam spillage "validation"** (`/api/dam/spillage/validate`): three spill events with input values that were not measured, and no non-spill cases.
+- **Exposure counts** (people, schools, hospitals exposed) as modelled exposure: they are a fixed share of population scaled by the risk score (section 2.10).
+- **Any statement that alerts have reached the public** or that the system has been used in a flood response (section 8).
 - **Any skill figure for the NFCC rule (M3) other than those in sections 5.2, 5.4 and 5.9.**
 
-## 10. References
+## 13. References
 
 - Alfieri, L. et al. (2013). GloFAS – global ensemble streamflow forecasting and flood early warning. *Hydrology and Earth System Sciences* 17, 1161–1175. doi:10.5194/hess-17-1161-2013
 - Breiman, L. (2001). Random forests. *Machine Learning* 45, 5–32. doi:10.1023/A:1010933404324
 - Brier, G. W. (1950). Verification of forecasts expressed in terms of probability. *Monthly Weather Review* 78, 1–3.
 - Chen, T. & Guestrin, C. (2016). XGBoost: a scalable tree boosting system. *Proc. KDD '16*, 785–794. doi:10.1145/2939672.2939785
 - Cox, D. R. (1958). The regression analysis of binary sequences. *Journal of the Royal Statistical Society B* 20, 215–242.
+- Collins, G. S. et al. (2024). TRIPOD+AI statement: updated guidance for reporting clinical prediction models that use regression or machine learning methods. *BMJ* 385, e078378. doi:10.1136/bmj-2023-078378
 - Efron, B. & Tibshirani, R. J. (1993). *An Introduction to the Bootstrap*. Chapman & Hall.
 - FAO (2015). Global Administrative Unit Layers (GAUL) 2015. Food and Agriculture Organization of the United Nations.
+- Funk, C. et al. (2015). The climate hazards infrared precipitation with stations – a new environmental record for monitoring extremes. *Scientific Data* 2, 150066. doi:10.1038/sdata.2015.66
+- Gebru, T. et al. (2021). Datasheets for datasets. *Communications of the ACM* 64(12), 86–92. doi:10.1145/3458723
 - Farr, T. G. et al. (2007). The Shuttle Radar Topography Mission. *Reviews of Geophysics* 45, RG2004. doi:10.1029/2005RG000183
 - Ferro, C. A. T. & Stephenson, D. B. (2011). Extremal dependence indices: improved verification measures for deterministic forecasts of rare binary events. *Weather and Forecasting* 26, 699–713. doi:10.1175/WAF-D-10-05030.1
 - Funk, C. et al. (2015). The climate hazards infrared precipitation with stations – a new environmental record for monitoring extremes. *Scientific Data* 2, 150066. doi:10.1038/sdata.2015.66
@@ -902,12 +1352,14 @@ Repository: **github.com/NFCC-Ghana/nfcc-platform** (public).
 - Huffman, G. J. et al. (2023). GPM IMERG Final Precipitation L3 Half Hourly 0.1 degree x 0.1 degree V07. NASA GES DISC. doi:10.5067/GPM/IMERG/3B-HH/07
 - Lundberg, S. M. & Lee, S.-I. (2017). A unified approach to interpreting model predictions. *Advances in Neural Information Processing Systems* 30, 4765–4774.
 - Lundberg, S. M. et al. (2020). From local explanations to global understanding with explainable AI for trees. *Nature Machine Intelligence* 2, 56–67. doi:10.1038/s42256-019-0138-9
+- Lott, J. N. (1998). The quality control of the integrated surface hourly database. NOAA National Climatic Data Center. (GSOD is derived from this database; data: NOAA NCEI Global Surface Summary of the Day, https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ncdc:C00516)
 - Mayo, R. et al. (2026). Groundsource: a dataset of flood events from news. EarthArXiv preprint. Data: doi:10.5281/zenodo.18647054
 - Mitchell, M. et al. (2019). Model cards for model reporting. *Proc. FAT* '19*, 220–229. doi:10.1145/3287560.3287596
 - Muñoz-Sabater, J. et al. (2021). ERA5-Land: a state-of-the-art global reanalysis dataset for land applications. *Earth System Science Data* 13, 4349–4383. doi:10.5194/essd-13-4349-2021
 - Murphy, A. H. (1977). The value of climatological, categorical and probabilistic forecasts in the cost-loss ratio situation. *Monthly Weather Review* 105, 803–816.
 - Naeini, M. P., Cooper, G. & Hauskrecht, M. (2015). Obtaining well calibrated probabilities using Bayesian binning. *Proc. AAAI '15*, 2901–2907.
 - OASIS (2010). Common Alerting Protocol Version 1.2. OASIS Standard.
+- U.S. IOOS (2020). Manual for real-time quality control of in-situ surface wave data and related QARTOD manuals. U.S. Integrated Ocean Observing System, NOAA.
 - Pearl, J. (1988). *Probabilistic Reasoning in Intelligent Systems*. Morgan Kaufmann.
 - Pedregosa, F. et al. (2011). Scikit-learn: machine learning in Python. *Journal of Machine Learning Research* 12, 2825–2830.
 - Pekel, J.-F. et al. (2016). High-resolution mapping of global surface water and its long-term changes. *Nature* 540, 418–422. doi:10.1038/nature20584
@@ -921,6 +1373,8 @@ Repository: **github.com/NFCC-Ghana/nfcc-platform** (public).
 - Tellman, B. et al. (2021). Satellite imaging reveals increased proportion of population exposed to floods. *Nature* 596, 80–86. doi:10.1038/s41586-021-03695-w
 - Torres, R. et al. (2012). GMES Sentinel-1 mission. *Remote Sensing of Environment* 120, 9–24. doi:10.1016/j.rse.2011.05.028
 - UN-SPIDER (2019). Recommended Practice: Flood mapping and damage assessment using Sentinel-1 SAR data in Google Earth Engine. United Nations Office for Outer Space Affairs.
+- WMO (2018). Multi-hazard early warning systems: a checklist. Outcome of the first Multi-hazard Early Warning Conference, Cancún, Mexico, 22–23 May 2017. World Meteorological Organization.
+- WMO (2022). Early Warnings for All: the UN Global Early Warning Initiative for the Implementation of Climate Adaptation. Executive Action Plan 2023–2027. World Meteorological Organization.
 - Wilks, D. S. (2011). *Statistical Methods in the Atmospheric Sciences*, 3rd ed. Academic Press.
 - Yamazaki, D. et al. (2019). MERIT Hydro: a high-resolution global hydrography map based on latest topography dataset. *Water Resources Research* 55, 5053–5073. doi:10.1029/2019WR024873
 - Zadrozny, B. & Elkan, C. (2002). Transforming classifier scores into accurate multiclass probability estimates. *Proc. KDD '02*, 694–699. doi:10.1145/775047.775151
