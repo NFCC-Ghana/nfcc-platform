@@ -303,24 +303,28 @@ class TestLocalClimate:
 
 
 class TestShadowRunResilience:
-    """The first scheduled shadow run crashed on one GloFAS timeout."""
+    """The first scheduled shadow runs crashed on one GloFAS timeout, then
+    ran out of time making 432 single-district requests."""
 
     def test_discharge_timeout_becomes_missing_not_a_crash(self, monkeypatch):
+        from datetime import date
+
         import requests
 
         from research.flood_experiments import operational as ops
 
         monkeypatch.setattr(ops.time, "sleep", lambda s: None)
-        monkeypatch.setattr(
-            ops.requests,
-            "get",
-            lambda *a, **k: (_ for _ in ()).throw(requests.ReadTimeout()),
-        )
-        from datetime import date
 
-        assert math.isnan(ops._discharge_lag1(6.0, 0.6, date(2026, 11, 2)))
+        def down(*a, **k):
+            raise requests.ReadTimeout()
+
+        monkeypatch.setattr(ops.requests, "get", down)
+        out = ops._discharge_lag1s([6.0, 9.4], [0.6, -0.84], date(2026, 11, 2))
+        assert len(out) == 2 and all(math.isnan(v) for v in out)
 
     def test_retries_recover_from_a_temporary_failure(self, monkeypatch):
+        from datetime import date
+
         import requests
 
         from research.flood_experiments import operational as ops
@@ -332,7 +336,10 @@ class TestShadowRunResilience:
             status_code = 200
 
             def json(self):
-                return {"daily": {"river_discharge": [1.0, 5.0, None]}}
+                return [
+                    {"daily": {"river_discharge": [1.0, 5.0, None]}},
+                    {"daily": {"river_discharge": [2.0]}},
+                ]
 
         def flaky(*a, **k):
             calls.append(1)
@@ -341,7 +348,31 @@ class TestShadowRunResilience:
             return _Ok()
 
         monkeypatch.setattr(ops.requests, "get", flaky)
-        from datetime import date
-
-        assert ops._discharge_lag1(6.0, 0.6, date(2026, 11, 2)) == 5.0
+        out = ops._discharge_lag1s([6.0, 9.4], [0.6, -0.84], date(2026, 11, 2))
+        assert out == [5.0, 2.0]
         assert len(calls) == 3
+
+    def test_points_are_batched_and_answers_kept_in_order(self, monkeypatch):
+        from research.flood_experiments import operational as ops
+
+        monkeypatch.setattr(ops, "BATCH", 2)
+        seen = []
+
+        def fake_get(url, params, **k):
+            lats = params["latitude"].split(",")
+            seen.append(len(lats))
+            return [{"lat": float(v)} for v in lats]
+
+        monkeypatch.setattr(ops, "_get_json", fake_get)
+        out = ops._batched("u", {}, [1.0, 2.0, 3.0, 4.0, 5.0], [0.0] * 5)
+        assert seen == [2, 2, 1]  # 5 points, 3 requests
+        assert [o["lat"] for o in out] == [1.0, 2.0, 3.0, 4.0, 5.0]
+
+    def test_failed_batch_marks_only_its_points_missing(self, monkeypatch):
+        from research.flood_experiments import operational as ops
+
+        monkeypatch.setattr(ops, "BATCH", 2)
+        replies = iter([[{"x": 1}, {"x": 2}], None])
+        monkeypatch.setattr(ops, "_get_json", lambda *a, **k: next(replies))
+        out = ops._batched("u", {}, [1.0, 2.0, 3.0], [0.0] * 3)
+        assert out == [{"x": 1}, {"x": 2}, None]
