@@ -71,5 +71,25 @@ def test_search_sends_full_iso_datetimes_to_reliefweb():
         search_flood_reports("Tamale", "2026-01-01", "2026-01-15")
 
     sent_params = mock_get.call_args.kwargs["params"]
-    assert sent_params["filter[value][from]"] == "2026-01-01T00:00:00+00:00"
-    assert sent_params["filter[value][to]"] == "2026-01-15T23:59:59+00:00"
+    assert sent_params["filter[conditions][1][value][from]"] == "2026-01-01T00:00:00+00:00"
+    assert sent_params["filter[conditions][1][value][to]"] == "2026-01-15T23:59:59+00:00"
+
+
+def test_query_requires_every_term_and_the_ghana_tag():
+    """ReliefWeb's query operator defaults to OR, which once matched any
+    report containing "Ghana", "flood" or the district name and marked
+    nearly every prediction flood_confirmed."""
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.return_value = None
+    mock_resp.json.return_value = {"data": []}
+    with patch.dict("os.environ", {"RELIEFWEB_APPNAME": "approved-app"}), patch(
+        "requests.get", return_value=mock_resp
+    ) as mock_get:
+        search_flood_reports("Accra West", "2026-01-01", "2026-01-15")
+    params = mock_get.call_args.kwargs["params"]
+    assert params["query[operator]"] == "AND"
+    assert params["query[value]"] == 'flood* AND "Accra"'
+    assert params["filter[operator]"] == "AND"
+    assert params["filter[conditions][0][field]"] == "country.iso3"
+    assert params["filter[conditions][0][value]"] == "gha"
+    assert params["filter[conditions][1][field]"] == "date.created"

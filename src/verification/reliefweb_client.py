@@ -37,6 +37,8 @@ from typing import Dict, List
 
 import requests
 
+from src.verification.place_names import search_place
+
 logger = logging.getLogger("nfcc.verification.reliefweb")
 
 
@@ -56,13 +58,25 @@ _BASE_URL = "https://api.reliefweb.int/v2/reports"
 
 
 def search_flood_reports(district: str, start_date: str, end_date: str) -> Dict:
-    """Real ReliefWeb reports mentioning Ghana + flood, filtered to a
-    real date window - used to check whether a documented humanitarian
-    report corroborates a past prediction for this district. district
-    is included in the free-text query (ReliefWeb's editorial tagging
-    is at country/region level, not Ghana-district level, so an exact
-    district-field filter isn't available - the query text is the best
-    real precision achievable)."""
+    """Real ReliefWeb reports tagged Ghana that mention a flood and this
+    district's place name, filtered to a real date window - used to check
+    whether a documented humanitarian report corroborates a past
+    prediction for this district. ReliefWeb's editorial tagging is at
+    country level, not Ghana-district level, so the place name has to be
+    matched in the text.
+
+    ReliefWeb's query operator defaults to OR: the previous free-text
+    query "Ghana flood <district>" matched any report containing any one
+    of those words (Somali river-flood advisories, Ghanaian health news)
+    and marked almost every prediction "flood_confirmed". The query now
+    requires every term (operator AND), quotes the place name, and
+    filters on the Ghana country tag. `flood*` because the search does
+    not stem ("flood" misses "Floods").
+
+    Tested against known events: the search effectively matches titles,
+    and Ghana flood reports are titled at country or region level
+    ("Ghana - Floods Situation Report, 8 June 2015"), so this rarely
+    confirms a district - high precision, very low recall."""
     appname = os.getenv("RELIEFWEB_APPNAME")
     if not appname:
         return {
@@ -79,10 +93,16 @@ def search_flood_reports(district: str, start_date: str, end_date: str) -> Dict:
             _BASE_URL,
             params={
                 "appname": appname,
-                "query[value]": f"Ghana flood {district}",
-                "filter[field]": "date.created",
-                "filter[value][from]": _to_iso_datetime(start_date),
-                "filter[value][to]": _to_iso_datetime(end_date, end_of_day=True),
+                "query[value]": f'flood* AND "{search_place(district)}"',
+                "query[operator]": "AND",
+                "filter[operator]": "AND",
+                "filter[conditions][0][field]": "country.iso3",
+                "filter[conditions][0][value]": "gha",
+                "filter[conditions][1][field]": "date.created",
+                "filter[conditions][1][value][from]": _to_iso_datetime(start_date),
+                "filter[conditions][1][value][to]": _to_iso_datetime(
+                    end_date, end_of_day=True
+                ),
                 "limit": 10,
             },
             timeout=20,

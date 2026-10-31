@@ -69,17 +69,39 @@ def _age_days(predicted_at: str, now: datetime) -> float:
     return (now - predicted_dt).total_seconds() / 86400.0
 
 
-def run(api_url: str) -> int:
+def _news_confirmed(api_url: str) -> list:
+    """Predictions marked flood_confirmed by ReliefWeb or GDELT. Before the
+    ReliefWeb query required every term (src/verification/
+    reliefweb_client.py), it matched almost any report, so these labels
+    are re-checked with --reverify-news rather than trusted."""
+    resp = requests.get(
+        f"{api_url}/v1/predictions",
+        params={"outcome": "flood_confirmed", "limit": 100000},
+        timeout=60,
+        headers=_auth_headers(),
+    )
+    resp.raise_for_status()
+    return [
+        p
+        for p in resp.json().get("predictions", [])
+        if any(s in (p.get("outcome_source") or "") for s in ("ReliefWeb", "GDELT"))
+    ]
+
+
+def run(api_url: str, reverify_news: bool = False) -> int:
     try:
-        resp = requests.get(
-            f"{api_url}/v1/predictions",
-            params={"outcome": "__pending__", "limit": 500},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        pending = resp.json().get("predictions", [])
+        if reverify_news:
+            pending = _news_confirmed(api_url)
+        else:
+            resp = requests.get(
+                f"{api_url}/v1/predictions",
+                params={"outcome": "__pending__", "limit": 500},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            pending = resp.json().get("predictions", [])
     except Exception as e:
-        logger.error(f"Failed to fetch pending predictions: {e}")
+        logger.error(f"Failed to fetch predictions: {e}")
         return 1
 
     now = datetime.now(timezone.utc)
@@ -90,7 +112,7 @@ def run(api_url: str) -> int:
 
     for prediction in pending:
         age = _age_days(prediction["predicted_at"], now)
-        if age < _MIN_AGE_DAYS or age > _MAX_AGE_DAYS:
+        if not reverify_news and (age < _MIN_AGE_DAYS or age > _MAX_AGE_DAYS):
             skipped += 1
             continue
 
@@ -132,8 +154,13 @@ def run(api_url: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--api-url", default=DEFAULT_API_URL)
+    parser.add_argument(
+        "--reverify-news",
+        action="store_true",
+        help="Re-check every prediction confirmed by ReliefWeb or GDELT, at any age.",
+    )
     args = parser.parse_args()
-    return run(args.api_url)
+    return run(args.api_url, reverify_news=args.reverify_news)
 
 
 if __name__ == "__main__":
