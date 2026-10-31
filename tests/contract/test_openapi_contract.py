@@ -75,7 +75,8 @@ PROTECTED_ROUTES = [
     ("GET", "/v1/alert-subscriptions", None),
     # AI Copilot
     ("POST", "/v1/copilot/ask", {"question": "ping"}),
-    # Community report triage
+    # Community reports (list carries reporter phone/name/email) and triage
+    ("GET", "/v1/community-reports", None),
     ("POST", "/v1/community-reports/RPT_does_not_exist/validate", {"confidence": 0.9}),
 ]
 
