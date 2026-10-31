@@ -287,7 +287,7 @@ async def _build_situation_response(body: SituationRequest) -> dict:
     # Real Sentinel-1 SAR satellite flood detection (Google Earth
     # Engine, via src/hydrology/sentinel_processor.py) when reachable;
     # satellite["source"] says "Sentinel-1 SAR" for a real detection
-    # or "Sentinel-1 (simulated)"/"(unavailable)" otherwise - always
+    # or "Sentinel-1 (unavailable)" otherwise - always
     # check this field before treating the numbers as real. Falls back
     # to an explicit "(unavailable)" dict, matching sentinel_processor's
     # own honest-failure shape, if the try/except above caught an error.

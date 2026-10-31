@@ -67,3 +67,43 @@ def test_confidence_symmetric_around_threshold():
     # band (margin=-1), the same distance 2x threshold is above it
     # (margin=+1) - both should land at the same confidence.
     assert above == pytest.approx(below)
+
+
+def test_no_earth_engine_reports_unavailable_never_random():
+    """Without a real Sentinel-1 reading the module used to return random
+    flood areas (labelled "simulated") that the dashboard displayed. It
+    must report "unavailable" with no detection and no area instead."""
+    from src.hydrology.sentinel_processor import SentinelProcessor
+
+    proc = SentinelProcessor.__new__(SentinelProcessor)
+    proc.ee_initialized = False
+    proc.districts = {}
+    first = proc.detect_flood("Accra Central")
+    second = proc.detect_flood("Accra Central")
+    assert first == second  # deterministic, nothing invented
+    assert first["source"] == "Sentinel-1 (unavailable)"
+    assert first["water_detected"] is False
+    assert first["flood_extent_km2"] is None
+    assert first["confidence"] == 0
+    assert first["reason"] == "Earth Engine unavailable"
+
+
+def test_unavailable_reading_never_counts_as_satellite_evidence(api_client):
+    """The decision card only counts a real "Sentinel-1 SAR" detection."""
+    from unittest.mock import patch
+
+    from src.hydrology.sentinel_processor import sentinel_processor
+
+    with patch.object(
+        sentinel_processor,
+        "detect_flood",
+        return_value=sentinel_processor._unavailable("Tamale", "test"),
+    ):
+        resp = api_client.post(
+            "/decision/card", json={"location": "Tamale", "precipitation": 5}
+        )
+    assert resp.status_code == 200
+    assert not any(
+        e.get("field") == "satellite_water_detected" and e.get("value") is True
+        for e in resp.json().get("evidence", [])
+    )
