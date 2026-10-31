@@ -58,7 +58,14 @@ class ValidateReportRequest(BaseModel):
     )
 
 
-@router.get("", response_model=CommunityReportListResponse)
+# Keyed: each report carries the reporter's phone number, name and email
+# (personal data under Ghana's Data Protection Act, 2012 (Act 843)), the
+# same reason GET /v1/alert-subscriptions is keyed.
+@router.get(
+    "",
+    response_model=CommunityReportListResponse,
+    dependencies=[Depends(verify_api_key)],
+)
 async def list_community_reports(
     district: Optional[str] = None, validated_only: bool = False, limit: int = 50
 ) -> CommunityReportListResponse:
