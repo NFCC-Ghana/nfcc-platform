@@ -24,7 +24,7 @@ NFCC has two parts, and the manuscript should keep them distinct:
 | # | Question | Answer |
 | --- | --- | --- |
 | 1 | Did we use only XGBoost, or other models? | **No.** The study compares 11 models: two baselines (climatology, persistence), the NFCC rainfall rule, a river-discharge benchmark, logistic regression, random forest and five XGBoost variants. It also compares 4 ways of fusing data sources. The best is M11 (XGBoost on multi-source data plus local-climate rainfall features). The model deployed in shadow mode is a calibrated XGBoost using only inputs known when the week starts. The live alert system is rule-based. Full catalogue: section 4.1. |
-| 2 | Is the dashboard connected to all data sources? | **Partly.** It is connected to 10 real sources: GPM IMERG V07, CHIRPS v2.0, Open-Meteo forecast, GloFAS v4, NASA SMAP L4, Sentinel-1 GRD, DAHITI altimetry, ReliefWeb, GDELT and citizen reports. It is **not** connected to river gauges (HSD), VRA dam telemetry, Google Flood Hub, TAHMO or GMet. "Phase 2" items in the project plan (nowcasting, inundation model, insurance trigger API, SMS at scale) are not built. Section 2.2. |
+| 2 | Is the dashboard connected to all data sources? | **Partly.** It is connected to 10 real sources: GPM IMERG V07, CHIRPS v2.0, Open-Meteo forecast, GloFAS v4, NASA SMAP L4, Sentinel-1 GRD, DAHITI altimetry (Lake Volta, White Volta, Nakambé), ReliefWeb, GDELT and citizen reports. It is **not** connected to Ghana Hydrological Authority river gauges, VRA or SONABEL dam operator data, Google Flood Hub, TAHMO or GMet; those require data agreements or API approval (section 6). All external APIs and services are listed in section 2.6. "Phase 2" items in the project plan (nowcasting, inundation model, insurance trigger API, SMS at scale) are not built. Section 2.2. |
 | 3 | Do the experiments cover Accra alone or many districts? | **All 216 districts in all 10 (2015) regions**, for 2015–2025 (main study) and 2000–2018 (sensitivity study). The live platform tracks 9 districts. Sections 3.1 and 5.1. |
 | 4 | Were TAHMO, GMet and river-gauge data available? | **No.** None was obtained. Open satellite and reanalysis products were used instead (CHIRPS, IMERG, ERA5-Land, GloFAS). Section 6. |
 | 5 | What models, datasets and results are accessible? | Everything in this document is in the public repository **NFCC-Ghana/nfcc-platform** and can be regenerated from open data. Section 7 lists each item and where it is. |
@@ -59,7 +59,7 @@ The dashboard reads all data through the platform API; a source counts as connec
 | 4 | GloFAS v4 river discharge (`flood-api.open-meteo.com/v1/flood`) | Copernicus Emergency Management Service, via Open-Meteo | 0.05°; daily | River pathway: discharge relative to the day's long-term mean (≥1.5× = elevated; illustrative, not a calibrated flood stage) | Connected |
 | 5 | NASA SMAP L4 surface and root-zone soil moisture (`NASA/SMAP/SPL4SMGP/008`) | NASA, via Earth Engine | 9 km, 3-hourly; 2–3 days latency | Soil saturation | Connected |
 | 6 | Sentinel-1 GRD C-band SAR (`COPERNICUS/S1_GRD`), IW mode, VV and VH | ESA Copernicus, via Earth Engine | 10 m; revisit 6–12 days over Ghana | Flood detection by change detection (section 2.4) | Connected. Reports "unavailable" (no detection, no area) when Earth Engine is unreachable or there is no image in the last 12 days |
-| 7 | DAHITI satellite altimetry (`dahiti.dgfi.tum.de`, API v2) | DGFI-TUM | Water-level time series per target | Lake Volta level, Akosombo (target 97); White Volta river level for Tamale only (target 9087, about 45.5 km away) | Connected (two targets only) |
+| 7 | DAHITI satellite altimetry (`dahiti.dgfi.tum.de`, API v2; requires an API key) | DGFI-TUM | Water-level time series per target, at each satellite overpass | Three targets: Lake Volta, for Akosombo Dam (target 97); White Volta river level for Tamale only (target 9087, about 45.5 km away); Nakambé River (target 19006, about 22.4 km from Bagre Dam, Burkina Faso), an upstream proxy for Bagre releases, reported separately from the dam's own (unavailable) status | Connected (three targets) |
 | 8 | ReliefWeb API v2 (`api.reliefweb.int/v2/reports`) | UN OCHA | Reports, country-tagged | Post-event outcome evidence | Connected (country-level only) |
 | 9 | GDELT DOC 2.0 API (`api.gdeltproject.org/api/v2/doc/doc`) | GDELT Project | News articles | Post-event outcome evidence | Connected (country-level only) |
 | 10 | Citizen flood reports | NFCC community reporting (database `community_reports`) | Event-level | Direct-observation pathway, after verification | Connected |
@@ -162,6 +162,33 @@ where rainfall is normalised over 0–200 mm, reservoir level over 0–100% and 
 | Prediction outcome verification | Daily, 06:00 UTC |
 | CHIRPS ingestion | Daily, 08:00 UTC |
 | Weekly shadow flood forecast (section 5.10) | Mondays, 05:17 UTC |
+
+### 2.6 Complete list of external APIs and services
+
+| Service | Endpoint / interface | Used for | Authentication | Used by |
+| --- | --- | --- | --- | --- |
+| Google Earth Engine | `earthengine-api` (Python) | Platform: CHIRPS, GPM IMERG, NASA SMAP, Sentinel-1. Research: all gridded predictors and labels (section 3.3) | Google Cloud service account | Platform, research |
+| Open-Meteo Forecast API | `api.open-meteo.com/v1/forecast` | Rainfall forecast, current weather | None (free tier) | Platform |
+| Open-Meteo Flood API (GloFAS v4) | `flood-api.open-meteo.com/v1/flood` | River discharge | None (free tier) | Platform, research |
+| Open-Meteo Ensemble API (ECMWF IFS, 51 members) | `ensemble-api.open-meteo.com/v1/ensemble` | Next-week rain context in the shadow forecast | None (free tier) | Research (shadow run) |
+| Open-Meteo Previous Runs API (ECMWF IFS 0.25°) | `previous-runs-api.open-meteo.com/v1/forecast` | Archived forecasts for experiment E3c | None (free tier) | Research |
+| DAHITI API v2 | `dahiti.dgfi.tum.de/api/v2/download-water-level` | Lake Volta, White Volta and Nakambé water levels | API key | Platform |
+| ReliefWeb API v2 | `api.reliefweb.int/v2/reports` | Flood reports (outcome evidence) | Registered application name | Platform |
+| GDELT DOC 2.0 API | `api.gdeltproject.org/api/v2/doc/doc` | News articles (outcome evidence) | None | Platform |
+| Google Flood Forecasting API | `floodforecasting.googleapis.com/v1` | River flood forecasts | API key (not yet issued) | Platform (inactive) |
+| Twilio | Twilio Python SDK | WhatsApp and SMS alerts | Account SID + auth token | Platform (alerting) |
+| Telegram Bot API | `api.telegram.org` | Telegram alerts and subscriptions | Bot token + webhook secret | Platform (alerting) |
+| SMTP email (Gmail) | Python `smtplib` | Email alerts | SMTP user + app password | Platform (alerting) |
+| Google Gemini API | `google-genai` SDK, model `gemini-flash-lite-latest` | AI copilot | API key | Platform (copilot) |
+| Upstash Redis | Redis protocol | Shared API rate limits | Connection URL with password | Platform |
+| Google Cloud Run, Cloud Storage, Secret Manager, Cloud Build | Google Cloud | API hosting; Litestream database replicas; secrets; container builds | Google Cloud service accounts | Platform |
+| Streamlit Community Cloud | – | Dashboard hosting | – | Platform |
+| GitHub Actions | – | Scheduled jobs (section 2.5) | Repository secrets | Platform, research |
+
+**Dams covered:**
+- **Akosombo (Volta, Ghana):** Lake Volta level from DAHITI; no VRA operator data.
+- **Bagre (Nakambé, Burkina Faso):** no operator data; DAHITI upstream river proxy only.
+- **Kompienga (Burkina Faso):** no data source.
 
 ## 3. Research framework: study design and data
 
@@ -645,13 +672,16 @@ For the week of 2 November 2026, no district reached WATCH. The highest probabil
 
 ## 6. Partner data: availability
 
-| Dataset | Availability | Open substitute used |
-| --- | --- | --- |
-| TAHMO station rainfall | Not obtained | CHIRPS v2.0 (training), GPM IMERG V07 (live), ECMWF IFS (forecasts) |
-| Ghana Meteorological Agency (GMet) records | Not obtained | Same as above |
-| Ghana Hydrological Authority (HSD) river gauges | Not obtained | GloFAS v4 discharge; DAHITI altimetry |
-| VRA (Akosombo, Kpong) and SONABEL (Bagre) dam releases | Not obtained | None. The dam pathway uses DAHITI Lake Volta levels and a fixed formula; E2 "+ Dam" not run |
-| NADMO flood incident records (dates, districts, people affected) | Not obtained. A request letter is prepared (`research/flood_experiments/nadmo_data_request.md`) and the loader is implemented (`nadmo.py`) | Groundsource news-reported floods. E8 not run |
+None of these datasets has a public, real-time interface. Each needs a data-sharing agreement or an API approval from its owner before the platform can connect to it.
+
+| Dataset | Availability | What connecting it requires | Open substitute used |
+| --- | --- | --- | --- |
+| TAHMO station rainfall (Trans-African Hydro-Meteorological Observatory) | Not obtained | A research data agreement with TAHMO; TAHMO then issues API credentials | CHIRPS v2.0 (training), GPM IMERG V07 (live), ECMWF IFS (forecasts) |
+| Ghana Meteorological Agency (GMet) station records | Not obtained | A data-sharing request to GMet | Same as above. GMet's main synoptic stations (e.g. Accra Kotoka, Tamale) are also exchanged internationally through the WMO and republished by NOAA (Global Surface Summary of the Day). That copy ends on 24 Aug 2025, so it can serve for historical validation but not as a live feed |
+| Ghana Hydrological Authority river gauges | Not obtained | A data-sharing agreement with the Ghana Hydrological Authority | GloFAS v4 discharge; DAHITI altimetry |
+| VRA dam data (Akosombo, Kpong) and SONABEL data (Bagre, Kompienga; Burkina Faso) | Not obtained | Data agreements with the Volta River Authority and SONABEL, or through the Volta Basin Authority | DAHITI Lake Volta level and Nakambé river level (Bagre proxy). The dam spillage index is a fixed formula. E2 "+ Dam" not run |
+| Google Flood Hub forecasts | API not issued | Approval for the Google Flood Forecasting API pilot. The platform's client is already implemented and activates once an API key is set | GloFAS v4 discharge |
+| NADMO flood incident records (dates, districts, people affected) | Not obtained | A data request to NADMO. The request letter is prepared (`research/flood_experiments/nadmo_data_request.md`) and the loader is implemented (`nadmo.py`) | Groundsource news-reported floods. E8 not run |
 
 ## 7. Accessible models, datasets and results
 
