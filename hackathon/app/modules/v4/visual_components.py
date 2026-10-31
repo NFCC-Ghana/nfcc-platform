@@ -199,7 +199,7 @@ def render_risk_indicator(
         '<div style="font-size:28px; font-weight:700; color:'
         + color
         + ';">'
-        + f"{score:.0f}%"
+        + f"{score:.0f}/100"
         + " • "
         + safe_text(label)
         + "</div>"
@@ -765,7 +765,7 @@ def render_risk_timeline_visual(
             + color
             + '; min-width:45px; text-align:right;">'
         )
-        row += f"{score:.0f}%"
+        row += f"{score:.0f}/100"
         if is_peak:
             row += " ⭐"
         if is_current:
