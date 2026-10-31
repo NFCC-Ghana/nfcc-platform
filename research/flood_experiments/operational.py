@@ -368,14 +368,17 @@ class OperationalModel:
 
 
 # ------------------------------------------------------------- shadow run
-def _get_json(url, params, attempts=4):
+BATCH = 36  # districts per Open-Meteo request (it accepts coordinate lists)
+
+
+def _get_json(url, params, attempts=4, timeout=90):
     """GET with retries on timeouts, connection errors and non-200
     replies (backoff 15, 30, 45 s). Returns the JSON body, or None after
     the last attempt: a slow API must not crash the weekly run, it only
     leaves that input missing."""
     for attempt in range(attempts):
         try:
-            r = requests.get(url, params=params, timeout=30)
+            r = requests.get(url, params=params, timeout=timeout)
             if r.status_code == 200:
                 return r.json()
             logger.info(f"{url}: HTTP {r.status_code} (attempt {attempt + 1})")
@@ -386,19 +389,37 @@ def _get_json(url, params, attempts=4):
     return None
 
 
-def _ensemble_week(lat, lon, week: date):
-    """Per-member weekly total and wettest day from the ECMWF IFS
-    ensemble (51 members) for the 7 days from `week`."""
-    params = {
-        "latitude": round(lat, 4),
-        "longitude": round(lon, 4),
-        "hourly": "precipitation",
-        "models": "ecmwf_ifs025",
-        "start_date": week.isoformat(),
-        "end_date": (week + timedelta(days=6)).isoformat(),
-        "timezone": "GMT",
-    }
-    body = _get_json(ENSEMBLE_URL, params)
+def _batched(url, params, lats, lons):
+    """One response per point, fetching BATCH points per request.
+
+    The first scheduled runs made two requests per district (432 in
+    all) from GitHub's servers, and Open-Meteo timed many out; one
+    run hit the 60-minute limit in retries. Open-Meteo accepts lists of
+    coordinates, so 216 districts need 6 requests per API. A batch that
+    still fails gives None for its points (missing inputs, not a crash).
+    """
+    out = []
+    for k in range(0, len(lats), BATCH):
+        la, lo = lats[k : k + BATCH], lons[k : k + BATCH]
+        body = _get_json(
+            url,
+            {
+                **params,
+                "latitude": ",".join(f"{v:.4f}" for v in la),
+                "longitude": ",".join(f"{v:.4f}" for v in lo),
+            },
+        )
+        if isinstance(body, dict):  # a single location comes back unwrapped
+            body = [body]
+        if body is None or len(body) != len(la):
+            out.extend([None] * len(la))
+        else:
+            out.extend(body)
+    return out
+
+
+def _ensemble_summary(body):
+    """Per-member weekly total and wettest day (51 ECMWF members)."""
     if body is None:
         return None
     h = body["hourly"]
@@ -413,23 +434,35 @@ def _ensemble_week(lat, lon, week: date):
     return pd.DataFrame({"sum": daily.sum(min_count=1), "max": daily.max()})
 
 
-def _discharge_lag1(lat, lon, week: date):
-    """GloFAS max discharge over the week before `week` (Open-Meteo);
-    NaN (a missing input the model handles) if the API stays down."""
-    body = _get_json(
-        C.OPEN_METEO_FLOOD_URL,
-        {
-            "latitude": round(lat, 4),
-            "longitude": round(lon, 4),
-            "daily": "river_discharge",
-            "start_date": (week - timedelta(days=7)).isoformat(),
-            "end_date": (week - timedelta(days=1)).isoformat(),
-        },
-    )
-    if body is None:
-        return np.nan
-    v = [x for x in body["daily"]["river_discharge"] if x is not None]
-    return float(max(v)) if v else np.nan
+def _ensemble_weeks(lats, lons, week: date):
+    """ECMWF IFS ensemble rain for the 7 days from `week`, per point."""
+    params = {
+        "hourly": "precipitation",
+        "models": "ecmwf_ifs025",
+        "start_date": week.isoformat(),
+        "end_date": (week + timedelta(days=6)).isoformat(),
+        "timezone": "GMT",
+    }
+    return [_ensemble_summary(b) for b in _batched(ENSEMBLE_URL, params, lats, lons)]
+
+
+def _discharge_lag1s(lats, lons, week: date):
+    """GloFAS max discharge over the week before `week`, per point; NaN
+    (a missing input the model handles) where the API stays down."""
+    params = {
+        "daily": "river_discharge",
+        "start_date": (week - timedelta(days=7)).isoformat(),
+        "end_date": (week - timedelta(days=1)).isoformat(),
+    }
+    out = []
+    for b in _batched(C.OPEN_METEO_FLOOD_URL, params, lats, lons):
+        v = (
+            []
+            if b is None
+            else [x for x in b["daily"]["river_discharge"] if x is not None]
+        )
+        out.append(float(max(v)) if v else np.nan)
+    return out
 
 
 def _past_weeks(ee, week: date):
@@ -500,10 +533,13 @@ def shadow(week: date):
         meta["scale_imerg"]
     ).fillna(1.0)
     woy = pd.Timestamp(week).isocalendar().week
+    rows = static.merge(points, on="district_code")
+    ens = _ensemble_weeks(rows["lat"].tolist(), rows["lon"].tolist(), week)
+    q1s = _discharge_lag1s(rows["river_lat"].tolist(), rows["river_lon"].tolist(), week)
     out = []
-    for r in static.merge(points, on="district_code").itertuples():
+    for r, e, q1 in zip(rows.itertuples(), ens, q1s):
         try:
-            out.append(_score_district(r, past, week, woy, om, meta))
+            out.append(_score_district(r, past, woy, om, meta, e, q1))
         except Exception as e:  # one district must not stop the other 215
             logger.warning(f"shadow {r.district}: {type(e).__name__}: {e}")
             out.append(
@@ -528,19 +564,19 @@ def shadow(week: date):
     return res
 
 
-def _score_district(r, past, week, woy, om, meta):
-    """One district's shadow forecast row."""
+def _score_district(r, past, woy, om, meta, ens, q1):
+    """One district's shadow forecast row. `ens` (ECMWF ensemble) is
+    forecaster context, not a model input, so a missing ensemble still
+    gives a score, with the context columns left empty."""
     code = r.district_code
     p = past[past["district_code"] == code].set_index("lag")
-    ens = _ensemble_week(r.lat, r.lon, week)
-    if ens is None or p.empty:
+    if p.empty:
         return {
             "district_code": code,
             "district": r.district,
             "region": r.region,
             "status": "inputs unavailable",
         }
-    q1 = _discharge_lag1(r.river_lat, r.river_lon, week)
     qm = meta["q_median"].get(str(code), np.nan)
     base = {
         "woy_sin": np.sin(2 * np.pi * woy / 52.18),
@@ -566,6 +602,8 @@ def _score_district(r, past, week, woy, om, meta):
     s = om.score(pd.DataFrame([base]))
     pm = float(s["p"].iloc[0])
     # Forecaster context, not model input (see module docstring).
+    if ens is None:
+        ens = pd.DataFrame({"sum": [np.nan], "max": [np.nan]}).iloc[:0]
     ws = ens["sum"] * meta["scale_rain_week_sum"].get(str(code), 1.0)
     wm = ens["max"] * meta["scale_rain_week_max"].get(str(code), 1.0)
     return {
@@ -575,10 +613,14 @@ def _score_district(r, past, week, woy, om, meta):
         "p_flood_onset": round(pm, 4),
         "level": om.level(pm),
         "drivers": s["drivers"].iloc[0],
-        "ecmwf_rain_week_mm_median": round(float(ws.median()), 1),
-        "ecmwf_rain_week_mm_p90": round(float(ws.quantile(0.9)), 1),
-        "ecmwf_wettest_day_local_pct_median": round(
-            om.percentile(code, "rain_week_max", float(wm.median())), 2
+        "ecmwf_rain_week_mm_median": round(float(ws.median()), 1) if len(ws) else None,
+        "ecmwf_rain_week_mm_p90": (
+            round(float(ws.quantile(0.9)), 1) if len(ws) else None
+        ),
+        "ecmwf_wettest_day_local_pct_median": (
+            round(om.percentile(code, "rain_week_max", float(wm.median())), 2)
+            if len(wm)
+            else None
         ),
         "ecmwf_members": int(len(ens)),
         "river_discharge_available": bool(q1 == q1),
