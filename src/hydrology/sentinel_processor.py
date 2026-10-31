@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -29,6 +30,30 @@ _VV_THRESHOLD_DB = 1.5
 # Kumasi/Tamale's bigger urban extent, 0.05 default for everyone else.
 # Not a canonical-registry fact (see _load_districts' docstring for why).
 _DISTRICT_SAR_RADIUS = {"Kumasi": 0.08, "Tamale": 0.08}
+
+# Newly flooded land smaller than this is treated as noise - the same 1 km2
+# floor the research label audit uses (research/flood_experiments/config.py
+# SAR_MIN_KM2), against a 0.1-0.16 degree box of roughly 120-310 km2.
+_MIN_FLOOD_KM2 = 1.0
+
+# JRC Global Surface Water occurrence (% of months observed as water) at or
+# above which a pixel is permanent water or sea, not flooding.
+_PERMANENT_WATER_OCCURRENCE = 50
+
+# A newly flooded pixel must also look like open water after the change
+# (calm water reflects the radar away: VH typically below about -20 dB).
+# Without this, ploughed, burned or drying land that loses 3 dB is counted
+# as water. Checked on the Akosombo spill: Mepe, 25 Oct 2023, 5.3 km2 of new
+# water, against 0.4 km2 in the same window of 2024 with no spill, and
+# <0.1 km2 over Accra and Tamale in a dry week.
+_WATER_VH_MAX_DB = -20.0
+
+# Sentinel-1 revisits Ghana every 6-12 days, so a live result stays valid
+# for hours; /situation calls detect_flood on every request.
+_LIVE_CACHE_SECONDS = 3 * 3600
+
+# 30 m is enough for a >= 1 km2 decision and is ~10x faster than 10 m.
+_ANALYSIS_SCALE_M = 30
 
 
 def _confidence_from_sar_margins(
@@ -89,6 +114,7 @@ class SentinelProcessor:
 
         # District geometries (simplified)
         self.districts = self._load_districts()
+        self._live_cache: Dict[str, Tuple[float, Dict]] = {}
 
         logger.info("Sentinel-1 Processor initialized")
 
@@ -134,25 +160,43 @@ class SentinelProcessor:
         """
         if not self.ee_initialized:
             return self._unavailable(district, "Earth Engine unavailable")
+        if district not in self.districts:
+            return {"error": f"District {district} not found"}
+        if date is None:
+            cached = self._live_cache.get(district)
+            if cached and time.time() - cached[0] < _LIVE_CACHE_SECONDS:
+                return cached[1]
+        coords = self.districts[district]
+        result = self.detect_flood_at(
+            district, coords["lat"], coords["lon"], coords["radius"], date
+        )
+        if date is None and result.get("source") == "Sentinel-1 SAR":
+            self._live_cache[district] = (time.time(), result)
+        return result
 
+    def detect_flood_at(
+        self,
+        label: str,
+        lat: float,
+        lon: float,
+        radius_deg: float,
+        date: Optional[str] = None,
+    ) -> Dict:
+        """Change detection over a lat/lon box of +-radius_deg degrees.
+
+        The analysis area was once `point.buffer(0.05)` - but Earth Engine
+        buffers in METRES, so that was a 5 cm circle containing no 10 m
+        pixel, and no water could ever be detected. It is now an explicit
+        degree box. Before and after composites use the same orbit
+        direction (ascending/descending geometry otherwise changes
+        backscatter on its own), are lightly smoothed against speckle, and
+        sea and permanent water (JRC Global Surface Water occurrence >= 50%)
+        are masked out, since a box on the coast is partly sea.
+        """
         try:
-            if district not in self.districts:
-                return {"error": f"District {district} not found"}
-
-            coords = self.districts[district]
-            point = ee.Geometry.Point(coords["lon"], coords["lat"])
-            bbox = point.buffer(0.05)
-
-            # Get Sentinel-1 imagery
-            sentinel1 = ee.ImageCollection("COPERNICUS/S1_GRD")
-
-            # Filter by date. "after" uses a 12-day window ending on the
-            # target date, not that single exact day - Sentinel-1's revisit
-            # time over Ghana is roughly 6-12 days, so filtering for one
-            # specific day almost never actually finds an image, and this
-            # collection being empty was never being detected (see below),
-            # silently deferring an "Empty date ranges" error to the
-            # getInfo() call much further down instead of failing fast here.
+            region = ee.Geometry.Rectangle(
+                [lon - radius_deg, lat - radius_deg, lon + radius_deg, lat + radius_deg]
+            )
             reference_date = (
                 datetime.strptime(date, "%Y-%m-%d") if date else datetime.now()
             )
@@ -161,98 +205,99 @@ class SentinelProcessor:
             baseline_end = (reference_date - timedelta(days=30)).strftime("%Y-%m-%d")
             baseline_start = (reference_date - timedelta(days=60)).strftime("%Y-%m-%d")
 
-            # Get before and after images
-            before = (
-                sentinel1.filterDate(baseline_start, baseline_end)
-                .filterBounds(bbox)
+            s1 = (
+                ee.ImageCollection("COPERNICUS/S1_GRD")
+                .filterBounds(region)
                 .filter(ee.Filter.eq("instrumentMode", "IW"))
-                .select(["VH", "VV"])
-                .median()
+                .filter(ee.Filter.listContains("transmitterReceiverPolarisation", "VH"))
             )
-
-            after_collection = (
-                sentinel1.filterDate(after_start, after_end)
-                .filterBounds(bbox)
-                .filter(ee.Filter.eq("instrumentMode", "IW"))
-                .select(["VH", "VV"])
-            )
-
-            # ee.Image objects are always truthy in Python regardless of
-            # whether the collection they came from was empty - `if not
-            # after:` never actually caught this, letting an empty
-            # collection's null image flow all the way down to the
-            # getInfo() call below before failing. size().getInfo() is a
-            # real, immediate check, same pattern already used correctly
-            # in scripts/daily_chirps_pull.py.
-            after_image_count = after_collection.size().getInfo()
-            if after_image_count == 0:
+            after_collection = s1.filterDate(after_start, after_end)
+            if after_collection.size().getInfo() == 0:
                 logger.info(
-                    f"No Sentinel-1 imagery for {district} in "
-                    f"{after_start} to {after_end}"
+                    f"No Sentinel-1 imagery for {label} in {after_start} to {after_end}"
                 )
                 return self._unavailable(
-                    district,
-                    f"no Sentinel-1 image between {after_start} and {after_end}",
+                    label, f"no Sentinel-1 image between {after_start} and {after_end}"
+                )
+            orbit_pass = (
+                after_collection.sort("system:time_start", False)
+                .first()
+                .get("orbitProperties_pass")
+            )
+            same_pass = ee.Filter.eq("orbitProperties_pass", orbit_pass)
+            after_collection = after_collection.filter(same_pass)
+            before_collection = s1.filterDate(baseline_start, baseline_end).filter(
+                same_pass
+            )
+            if before_collection.size().getInfo() == 0:
+                return self._unavailable(
+                    label,
+                    f"no same-orbit Sentinel-1 baseline between {baseline_start} "
+                    f"and {baseline_end}",
                 )
 
-            after = after_collection.median()
+            def smooth(img):
+                return img.select(["VH", "VV"]).focalMedian(30, "circle", "meters")
 
-            # Change detection
+            before = before_collection.map(smooth).median()
+            after = after_collection.map(smooth).median()
             vh_diff = before.select("VH").subtract(after.select("VH"))
             vv_diff = before.select("VV").subtract(after.select("VV"))
 
-            # Water detection threshold - _VH_THRESHOLD_DB/_VV_THRESHOLD_DB
-            # module constants, shared with _confidence_from_sar_margins
-            # below so confidence is always grounded in the exact same
-            # numbers this classification itself used, not a second,
-            # independently-chosen pair that could drift from it.
-            water = vh_diff.gt(_VH_THRESHOLD_DB).And(vv_diff.gt(_VV_THRESHOLD_DB))
-
-            # Calculate area
-            area = water.multiply(ee.Image.pixelArea()).reduceRegion(
-                reducer=ee.Reducer.sum(), geometry=bbox, scale=10, maxPixels=1e9
+            land = (
+                ee.Image("JRC/GSW1_4/GlobalSurfaceWater")
+                .select("occurrence")
+                .unmask(0)
+                .lt(_PERMANENT_WATER_OCCURRENCE)
             )
-
-            area_km2 = area.getInfo().get("VH", 0) / 1e6
-
-            # Real proxy for detection confidence: how far the scene's
-            # actual mean backscatter differential sits from the water-
-            # detection threshold that produced this classification - see
-            # _confidence_from_sar_margins' docstring (a standalone,
-            # directly-tested pure function - this method's EE calls have
-            # no test coverage in this codebase at all, being a long real
-            # Earth Engine chain that's expensive to mock faithfully, but
-            # the arithmetic itself, where a fix could actually introduce
-            # a bug, is isolated and unit-tested independently of that).
-            vh_diff_mean = (
-                vh_diff.reduceRegion(
-                    reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
-                )
-                .getInfo()
-                .get("VH")
+            water = (
+                vh_diff.gt(_VH_THRESHOLD_DB)
+                .And(vv_diff.gt(_VV_THRESHOLD_DB))
+                .And(after.select("VH").lt(_WATER_VH_MAX_DB))
+                .And(land)
             )
-            vv_diff_mean = (
-                vv_diff.reduceRegion(
-                    reducer=ee.Reducer.mean(), geometry=bbox, scale=10, maxPixels=1e9
-                )
-                .getInfo()
-                .get("VV")
-            )
-            confidence = _confidence_from_sar_margins(vh_diff_mean, vv_diff_mean)
+            stats = ee.Dictionary(
+                {
+                    "area": water.multiply(ee.Image.pixelArea())
+                    .reduceRegion(
+                        ee.Reducer.sum(),
+                        region,
+                        _ANALYSIS_SCALE_M,
+                        maxPixels=1e10,
+                        tileScale=4,
+                    )
+                    .get("VH"),
+                    "diff": vh_diff.addBands(vv_diff)
+                    .updateMask(land)
+                    .reduceRegion(
+                        ee.Reducer.mean(),
+                        region,
+                        _ANALYSIS_SCALE_M,
+                        maxPixels=1e10,
+                        tileScale=4,
+                    ),
+                }
+            ).getInfo()
+            area_km2 = (stats.get("area") or 0) / 1e6
+            diff = stats.get("diff") or {}
+            confidence = _confidence_from_sar_margins(diff.get("VH"), diff.get("VV"))
 
             return {
-                "district": district,
-                "water_detected": area_km2 > 0.1,
+                "district": label,
+                "water_detected": area_km2 >= _MIN_FLOOD_KM2,
                 "flood_extent_km2": round(area_km2, 2),
                 "acquisition_date": f"{after_start} to {after_end}",
                 "baseline_date": f"{baseline_start} to {baseline_end}",
+                "analysis_area_km2": round(
+                    (2 * radius_deg * 111.32) ** 2 * np.cos(np.radians(lat)), 1
+                ),
                 "source": "Sentinel-1 SAR",
                 "confidence": confidence,
             }
 
         except Exception as e:
             logger.error(f"Sentinel-1 processing failed: {e}")
-            return self._unavailable(district, f"processing failed: {type(e).__name__}")
+            return self._unavailable(label, f"processing failed: {type(e).__name__}")
 
     def _unavailable(self, district: str, reason: str) -> Dict:
         """No Sentinel-1 reading: no Earth Engine, no image in the last 12

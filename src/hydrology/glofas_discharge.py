@@ -14,7 +14,10 @@ POST /situation - a genuine circular import otherwise).
 """
 
 import logging
-from typing import Optional
+from datetime import date, timedelta
+from functools import lru_cache
+from statistics import median
+from typing import List, Optional
 
 import requests
 
@@ -24,41 +27,69 @@ _FLOOD_API_URL = "https://flood-api.open-meteo.com/v1/flood"
 
 # A district counts as an "active flood zone" (GET /national/summary)
 # when today's simulated river discharge is running well above its
-# long-term seasonal mean for that day. 1.5x is an illustrative
+# day-of-year median over the previous ten years. 1.5x is an illustrative
 # threshold, not a calibrated hydrological one - no flood-stage threshold
 # per Ghana river exists publicly.
 ELEVATED_DISCHARGE_RATIO = 1.5
 
 
+# Day-of-year climatology: the median of every day within +-15 days of
+# today's date in the previous ~10 years of GloFAS reanalysis/forecast.
+_CLIMATOLOGY_DAYS = 3650
+_SEASON_HALF_WINDOW_DAYS = 15
+
+
+def _seasonal_median(
+    times: List[str], values: List[Optional[float]]
+) -> Optional[float]:
+    today = date.fromisoformat(times[-1])
+    doy = today.timetuple().tm_yday
+    ref = []
+    for t, v in zip(times, values):
+        d = date.fromisoformat(t)
+        if v is None or (today - d).days < 365:
+            continue
+        gap = abs(d.timetuple().tm_yday - doy)
+        if min(gap, 365 - gap) <= _SEASON_HALF_WINDOW_DAYS:
+            ref.append(v)
+    return median(ref) if len(ref) >= 30 else None
+
+
+@lru_cache(maxsize=64)
+def _cached_ratio(lat: float, lon: float, day: str) -> Optional[float]:
+    end = date.fromisoformat(day)
+    resp = requests.get(
+        _FLOOD_API_URL,
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "daily": "river_discharge",
+            "start_date": (end - timedelta(days=_CLIMATOLOGY_DAYS)).isoformat(),
+            "end_date": end.isoformat(),
+        },
+        timeout=20,
+    )
+    resp.raise_for_status()
+    daily = resp.json().get("daily", {})
+    times, values = daily.get("time") or [], daily.get("river_discharge") or []
+    if not times or len(times) != len(values) or values[-1] is None:
+        return None
+    clim = _seasonal_median(times, values)
+    if not clim:
+        return None
+    return values[-1] / clim
+
+
 def fetch_glofas_discharge_ratio(lat: float, lon: float) -> Optional[float]:
-    """Real GloFAS-based river discharge, today's value relative to its
-    own long-term seasonal mean - None if the API call failed or no
-    river is resolved within Open-Meteo's 5km grid at this point (a
-    documented limitation, Cape Coast hits this in practice)."""
+    """Today's GloFAS discharge divided by its day-of-year median over the
+    previous ten years at this point, or None when unavailable.
+
+    This used to divide by the API's `river_discharge_mean` - which in the
+    Open-Meteo Flood API is the mean of today's ENSEMBLE members, not a
+    climatology - so the ratio was always about 1 and "elevated (>1.5x)"
+    could practically never fire. Cached per point per day."""
     try:
-        resp = requests.get(
-            _FLOOD_API_URL,
-            params={
-                "latitude": lat,
-                "longitude": lon,
-                "daily": "river_discharge,river_discharge_mean",
-                "forecast_days": 1,
-            },
-            timeout=8,
-        )
-        resp.raise_for_status()
-        daily = resp.json().get("daily", {})
-        discharge = daily.get("river_discharge", [])
-        mean = daily.get("river_discharge_mean", [])
-        # Open-Meteo returns null for either value at some coastal points
-        # where no river is resolved within their 5km grid (documented
-        # limitation, not an error) - Cape Coast hits this in practice.
-        if not discharge or not mean:
-            return None
-        latest_discharge, latest_mean = discharge[-1], mean[-1]
-        if latest_discharge is None or not latest_mean:
-            return None
-        return latest_discharge / latest_mean
+        return _cached_ratio(round(lat, 4), round(lon, 4), date.today().isoformat())
     except Exception as e:
         logger.warning(f"Flood API call failed for ({lat},{lon}): {e}")
         return None
