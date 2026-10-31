@@ -128,7 +128,7 @@ class WeatherForecastEngine:
         # Check cache
         if cache_key in self.forecast_cache:
             cached = self.forecast_cache[cache_key]
-            if (datetime.now() - cached["timestamp"]).seconds < 3600:
+            if (datetime.now() - cached["timestamp"]).total_seconds() < 3600:
                 return cached["data"]
 
         try:
@@ -136,12 +136,16 @@ class WeatherForecastEngine:
             # right-now reading (temperature/weather/precipitation),
             # independent of the "hourly" array used for the rainfall
             # forecast timeline. Both come back in one request.
+            # `precipitation` is rain + convective showers; Open-Meteo's
+            # `rain` is large-scale rain only (~35-45% of the total in
+            # Ghana). `forecast_hours` starts the series at the current
+            # hour, so "next 24h" really is the next 24 hours.
             params = {
                 "latitude": lat,
                 "longitude": lon,
-                "hourly": "rain,precipitation_probability",
+                "hourly": "precipitation,precipitation_probability",
                 "current": "temperature_2m,weather_code,precipitation,is_day",
-                "forecast_days": 3,
+                "forecast_hours": 72,
                 "timezone": "GMT",
             }
 
@@ -171,14 +175,14 @@ class WeatherForecastEngine:
     def _parse_open_meteo(self, data: Dict, hours: int, lat: float, lon: float) -> Dict:
         """Parse Open-Meteo API response."""
         hourly = data.get("hourly", {})
-        rain = hourly.get("rain", [])
+        rain = [r or 0.0 for r in hourly.get("precipitation", [])]
         precip_probability = hourly.get("precipitation_probability", [])
 
         forecast = {}
 
         # Sum rainfall for 24h, 48h, 72h
         for h in [24, 48, 72]:
-            if h <= hours and len(rain) > h:
+            if h <= hours and len(rain) >= h:
                 total_rain = sum(rain[:h])
                 forecast[f"{h}h"] = round(total_rain, 1)
             else:
@@ -197,7 +201,7 @@ class WeatherForecastEngine:
         # Daily breakdown
         forecast["daily"] = []
         for day in range(3):
-            if len(rain) > (day + 1) * 24:
+            if len(rain) >= (day + 1) * 24:
                 daily_rain = sum(rain[day * 24 : (day + 1) * 24])
                 forecast["daily"].append(
                     {"day": day + 1, "rainfall_mm": round(daily_rain, 1)}

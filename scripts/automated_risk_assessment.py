@@ -123,20 +123,26 @@ DISTRICT_COORDS = {
 def get_forecast_precipitation(lat: float, lon: float) -> float:
     """Real next-24h forecasted rainfall for a coordinate, via Open-Meteo -
     an anticipatory signal (what's coming), not just a retrospective one,
-    which is the more useful thing to assess flood risk against."""
+    which is the more useful thing to assess flood risk against.
+
+    Reads `precipitation` (rain + convective showers), not `rain`, which
+    in Open-Meteo is large-scale rain only and in Ghana held ~35-45% of
+    the total (most rain here is convective). `forecast_hours` anchors
+    the 24 hours on the current hour rather than on 00:00 GMT today."""
     resp = requests.get(
         "https://api.open-meteo.com/v1/forecast",
         params={
             "latitude": lat,
             "longitude": lon,
-            "hourly": "rain",
-            "forecast_days": 1,
+            "hourly": "precipitation",
+            "forecast_hours": 24,
+            "timezone": "GMT",
         },
         timeout=25,
     )
     resp.raise_for_status()
-    rain = resp.json().get("hourly", {}).get("rain", [])
-    return round(sum(rain[:24]), 1) if rain else 0.0
+    rain = resp.json().get("hourly", {}).get("precipitation", [])
+    return round(sum(r or 0.0 for r in rain[:24]), 1) if rain else 0.0
 
 
 def get_antecedent_precipitation(api_url: str, district: str) -> Optional[float]:
@@ -197,18 +203,19 @@ def get_observed_past_precipitation(
         params={
             "latitude": lat,
             "longitude": lon,
-            "hourly": "rain",
-            "past_days": days,
-            "forecast_days": 1,
+            "hourly": "precipitation",
+            "past_hours": days * 24,
+            "forecast_hours": 1,
+            "timezone": "GMT",
         },
         timeout=25,
     )
     resp.raise_for_status()
-    rain = resp.json().get("hourly", {}).get("rain", [])
+    rain = resp.json().get("hourly", {}).get("precipitation", [])
     observed_hours = days * 24
     if len(rain) < observed_hours:
         return None
-    return round(sum(rain[:observed_hours]), 1)
+    return round(sum(r or 0.0 for r in rain[:observed_hours]), 1)
 
 
 def get_fluvial_risk(api_url: str, district: str) -> Optional[float]:

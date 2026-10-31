@@ -200,7 +200,7 @@ class TestEliteComprehensive:
         fake_response = requests.models.Response()
         fake_response.status_code = 200
         fake_response._content = json.dumps(
-            {"hourly": {"time": [], "rain": [0.0] * 72}}
+            {"hourly": {"time": [], "precipitation": [0.0] * 72}}
         ).encode("utf-8")
 
         def _slow_get(*args, **kwargs):
