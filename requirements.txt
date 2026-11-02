@@ -66,7 +66,7 @@ google-genai==2.33.0
 # dataclass bindings for the exact CAP schema (identifier/sender/status/
 # msgType/severity/urgency/certainty/area/...), serialized via xsdata
 # rather than hand-built XML strings.
-cap-tools>=3.1.0
+cap-tools>=3.1.1
 
 # Remote sensing (src/hydrology/sentinel_processor.py needs `import ee` -
 # environment.yml has this via conda-forge for the conda-based workflows,
