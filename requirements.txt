@@ -5,7 +5,7 @@ uvicorn[standard]==0.54.0
 # pydantic>=2.12.5. Verified against the full existing test suite
 # before bumping; no other code in this repo depends on anything
 # specific to 2.5.0.
-pydantic==2.14.1
+pydantic==2.14.2
 # Bumped from 0.0.6: that version predates 0.0.7's fix for a ReDoS
 # advisory (CVE-2024-24762) in multipart/form-data parsing. 0.0.18
 # matches what fastapi==0.115.0 itself recommends as its "standard"/
@@ -60,7 +60,7 @@ slowapi==0.1.10
 # free tier (1,500 requests/day, no card required) is the realistic
 # option for a solo, low-budget maintainer - see src/copilot/engine.py's
 # module docstring.
-google-genai==2.33.0
+google-genai==2.34.0
 
 # Real OASIS CAP v1.2 XML export (src/api/routes/cap_export.py) - typed
 # dataclass bindings for the exact CAP schema (identifier/sender/status/
