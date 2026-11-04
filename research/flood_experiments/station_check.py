@@ -302,6 +302,7 @@ def analyse():
     res = {"strict": compare(st, sat, *load_gauges()), "i_as_dry": compare(st, sat, *load_gauges(True))}
     res["district_stations"] = DISTRICT_STATION
     res["period"] = f"{FIRST_YEAR}-01-01 to {LAST_DAY}"
+    res["rule_frequency"] = rule_frequency(st, sat)
     pd.DataFrame(res["strict"]["by_station"]).to_csv(OUT / "by_station.csv", index=False)
     (OUT / "results.json").write_text(json.dumps(res, indent=1, default=float))
     for v in ("strict", "i_as_dry"):
@@ -315,6 +316,42 @@ def analyse():
                 f"FAR20={d['heavy_20mm']['far']:.2f} | weekly r={wk['pearson_r']:.2f} "
                 f"anom r={r['weekly_anomaly_r'][p]:.2f} wetweek CSI={wk['wet_week_own_p90']['csi']:.2f}"
             )
+
+
+# Rainfall (mm) at which the live rule's score reaches each tier: S = 30, 50,
+# 70 and 85 (src/config/settings.py) on the piecewise curve of
+# src/alerts/formatter.calculate_score, without the Accra drainage factor.
+TIER_RAIN_MM = {"MODERATE": 10.0, "HIGH": 20.0, "CRITICAL": 30.0, "EXTREME": 40.0}
+
+
+def rule_frequency(st, sat, years=(2015, 2024)):
+    """How often the live rule reaches each tier at the tracked districts.
+
+    The 3-hourly assessment scores two rain signals with the same curve:
+    the next-24-hour forecast and the 3-day antecedent total. The curve
+    was designed for 24-hour rain, so a 3-day total reaches each tier far
+    more often. This counts, per year, the days on which the satellite
+    24-hour total and the trailing 3-day total reach each tier, at the
+    synoptic station cell nearest each tracked district (full years only).
+    """
+    rows = []
+    for district, station in DISTRICT_STATION.items():
+        sid = st.loc[st["name"] == station, "station_id"]
+        if sid.empty:
+            continue
+        s = sat[sat["station_id"] == sid.iloc[0]].set_index("date").sort_index()
+        s = s[(s.index.year >= years[0]) & (s.index.year <= years[1])]
+        for product in PRODUCTS:
+            day = s[product].asfreq("D")
+            three = day.rolling(3, min_periods=3).sum()
+            n_years = day.notna().sum() / 365.25
+            row = {"district": district, "station": station, "product": product,
+                   "years": round(float(n_years), 1)}
+            for tier, mm in TIER_RAIN_MM.items():
+                row[f"day_{tier}"] = float((day >= mm).sum() / n_years)
+                row[f"3day_{tier}"] = float((three >= mm).sum() / n_years)
+            rows.append(row)
+    return {"years": list(years), "tier_rain_mm": TIER_RAIN_MM, "rows": rows}
 
 
 def compare(st, sat, gauges, qc):

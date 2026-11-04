@@ -376,3 +376,38 @@ class TestShadowRunResilience:
         monkeypatch.setattr(ops, "_get_json", lambda *a, **k: next(replies))
         out = ops._batched("u", {}, [1.0, 2.0, 3.0], [0.0] * 3)
         assert out == [{"x": 1}, {"x": 2}, None]
+
+
+class TestReviewAdditions:
+    def test_fast_within_district_auc_matches_metric(self):
+        from research.flood_experiments.compare import _within_auc
+
+        rng = np.random.default_rng(0)
+        d = rng.integers(0, 12, 3000)
+        y = (rng.random(3000) < 0.05).astype(int)
+        p = np.round(rng.random(3000), 2)  # rounded: ties must be averaged
+        assert _within_auc(d, y, p) == pytest.approx(M.within_district_auc(d, y, p), abs=1e-12)
+
+    def test_rule_frequency_counts_days_per_year(self):
+        from research.flood_experiments.station_check import rule_frequency
+
+        days = pd.date_range("2015-01-01", "2015-12-31")
+        rain = np.zeros(len(days))
+        rain[[10, 11, 12]] = 12.0  # three 12 mm days: 24 h MODERATE x3, 3-day 36 mm
+        sat = pd.DataFrame({"station_id": "1", "date": days, "chirps": rain, "imerg": rain})
+        st = pd.DataFrame({"station_id": ["1"], "name": ["KUMASI"]})
+        rows = rule_frequency(st, sat, years=(2015, 2015))["rows"]
+        r = next(x for x in rows if x["product"] == "chirps")
+        scale = len(days) / 365.25
+        assert r["day_MODERATE"] * scale == pytest.approx(3)
+        assert r["day_HIGH"] == 0
+        # trailing 3-day sums: 12, 24, 36, 24, 12 -> >=30 mm on one day
+        assert r["3day_CRITICAL"] * scale == pytest.approx(1)
+        assert r["3day_HIGH"] * scale == pytest.approx(3)
+        assert r["3day_MODERATE"] * scale == pytest.approx(5)
+
+    def test_every_code_file_is_in_the_review_scope(self):
+        from research.flood_experiments import review_scope
+
+        _, unmatched = review_scope.coverage()
+        assert unmatched == []

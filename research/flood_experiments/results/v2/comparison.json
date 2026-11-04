@@ -1,0 +1,560 @@
+{
+ "study": "v2",
+ "test_years": [
+  2018,
+  2019,
+  2020,
+  2021,
+  2022,
+  2023,
+  2024,
+  2025
+ ],
+ "n_boot": 1000,
+ "models": {
+  "M1": "Climatology",
+  "M3": "NFCC rainfall rule",
+  "M5": "Logistic regression, rainfall",
+  "M9": "XGBoost, multi-source",
+  "M11": "XGBoost, multi-source + local climate",
+  "M12-raw": "XGBoost, forecast mode (M12 inputs)"
+ },
+ "pairs": [
+  {
+   "a": "M11",
+   "b": "M1",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": 0.03350729528324203,
+    "ci90": [
+     0.01622527773034244,
+     0.05205221740914813
+    ],
+    "share_a_better": 0.997
+   },
+   "within_district_auc": {
+    "difference": 0.06674304252639618,
+    "ci90": [
+     0.03594763496992711,
+     0.10685986085499646
+    ],
+    "share_a_better": 1.0
+   }
+  },
+  {
+   "a": "M11",
+   "b": "M9",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": 0.00868502286319485,
+    "ci90": [
+     0.0001110700263669933,
+     0.016378990242151142
+    ],
+    "share_a_better": 0.954
+   },
+   "within_district_auc": {
+    "difference": 0.0021664661733908908,
+    "ci90": [
+     -0.007503613918832424,
+     0.010799597192531823
+    ],
+    "share_a_better": 0.655
+   }
+  },
+  {
+   "a": "M11",
+   "b": "M3",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": 0.05063139094607547,
+    "ci90": [
+     0.03446314743848351,
+     0.06924582780632779
+    ],
+    "share_a_better": 1.0
+   },
+   "within_district_auc": {
+    "difference": -0.016186767993775386,
+    "ci90": [
+     -0.03354885999622833,
+     0.014420980066790169
+    ],
+    "share_a_better": 0.207
+   }
+  },
+  {
+   "a": "M9",
+   "b": "M1",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": 0.024822272420047184,
+    "ci90": [
+     0.011328618732546423,
+     0.04142273657911871
+    ],
+    "share_a_better": 0.992
+   },
+   "within_district_auc": {
+    "difference": 0.06457657635300529,
+    "ci90": [
+     0.03792707000217144,
+     0.09985632969307502
+    ],
+    "share_a_better": 1.0
+   }
+  },
+  {
+   "a": "M5",
+   "b": "M1",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": -0.004724623760320096,
+    "ci90": [
+     -0.021302744062900496,
+     0.010945615629021336
+    ],
+    "share_a_better": 0.325
+   },
+   "within_district_auc": {
+    "difference": 0.08240728200370162,
+    "ci90": [
+     0.05451247710460112,
+     0.1099780744323408
+    ],
+    "share_a_better": 1.0
+   }
+  },
+  {
+   "a": "M3",
+   "b": "M1",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": -0.01712409566283344,
+    "ci90": [
+     -0.02896963588398133,
+     -0.007962798928788005
+    ],
+    "share_a_better": 0.0
+   },
+   "within_district_auc": {
+    "difference": 0.08292981052017157,
+    "ci90": [
+     0.054592061087108734,
+     0.11156059226680724
+    ],
+    "share_a_better": 1.0
+   }
+  },
+  {
+   "a": "M12-raw",
+   "b": "M1",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": 0.003895513734185549,
+    "ci90": [
+     -0.009381131003635723,
+     0.019028920602961047
+    ],
+    "share_a_better": 0.732
+   },
+   "within_district_auc": {
+    "difference": 0.011033566405864281,
+    "ci90": [
+     -0.023411790463249732,
+     0.049931469592989025
+    ],
+    "share_a_better": 0.716
+   }
+  },
+  {
+   "a": "M12-raw",
+   "b": "M3",
+   "n_boot": 1000,
+   "pr_auc": {
+    "difference": 0.02101960939701899,
+    "ci90": [
+     0.007479707530292721,
+     0.038878698466981894
+    ],
+    "share_a_better": 0.996
+   },
+   "within_district_auc": {
+    "difference": -0.07189624411430728,
+    "ci90": [
+     -0.09286134667011696,
+     -0.04212793227097343
+    ],
+    "share_a_better": 0.0
+   }
+  }
+ ],
+ "subgroups": {
+  "M1": [
+   {
+    "group_type": "region",
+    "group": "Ashanti",
+    "districts": 30,
+    "onsets": 76,
+    "base_rate": 0.006118669994364383,
+    "pr_auc": 0.08467305893379368,
+    "within_district_auc": 0.7705795064688555,
+    "pod": 0.35526315789473684
+   },
+   {
+    "group_type": "region",
+    "group": "Brong Ahafo",
+    "districts": 27,
+    "onsets": 20,
+    "base_rate": 0.00177999288002848,
+    "pr_auc": 0.003289562760566976,
+    "within_district_auc": 0.6625232494850353,
+    "pod": 0.0
+   },
+   {
+    "group_type": "region",
+    "group": "Central",
+    "districts": 20,
+    "onsets": 86,
+    "base_rate": 0.010440694427582858,
+    "pr_auc": 0.07090234140560364,
+    "within_district_auc": 0.7700224325505288,
+    "pod": 0.13953488372093023
+   },
+   {
+    "group_type": "region",
+    "group": "Eastern",
+    "districts": 26,
+    "onsets": 56,
+    "base_rate": 0.005195769159398776,
+    "pr_auc": 0.01607747637438229,
+    "within_district_auc": 0.689574832131072,
+    "pod": 0.07142857142857142
+   },
+   {
+    "group_type": "region",
+    "group": "Greater Accra",
+    "districts": 16,
+    "onsets": 206,
+    "base_rate": 0.032232827413550304,
+    "pr_auc": 0.10394651596988973,
+    "within_district_auc": 0.7198360821816238,
+    "pod": 0.21359223300970873
+   },
+   {
+    "group_type": "region",
+    "group": "Northern",
+    "districts": 26,
+    "onsets": 77,
+    "base_rate": 0.007167457879549474,
+    "pr_auc": 0.018474809138518303,
+    "within_district_auc": 0.7057315271617681,
+    "pod": 0.025974025974025976
+   },
+   {
+    "group_type": "region",
+    "group": "Upper East",
+    "districts": 13,
+    "onsets": 54,
+    "base_rate": 0.010121836925960637,
+    "pr_auc": 0.01620764301784052,
+    "within_district_auc": 0.638399492195376,
+    "pod": 0.0
+   },
+   {
+    "group_type": "region",
+    "group": "Upper West",
+    "districts": 11,
+    "onsets": 27,
+    "base_rate": 0.005923650724001755,
+    "pr_auc": 0.011088764962896125,
+    "within_district_auc": 0.6361975940032546,
+    "pod": 0.0
+   },
+   {
+    "group_type": "region",
+    "group": "Volta",
+    "districts": 25,
+    "onsets": 94,
+    "base_rate": 0.009120015523430678,
+    "pr_auc": 0.031761508840969364,
+    "within_district_auc": 0.6975260052970547,
+    "pod": 0.06382978723404255
+   },
+   {
+    "group_type": "region",
+    "group": "Western",
+    "districts": 22,
+    "onsets": 54,
+    "base_rate": 0.0059301559411377115,
+    "pr_auc": 0.03155413079375304,
+    "within_district_auc": 0.7331095366373594,
+    "pod": 0.07407407407407407
+   },
+   {
+    "group_type": "setting",
+    "group": "Rural",
+    "districts": 162,
+    "onsets": 299,
+    "base_rate": 0.004450596886070674,
+    "pr_auc": 0.010713449376333579,
+    "within_district_auc": 0.7084780433867655,
+    "pod": 0.0033444816053511705
+   },
+   {
+    "group_type": "setting",
+    "group": "Urban",
+    "districts": 54,
+    "onsets": 451,
+    "base_rate": 0.020565435476516188,
+    "pr_auc": 0.07913640857088486,
+    "within_district_auc": 0.7189612415104781,
+    "pod": 0.21729490022172948
+   }
+  ],
+  "M3": [
+   {
+    "group_type": "region",
+    "group": "Ashanti",
+    "districts": 30,
+    "onsets": 76,
+    "base_rate": 0.006118669994364383,
+    "pr_auc": 0.024234805427399447,
+    "within_district_auc": 0.7907363513504851,
+    "pod": 0.10526315789473684
+   },
+   {
+    "group_type": "region",
+    "group": "Brong Ahafo",
+    "districts": 27,
+    "onsets": 20,
+    "base_rate": 0.00177999288002848,
+    "pr_auc": 0.0033769197903689907,
+    "within_district_auc": 0.7072568636626513,
+    "pod": 0.0
+   },
+   {
+    "group_type": "region",
+    "group": "Central",
+    "districts": 20,
+    "onsets": 86,
+    "base_rate": 0.010440694427582858,
+    "pr_auc": 0.03315894478252623,
+    "within_district_auc": 0.7998404885936672,
+    "pod": 0.1744186046511628
+   },
+   {
+    "group_type": "region",
+    "group": "Eastern",
+    "districts": 26,
+    "onsets": 56,
+    "base_rate": 0.005195769159398776,
+    "pr_auc": 0.010754031313781543,
+    "within_district_auc": 0.7354990984921544,
+    "pod": 0.017857142857142856
+   },
+   {
+    "group_type": "region",
+    "group": "Greater Accra",
+    "districts": 16,
+    "onsets": 206,
+    "base_rate": 0.032232827413550304,
+    "pr_auc": 0.10730474464569245,
+    "within_district_auc": 0.8001316959994638,
+    "pod": 0.09223300970873786
+   },
+   {
+    "group_type": "region",
+    "group": "Northern",
+    "districts": 26,
+    "onsets": 77,
+    "base_rate": 0.007167457879549474,
+    "pr_auc": 0.03221105149449563,
+    "within_district_auc": 0.8291300114310289,
+    "pod": 0.07792207792207792
+   },
+   {
+    "group_type": "region",
+    "group": "Upper East",
+    "districts": 13,
+    "onsets": 54,
+    "base_rate": 0.010121836925960637,
+    "pr_auc": 0.07461612772113689,
+    "within_district_auc": 0.8878336750815293,
+    "pod": 0.05555555555555555
+   },
+   {
+    "group_type": "region",
+    "group": "Upper West",
+    "districts": 11,
+    "onsets": 27,
+    "base_rate": 0.005923650724001755,
+    "pr_auc": 0.039268963880043785,
+    "within_district_auc": 0.843423576987829,
+    "pod": 0.18518518518518517
+   },
+   {
+    "group_type": "region",
+    "group": "Volta",
+    "districts": 25,
+    "onsets": 94,
+    "base_rate": 0.009120015523430678,
+    "pr_auc": 0.020826600765144247,
+    "within_district_auc": 0.7224470871439984,
+    "pod": 0.02127659574468085
+   },
+   {
+    "group_type": "region",
+    "group": "Western",
+    "districts": 22,
+    "onsets": 54,
+    "base_rate": 0.0059301559411377115,
+    "pr_auc": 0.0700292744804479,
+    "within_district_auc": 0.8661640702370911,
+    "pod": 0.48148148148148145
+   },
+   {
+    "group_type": "setting",
+    "group": "Rural",
+    "districts": 162,
+    "onsets": 299,
+    "base_rate": 0.004450596886070674,
+    "pr_auc": 0.019276299689781763,
+    "within_district_auc": 0.7978264936930627,
+    "pod": 0.11705685618729098
+   },
+   {
+    "group_type": "setting",
+    "group": "Urban",
+    "districts": 54,
+    "onsets": 451,
+    "base_rate": 0.020565435476516188,
+    "pr_auc": 0.06603792777424,
+    "within_district_auc": 0.7976356788686735,
+    "pod": 0.11086474501108648
+   }
+  ],
+  "M11": [
+   {
+    "group_type": "region",
+    "group": "Ashanti",
+    "districts": 30,
+    "onsets": 76,
+    "base_rate": 0.006118669994364383,
+    "pr_auc": 0.15581354005641213,
+    "within_district_auc": 0.7715042584521472,
+    "pod": 0.39473684210526316
+   },
+   {
+    "group_type": "region",
+    "group": "Brong Ahafo",
+    "districts": 27,
+    "onsets": 20,
+    "base_rate": 0.00177999288002848,
+    "pr_auc": 0.006334235093774093,
+    "within_district_auc": 0.7050983085878408,
+    "pod": 0.0
+   },
+   {
+    "group_type": "region",
+    "group": "Central",
+    "districts": 20,
+    "onsets": 86,
+    "base_rate": 0.010440694427582858,
+    "pr_auc": 0.05602181046814212,
+    "within_district_auc": 0.7896509541493125,
+    "pod": 0.09302325581395349
+   },
+   {
+    "group_type": "region",
+    "group": "Eastern",
+    "districts": 26,
+    "onsets": 56,
+    "base_rate": 0.005195769159398776,
+    "pr_auc": 0.03251982242426687,
+    "within_district_auc": 0.723059885626547,
+    "pod": 0.07142857142857142
+   },
+   {
+    "group_type": "region",
+    "group": "Greater Accra",
+    "districts": 16,
+    "onsets": 206,
+    "base_rate": 0.032232827413550304,
+    "pr_auc": 0.15179247830870568,
+    "within_district_auc": 0.7900732308645507,
+    "pod": 0.36893203883495146
+   },
+   {
+    "group_type": "region",
+    "group": "Northern",
+    "districts": 26,
+    "onsets": 77,
+    "base_rate": 0.007167457879549474,
+    "pr_auc": 0.04627052528135378,
+    "within_district_auc": 0.8223651039654047,
+    "pod": 0.06493506493506493
+   },
+   {
+    "group_type": "region",
+    "group": "Upper East",
+    "districts": 13,
+    "onsets": 54,
+    "base_rate": 0.010121836925960637,
+    "pr_auc": 0.028634029894163197,
+    "within_district_auc": 0.8091719151489842,
+    "pod": 0.018518518518518517
+   },
+   {
+    "group_type": "region",
+    "group": "Upper West",
+    "districts": 11,
+    "onsets": 27,
+    "base_rate": 0.005923650724001755,
+    "pr_auc": 0.0851760591511101,
+    "within_district_auc": 0.845020110006007,
+    "pod": 0.0
+   },
+   {
+    "group_type": "region",
+    "group": "Volta",
+    "districts": 25,
+    "onsets": 94,
+    "base_rate": 0.009120015523430678,
+    "pr_auc": 0.05456353228533882,
+    "within_district_auc": 0.7135354694399144,
+    "pod": 0.06382978723404255
+   },
+   {
+    "group_type": "region",
+    "group": "Western",
+    "districts": 22,
+    "onsets": 54,
+    "base_rate": 0.0059301559411377115,
+    "pr_auc": 0.16930870049609467,
+    "within_district_auc": 0.8397361526597299,
+    "pod": 0.3148148148148148
+   },
+   {
+    "group_type": "setting",
+    "group": "Rural",
+    "districts": 162,
+    "onsets": 299,
+    "base_rate": 0.004450596886070674,
+    "pr_auc": 0.02702519030311068,
+    "within_district_auc": 0.7821087431670524,
+    "pod": 0.026755852842809364
+   },
+   {
+    "group_type": "setting",
+    "group": "Urban",
+    "districts": 54,
+    "onsets": 451,
+    "base_rate": 0.020565435476516188,
+    "pr_auc": 0.11640724784402087,
+    "within_district_auc": 0.78113796581312,
+    "pod": 0.3082039911308204
+   }
+  ]
+ }
+}
