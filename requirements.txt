@@ -14,7 +14,7 @@ python-multipart==0.0.32
 email-validator>=2.0.0
 
 # ML & Data Processing
-numpy==1.26.4
+numpy==2.5.4
 pandas==2.1.4
 # scikit-learn, xgboost, shap, and joblib were removed 2026-09-27 -
 # leftover dependencies from the trained XGBoost model, which was
