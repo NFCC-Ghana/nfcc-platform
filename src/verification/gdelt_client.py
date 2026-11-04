@@ -33,6 +33,7 @@ than hidden.
 """
 
 import logging
+import re
 import time
 from typing import Dict, List
 
@@ -53,6 +54,26 @@ def _throttle() -> None:
     if elapsed < _MIN_REQUEST_INTERVAL_SECONDS:
         time.sleep(_MIN_REQUEST_INTERVAL_SECONDS - elapsed)
     _last_request_time = time.time()
+
+
+# GDELT's DOC search matches its query words anywhere in an article's full
+# text, its page furniture (menus, "related stories" lists) included. In the
+# November 2026 re-check of the prediction ledger it returned, for
+# 'flood Ghana "Accra"' in mid-October 2026, a Graphic Online story about a
+# used-vehicle import ban and a 2009 Times Herald article, "Farewell to an
+# unbelievable 2008". Neither reports a flood in Accra, but each confirmed
+# sixteen Accra predictions. An article now counts only if its own title
+# names both a flood and the place searched for.
+_FLOOD_WORDS = re.compile(r"\b(flood\w*|inundat\w*|deluge\w*|torrential)\b", re.I)
+
+
+def is_relevant(title, place: str) -> bool:
+    """True if the headline itself reports flooding at `place`."""
+    if not title:
+        return False
+    return bool(_FLOOD_WORDS.search(title)) and bool(
+        re.search(rf"\b{re.escape(place)}\b", title, re.I)
+    )
 
 
 def search_flood_news(district: str, start_date: str, end_date: str) -> Dict:
@@ -92,7 +113,7 @@ def search_flood_news(district: str, start_date: str, end_date: str) -> Dict:
         return {"available": False, "reason": f"GDELT request failed: {e}"}
 
     raw_articles = payload.get("articles") or payload.get("docs") or []
-    articles: List[Dict] = [
+    returned: List[Dict] = [
         {
             "title": a.get("title"),
             "url": a.get("url"),
@@ -101,10 +122,16 @@ def search_flood_news(district: str, start_date: str, end_date: str) -> Dict:
         }
         for a in raw_articles
     ]
+    place = search_place(district)
+    articles = [a for a in returned if is_relevant(a["title"], place)]
 
     return {
         "available": True,
         "matched_articles": articles,
         "count": len(articles),
+        # Everything GDELT returned, kept so a reviewer can see what the
+        # headline filter set aside.
+        "returned_articles": returned,
+        "returned_count": len(returned),
         "source": "GDELT (global news monitoring)",
     }

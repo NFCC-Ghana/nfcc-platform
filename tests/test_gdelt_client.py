@@ -50,7 +50,8 @@ def test_missing_fields_handled_defensively():
     with patch.object(gdelt_client, "_throttle"), patch("requests.get", return_value=mock_resp):
         result = search_flood_news("Tamale", "2026-01-01", "2026-01-15")
     assert result["available"] is True
-    assert result["matched_articles"][0]["title"] is None
+    assert result["returned_articles"][0]["title"] is None
+    assert result["count"] == 0
 
 
 def test_graceful_on_request_failure():
@@ -76,3 +77,44 @@ def test_throttle_sleeps_when_called_too_soon():
     mock_sleep.assert_called_once()
     slept_seconds = mock_sleep.call_args[0][0]
     assert 0 < slept_seconds <= gdelt_client._MIN_REQUEST_INTERVAL_SECONDS
+
+
+def _search_with_titles(district, titles):
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status.return_value = None
+    mock_resp.json.return_value = {
+        "articles": [{"title": t, "url": "u", "seendate": "s", "domain": "d"} for t in titles]
+    }
+    with patch.object(gdelt_client, "_throttle"), patch("requests.get", return_value=mock_resp):
+        return search_flood_news(district, "2026-10-13", "2026-10-27")
+
+
+def test_articles_not_about_a_flood_at_the_place_do_not_count():
+    """The two articles GDELT really returned for Accra in October 2026,
+    which had confirmed sixteen predictions."""
+    result = _search_with_titles(
+        "Accra Central",
+        [
+            "Standards Authority sued over used - vehicle import ban",
+            "Farewell to an unbelievable 2008",
+        ],
+    )
+    assert result["count"] == 0
+    assert result["returned_count"] == 2
+
+
+def test_headline_must_name_both_a_flood_and_the_place():
+    result = _search_with_titles(
+        "Accra West",
+        [
+            "Floods hit parts of Accra after heavy downpour",  # counts (Accra)
+            "Flooding in Kumasi displaces residents",  # wrong place
+            "Accra traffic eases after roadworks",  # no flood
+            "NADMO assesses inundated communities in accra",  # counts
+        ],
+    )
+    assert result["count"] == 2
+    assert {a["title"] for a in result["matched_articles"]} == {
+        "Floods hit parts of Accra after heavy downpour",
+        "NADMO assesses inundated communities in accra",
+    }
