@@ -124,7 +124,10 @@ class UrbanDrainage:
         area_map = {
             "Accra Central": ["Central Accra", "Kaneshie", "Ring Road Central"],
             "Accra West": ["Weija", "Mallam"],
-            "Accra East": ["Korle", "Chorkor"],
+            # Not Korle/Chorkor: those are in Accra West/Central, so the
+            # Korle Lagoon "POOR" status gave Accra East a 1.2 factor it
+            # has no data for.
+            "Accra East": [],
             "Tema": ["Tema", "Community 1"],
             "Kumasi": ["Kumasi", "Atwima"],
             "Tamale": ["Tamale", "Gushegu"],

@@ -422,7 +422,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 45.5,
             "lat": 5.560,
             "lon": -0.210,
-            "elevation": 12,
+            "elevation": 19,
             "affected_communities": [
                 "Alajo",
                 "Kaneshie",
@@ -437,7 +437,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 52.3,
             "lat": 5.550,
             "lon": -0.230,
-            "elevation": 10,
+            "elevation": 6,
             "affected_communities": [
                 "Dansoman",
                 "Korle Bu",
@@ -452,7 +452,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 38.2,
             "lat": 5.565,
             "lon": -0.190,
-            "elevation": 15,
+            "elevation": 38,
             "affected_communities": [
                 "Labone",
                 "East Legon",
@@ -467,7 +467,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 565,
             "lat": 5.650,
             "lon": -0.020,
-            "elevation": 18,
+            "elevation": 11,
             "affected_communities": [
                 "Tema Community 1",
                 "Tema Community 2",
@@ -482,7 +482,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 299,
             "lat": 6.670,
             "lon": -1.620,
-            "elevation": 25,
+            "elevation": 251,
             "affected_communities": [
                 "Asokwa",
                 "Bantama",
@@ -497,7 +497,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 731,
             "lat": 9.400,
             "lon": -0.840,
-            "elevation": 125,
+            "elevation": 196,
             "affected_communities": [
                 "Tamale Central",
                 "Tamale North",
@@ -513,9 +513,9 @@ _DISTRICT_FALLBACK = {
             "region": "Central",
             "population": 189925,
             "area_km2": 122,
-            "lat": 5.100,
-            "lon": -1.250,
-            "elevation": 25,
+            "lat": 5.105,
+            "lon": -1.246,
+            "elevation": 18,
             "affected_communities": [
                 "Pedu",
                 "Abura",
@@ -530,7 +530,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 573.2,
             "lat": 6.601,
             "lon": 0.471,
-            "elevation": 100,
+            "elevation": 172,
             "affected_communities": ["Bankoe", "Heve", "Ahoe", "Dome", "Hliha"],
         },
         "Sunyani": {
@@ -539,7 +539,7 @@ _DISTRICT_FALLBACK = {
             "area_km2": 1289,
             "lat": 7.333,
             "lon": -2.333,
-            "elevation": 300,
+            "elevation": 295,
             "affected_communities": [
                 "Abesim",
                 "Atronie",
