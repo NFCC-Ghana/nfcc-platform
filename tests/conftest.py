@@ -140,3 +140,27 @@ def offline_http():
     offline = requests.ConnectionError("tests run offline")
     with patch("requests.sessions.Session.request", side_effect=offline):
         yield
+
+
+@pytest.fixture(autouse=True)
+def no_earth_engine(monkeypatch):
+    """Tests never call the real Earth Engine. CI has no credentials, so this
+    makes a developer machine that does behave the same; a test that needs
+    an "initialized" path patches it back on itself."""
+    import importlib
+
+    # importlib, not `import a.b as x`: src/hydrology/__init__.py re-exports
+    # an instance named sentinel_processor that shadows the submodule.
+    antecedent, sentinel, smap, backtest = (
+        importlib.import_module(name)
+        for name in (
+            "src.hydrology.antecedent_rainfall",
+            "src.hydrology.sentinel_processor",
+            "src.hydrology.smap_soil_moisture",
+            "src.models.historical_backtest",
+        )
+    )
+    for module in (antecedent, sentinel, smap, backtest):
+        monkeypatch.setattr(module, "initialize_earth_engine", lambda *a, **k: False)
+    monkeypatch.setattr(sentinel.sentinel_processor, "ee_initialized", False)
+    sentinel.sentinel_processor._live_cache.clear()
