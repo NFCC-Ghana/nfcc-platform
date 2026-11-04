@@ -368,3 +368,24 @@ def test_get_antecedent_precipitation_skips_stale_data():
             "https://fake-api.example", "Accra Central"
         )
     assert result is None
+
+
+def test_dam_river_pathway_sends_no_rainfall():
+    """The river/dam signal is a 0-100 score; it must travel as
+    score_override with precipitation 0, or the public message would print
+    the score as millimetres of rain."""
+    with patch.object(script, "get_forecast_precipitation", return_value=None), \
+            patch.object(script, "get_antecedent_precipitation", return_value=None), \
+            patch.object(script, "get_observed_past_precipitation", return_value=None), \
+            patch.object(script, "get_fluvial_risk", return_value=45.0), \
+            patch("requests.post") as mock_post:
+        mock_post.return_value = _mock_response({"queued": False, "score": 45})
+        script.run("https://fake-api.example")
+    dam = [
+        c.kwargs["json"]
+        for c in mock_post.call_args_list
+        if "/alerts/assess" in c.args[0]
+        and c.kwargs["json"]["basis"] == "dam_river_pathway"
+    ]
+    assert dam
+    assert all(j["precipitation"] == 0.0 and j["score_override"] == 45.0 for j in dam)

@@ -25,8 +25,8 @@ class DashboardState:
     api_connected: bool = True
     api_version: str = "3.0.0"
     timestamp: str = field(default_factory=lambda: datetime.datetime.now().isoformat())
-    active_sources_count: int = 6
-    data_quality_score: float = 92.0
+    active_sources_count: int = 0
+    data_quality_score: float = 0.0
 
     # ============================================================
     # RISK ASSESSMENT

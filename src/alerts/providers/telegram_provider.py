@@ -66,10 +66,16 @@ class TelegramAlertProvider(BaseAlertProvider):
             "EXTREME": "\U0001f480",
         }.get(alert.risk_tier, "⚠️")
 
+        # No rainfall line for a river/dam alert (precipitation 0).
+        rainfall = (
+            f"Rainfall: {alert.precipitation:.1f}mm\n"
+            if alert.precipitation > 0
+            else ""
+        )
         return (
             f"{risk_emoji} FLOOD ALERT: {alert.location}\n\n"
             f"Risk: {alert.risk_tier} ({alert.score:.0f}/100)\n"
-            f"Rainfall: {alert.precipitation:.1f}mm\n"
+            f"{rainfall}"
             f"{alert.message}\n\n"
             f"Reply 'ALERTS OFF' to stop these messages."
         )

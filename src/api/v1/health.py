@@ -62,7 +62,7 @@ def _check_earth_engine() -> DataSourceStatus:
     return DataSourceStatus(
         name="Google Earth Engine (Sentinel-1 SAR + CHIRPS)",
         status="unavailable",
-        detail="Not authenticated - falling back to simulated satellite data",
+        detail="Not authenticated - satellite readings report unavailable",
     )
 
 
@@ -150,9 +150,9 @@ def _check_river_gauges() -> DataSourceStatus:
         name="Ghana River Gauges (Hydrological Services)",
         status="not_configured",
         detail=(
-            "No API key configured and no public endpoint confirmed - "
-            "src/hydrology/river_gauge_api.py currently always falls "
-            "back to simulated gauge readings"
+            "No data-sharing agreement with the Ghana Hydrological "
+            "Authority and no public endpoint - river levels come only "
+            "from DAHITI satellite altimetry where available"
         ),
     )
 

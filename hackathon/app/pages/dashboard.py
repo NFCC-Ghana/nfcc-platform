@@ -150,13 +150,15 @@ API_URL = os.getenv(
 # checks the header once settings.API_KEY is configured, and sending an
 # unrecognized header to an endpoint that ignores it is a no-op.
 API_KEY = os.getenv("NFCC_API_KEY", "")
-# Optional second, stronger secret the backend requires (only when
+# Second, stronger secret the backend requires (when
 # settings.ALERT_APPROVAL_KEY is configured there - see src/api/auth.py's
 # enforce_approval_key) on top of the regular API key for approving,
-# dismissing, or retracting a REAL (non-exercise) pending alert. Blank
-# here is a safe no-op exactly like API_KEY being blank: harmless to
-# send an empty/absent header to a backend that isn't enforcing it yet.
-APPROVAL_KEY = os.getenv("NFCC_ALERT_APPROVAL_KEY", "")
+# dismissing, or retracting a REAL (non-exercise) pending alert.
+# The alert-approval key is typed by the operator in the review queue and
+# kept only in their session. It used to be read from this app's secrets,
+# and the app is publicly reachable, so any visitor could approve or
+# retract a real alert - defeating the point of a second key.
+_APPROVAL_KEY_STATE = "_operator_approval_key"
 
 st.set_page_config(
     page_title="CivicFlood AI - National Emergency Operations Center",
@@ -173,8 +175,9 @@ st.set_page_config(
 
 def _auth_headers(include_approval_key: bool = False) -> dict:
     headers = {"X-API-Key": API_KEY} if API_KEY else {}
-    if include_approval_key and APPROVAL_KEY:
-        headers["X-Approval-Key"] = APPROVAL_KEY
+    approval_key = st.session_state.get(_APPROVAL_KEY_STATE, "")
+    if include_approval_key and approval_key:
+        headers["X-Approval-Key"] = approval_key
     return headers
 
 
@@ -191,8 +194,8 @@ def call_api(
     alongside the regular API key - set it on every real (non-exercise)
     approve/dismiss/cancel call, matching what src/api/auth.py's
     enforce_approval_key checks for. Harmless to pass on any other call
-    (unused headers are simply ignored) or when APPROVAL_KEY isn't set
-    (the header is just never added, see _auth_headers)."""
+    (unused headers are simply ignored) or before the operator has entered
+    the approval key (the header is just never added, see _auth_headers)."""
     url = f"{API_URL}{endpoint}"
     try:
         if method == "GET":
@@ -329,12 +332,12 @@ SITUATION_BY_TIER = {
     "EXTREME": (
         "🔴 EXTREME: Immediate evacuation required.",
         "#cc0000",
-        "🚨 MANDATORY EVACUATION ORDER",
+        "🚨 RECOMMEND EVACUATION - decision for NADMO / district authority",
     ),
     "CRITICAL": (
         "🔴 CRITICAL: Prepare for evacuation immediately.",
         "#ff0000",
-        "🚨 EVACUATION ORDER LIKELY",
+        "🚨 PREPARE FOR POSSIBLE EVACUATION - follow official instructions",
     ),
     "HIGH": (
         "🟠 HIGH: Elevated flood risk in this area.",
@@ -585,7 +588,7 @@ def render_header(state):
     with col2:
         st.markdown("🟢 **SYSTEM ACTIVE**")
         st.caption(f"🕐 {datetime.now().strftime('%d %b %Y, %H:%M UTC')}")
-        st.caption(f"📊 {state.active_sources_count} Data Sources Active")
+        st.caption(f"📊 {state.active_sources_count} evidence sources available")
 
     with col3:
         # Previously always said "API Connected" regardless of
@@ -768,7 +771,7 @@ def render_executive_summary(state):
                     "subtitle": "hours",
                 },
                 {
-                    "label": "Data Quality",
+                    "label": "Evidence Coverage",
                     "value": f"{state.data_quality_score:.0f}%",
                     "emoji": "📊",
                     "color": "#9f7aea",
@@ -1077,7 +1080,7 @@ def render_evidence_panel(state):
                 "color": "#dd6b20" if state.confidence_degraded else "#38a169",
             },
             {
-                "label": "Data Quality",
+                "label": "Evidence Coverage",
                 "value": f"{state.data_quality_score:.0f}%",
                 "emoji": "📊",
                 "color": "#4299e1",
@@ -1434,7 +1437,7 @@ def render_ai_decision_center(state):
             st.warning(
                 f"⚠️ **Independent pathway check**: {card.get('risk_attribution', '')} "
                 f"Fused risk is **{card.get('fused_risk_tier', '?')}** "
-                f"({fused_score:.0f}%) even though rainfall alone is only {tier}."
+                f"({fused_score:.0f}/100) even though rainfall alone is only {tier}."
             )
         elif card.get("risk_attribution"):
             st.caption(f"🔎 {card['risk_attribution']}")
@@ -1537,9 +1540,9 @@ def render_risk_timeline(state):
     col1, col2, col3 = st.columns(3)
     with col1:
         delta = (
-            f"{peak_risk - current_risk:.0f}%" if peak_risk > current_risk else "Stable"
+            f"+{peak_risk - current_risk:.0f}" if peak_risk > current_risk else "Stable"
         )
-        st.metric("Peak Risk", f"{peak_risk:.0f}%", delta=delta)
+        st.metric("Peak Risk", f"{peak_risk:.0f}/100", delta=delta)
     with col2:
         st.metric("Peak Time", peak_hour)
     with col3:
@@ -1606,7 +1609,7 @@ def render_risk_history_chart(state):
     fig.update_layout(
         height=280,
         yaxis_range=[0, 100],
-        yaxis_title="Risk Score (%)",
+        yaxis_title="Risk score (0-100, not a probability)",
         xaxis_title="Recorded at",
         margin=dict(l=10, r=10, t=10, b=10),
     )
@@ -1623,10 +1626,10 @@ def render_ai_copilot(state):
 
     col1, col2, col3, col4 = st.columns(4)
     questions = [
-        "What roads will flood?",
-        "Should we evacuate?",
-        "When will rain stop?",
-        "Which areas are high risk?",
+        "What is the current risk here and why?",
+        "Which districts have the highest recorded risk?",
+        "What does the 24-hour forecast show?",
+        "Which data sources are unavailable now?",
     ]
     for i, question in enumerate(questions):
         with [col1, col2, col3, col4][i]:
@@ -1705,6 +1708,13 @@ def apply_confidence_to_state(state, confidence_data) -> None:
     state.evidence_overall_confidence = confidence_block["value"]
     state.confidence_explanation = confidence_block["explanation"]
     state.confidence_degraded = confidence_block["degraded"]
+    # Real counts from the evidence fusion, replacing constants (92%, 6)
+    # that were shown as live figures.
+    basis = confidence_block.get("basis") or []
+    state.active_sources_count = sum(
+        1 for b in basis if b.endswith(" available") and "unavailable" not in b
+    )
+    state.data_quality_score = confidence_block.get("coverage", 0.0)
 
 
 def fetch_situation_state(district: str, rainfall_mm: float):
@@ -1867,7 +1877,7 @@ def render_situation(
     st.divider()
     st.caption("🌊 CivicFlood AI • Decision Intelligence for National Flood Response")
     st.caption("NFCC Platform • Ghana AI Innovation Challenge 2026")
-    st.caption(f"📊 {state.active_sources_count} Data Sources Active")
+    st.caption(f"📊 {state.active_sources_count} evidence sources available")
     st.caption(f"🔄 Last updated: {state.timestamp[:19]}")
 
 
@@ -1941,7 +1951,7 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
         f"margin-bottom:20px;'>"
         f"<div style='font-size:72px;line-height:1;'>{style['emoji']}</div>"
         f"<div style='font-size:64px;font-weight:800;line-height:1.1;'>"
-        f"{state.risk_score:.0f}%</div>"
+        f"{state.risk_score:.0f}/100</div>"
         f"<div style='font-size:28px;font-weight:700;letter-spacing:2px;'>"
         f"{state.risk_category}</div>"
         f"</div>",
@@ -1964,7 +1974,7 @@ def render_broadcast_view(district: str, rainfall_mm: float, stage_label: str) -
             },
             {
                 "label": "Peak Risk (24h)",
-                "value": f"{peak_score:.0f}%",
+                "value": f"{peak_score:.0f}/100",
                 "emoji": "📈",
                 "color": style["color"],
             },
@@ -2312,8 +2322,8 @@ _KIOSK_I18N = {
         "rec_low": "✅ CONTINUE NORMAL OPERATIONS",
         "rec_moderate": "📢 STAY INFORMED",
         "rec_high": "⚠️ PREPARE TO EVACUATE",
-        "rec_critical": "🚨 EVACUATION ORDER LIKELY",
-        "rec_extreme": "🚨 MANDATORY EVACUATION ORDER",
+        "rec_critical": "⚠️ HIGH FLOOD RISK - follow NADMO and local authority instructions",
+        "rec_extreme": "🚨 VERY HIGH FLOOD RISK - follow NADMO and local authority instructions",
         "connection_lost_title": "⚠️ Unable to reach the NFCC system.",
         "connection_lost_body": (
             "Retrying automatically - no cached reading is available yet "
@@ -2328,8 +2338,8 @@ _KIOSK_I18N = {
             "not a live reading."
         ),
         "refresh_caption": (
-            "🔄 Refreshes every {seconds}s • NFCC Platform • real-time "
-            "satellite and weather data, not a recording"
+            "🔄 Refreshes every {seconds}s • NFCC Platform • rainfall "
+            "forecast scored by a rule; not an official warning"
         ),
         "language_fallback_notice": (
             "ℹ️ This screen is showing English - the language you selected "
@@ -2522,7 +2532,7 @@ def render_kiosk_view(district_param: str, lang: str = "en") -> None:
         f"margin-bottom:16px;'>"
         f"<div>{icon_svg}</div>"
         f"<div style='font-size:80px;font-weight:800;line-height:1.1;margin-top:8px;'>"
-        f"{state.risk_score:.0f}%</div>"
+        f"{state.risk_score:.0f}/100</div>"
         f"<div style='font-size:36px;font-weight:700;letter-spacing:2px;'>"
         f"{tier_label}</div>"
         f"<div style='font-size:20px;margin-top:6px;opacity:0.9;'>"
@@ -2704,6 +2714,12 @@ def render_alert_review_queue():
         key="_operator_name",
         placeholder="e.g. Kwame Mensah, NFCC duty officer",
     ).strip()
+    st.text_input(
+        "Alert-approval key (required to send, dismiss or retract a real alert)",
+        key=_APPROVAL_KEY_STATE,
+        type="password",
+        help="Issued to authorised duty officers; kept only for this session.",
+    )
     if not operator_name:
         st.warning(
             "⚠️ Enter your name above before you can approve, dismiss, or "
@@ -2794,7 +2810,7 @@ def render_alert_review_queue():
                 with c1:
                     st.markdown(
                         f"{style['emoji']} **{alert['location']}** — "
-                        f"{alert['risk_tier']} ({alert['score']:.0f}%)"
+                        f"{alert['risk_tier']} ({alert['score']:.0f}/100)"
                     )
                     basis_label = _BASIS_LABELS.get(alert.get("basis"), "Precipitation")
                     st.caption(f"{basis_label}: {alert['precipitation']}mm")

@@ -239,6 +239,11 @@ async def assess_district(request: AssessRequest):
         }
 
     message = _DEFAULT_MESSAGES.get(risk_tier, "Flood alert issued.")
+    if request.basis == "dam_river_pathway":
+        message = (
+            "River or reservoir level is above its usual range "
+            "(satellite altimetry). " + message
+        )
     cap_status = _CAP_STATUS_EXERCISE if request.exercise else _CAP_STATUS_ACTUAL
     if request.exercise:
         # CAP's own guidance (used by FEMA IPAWS/EU/Japan) is that an

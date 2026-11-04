@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import requests
 
+from src.alerts.formatter import calculate_score
 from src.hydrology.weather_forecast import WeatherForecastEngine, weather_forecast
 from src.models.forecast_timeline import build_risk_timeline, get_forecast_and_timeline
 
@@ -74,3 +75,14 @@ def test_copilot_refuses_to_score_without_a_forecast():
             assert "risk_tier" not in out
         out = asyncio.run(tools.get_district_forecast("Accra Central"))
         assert out["error"] == "forecast_unavailable"
+
+
+def test_timeline_does_not_add_the_forecast_to_itself():
+    """Callers pass the 24 h forecast as the current rainfall; the +24h
+    point must score that forecast once, not twice."""
+    forecast = {
+        "source": "open-meteo",
+        "cumulative_6h": {"6": 2.0, "12": 4.0, "18": 6.0, "24": 8.0},
+    }
+    timeline = build_risk_timeline(8.0, forecast)
+    assert timeline[0]["score"] == timeline[-1]["score"] == calculate_score(8.0)
