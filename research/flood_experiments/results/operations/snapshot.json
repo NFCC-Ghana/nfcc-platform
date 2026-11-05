@@ -1,44 +1,45 @@
 {
- "taken_at": "2026-11-04T12:42:47+00:00",
+ "taken_at": "2026-11-05T12:38:54+00:00",
  "api": "https://nfcc-platform-355353600602.europe-west1.run.app",
  "review_queue": {
-  "total": 79,
+  "total": 82,
   "created": {
    "first": "2026-09-19T15:17:35.756660",
-   "last": "2026-11-04T10:40:11.004001"
+   "last": "2026-11-05T10:34:59.572417"
   },
   "by_status": {
-   "pending": 77,
+   "pending": 80,
    "approved": 2
   },
   "by_basis": {
    "antecedent_3d_observed_fallback": 43,
-   "antecedent_3d_accumulation": 18,
+   "antecedent_3d_accumulation": 21,
    "dam_river_pathway": 11,
    "forecast_next_24h": 7
   },
   "by_tier": {
-   "MODERATE": 61,
+   "MODERATE": 63,
    "HIGH": 9,
-   "CRITICAL": 7,
+   "CRITICAL": 8,
    "EXTREME": 2
   },
   "by_cap_status": {
-   "Actual": 75,
+   "Actual": 78,
    "Exercise": 4
   },
   "by_district": {
    "Tamale": 29,
-   "Kumasi": 22,
-   "Ho": 17,
+   "Kumasi": 23,
+   "Ho": 18,
    "Sunyani": 9,
+   "Cape Coast": 1,
    "Accra West": 1,
    "Accra Central": 1
   },
   "reviewed_by_a_person": 0,
   "last_created_by_basis": {
+   "antecedent_3d_accumulation": "2026-11-05T10:34:59.572417",
    "forecast_next_24h": "2026-11-02T21:33:30.276175",
-   "antecedent_3d_accumulation": "2026-11-04T10:40:11.004001",
    "antecedent_3d_observed_fallback": "2026-11-04T10:39:48.421187",
    "dam_river_pathway": "2026-09-21T12:25:14.168136"
   }
@@ -61,96 +62,93 @@
   }
  },
  "prediction_ledger": {
-  "total": 1158,
+  "total": 1184,
   "predicted": {
    "first": "2026-09-19T15:14:34.606733",
-   "last": "2026-11-04T10:40:20.831225"
+   "last": "2026-11-05T10:36:11.218130"
   },
   "by_risk_tier": {
-   "LOW": 1156,
+   "LOW": 1182,
    "MODERATE": 2
   },
   "by_fused_tier": {
-   "LOW": 1145,
+   "LOW": 1171,
    "MODERATE": 11,
    "HIGH": 2
   },
   "by_outcome": {
-   "flood_confirmed": 1040,
-   "None": 115,
-   "no_evidence_found": 3
+   "no_evidence_found": 1078,
+   "None": 106
   },
   "by_outcome_source": {
-   "ReliefWeb": 1023,
-   "None": 115,
-   "ReliefWeb,GDELT": 17,
-   "automated_check_no_signal": 3
+   "automated_check_no_signal": 1078,
+   "None": 106
   }
  },
  "observation_archive": {
   "dam_river_pathway": {
-   "rows": 1161,
+   "rows": 1188,
    "with_value": 21,
    "last_with_value": "2026-09-21T12:25:14.674808"
   },
   "antecedent_3d_accumulation": {
-   "rows": 232,
-   "with_value": 127,
-   "last_with_value": "2026-11-04T10:40:17.316506"
+   "rows": 257,
+   "with_value": 152,
+   "last_with_value": "2026-11-05T10:36:06.030650"
   },
   "forecast_next_24h": {
-   "rows": 1162,
-   "with_value": 852,
-   "last_with_value": "2026-11-04T10:40:17.122499"
+   "rows": 1189,
+   "with_value": 867,
+   "last_with_value": "2026-11-05T10:35:16.147382"
   },
   "antecedent_3d_observed_fallback": {
-   "rows": 930,
-   "with_value": 930,
-   "last_with_value": "2026-11-04T10:39:49.007011"
+   "rows": 932,
+   "with_value": 932,
+   "last_with_value": "2026-11-05T10:32:09.735247"
   }
  },
  "risk_history": {
-  "rows": 854,
+  "rows": 869,
   "recorded": {
    "first": "2026-09-19T03:27:25.654227",
-   "last": "2026-11-04T10:40:16.927142"
+   "last": "2026-11-05T10:35:15.958501"
   }
  },
  "workflow_runs": {
   "automated_risk_assessment.yml": {
-   "runs": 193,
+   "runs": 196,
    "by_conclusion": {
-    "success": 193
+    "success": 196
    },
-   "scheduled": 188,
+   "scheduled": 191,
    "created": {
     "first": "2026-09-16T20:08:26Z",
-    "last": "2026-11-04T10:38:30Z"
+    "last": "2026-11-05T10:31:18Z"
    }
   },
   "verify_predictions.yml": {
-   "runs": 46,
+   "runs": 47,
    "by_conclusion": {
-    "success": 45,
+    "success": 46,
     "failure": 1
    },
-   "scheduled": 46,
+   "scheduled": 47,
    "created": {
     "first": "2026-09-19T10:06:58Z",
-    "last": "2026-11-03T13:26:02Z"
+    "last": "2026-11-04T13:37:20Z"
    }
   },
   "daily_chirps.yml": {
-   "runs": 165,
+   "runs": 166,
    "by_conclusion": {
     "failure": 112,
-    "success": 52,
+    "success": 53,
     "cancelled": 1
    },
-   "scheduled": 161,
+   "scheduled": 162,
    "created": {
     "first": "2026-05-27T11:36:22Z",
-    "last": "2026-11-03T15:47:33Z"
+    "last": "2026-11-04T15:56:19Z"
    }
   },
   "model_validation.yml": {
@@ -178,27 +176,27 @@
    }
   },
   "elite-resilience.yml": {
-   "runs": 544,
+   "runs": 557,
    "by_conclusion": {
-    "failure": 308,
-    "success": 236
+    "failure": 309,
+    "success": 248
    },
-   "scheduled": 164,
+   "scheduled": 165,
    "created": {
     "first": "2026-05-24T19:10:20Z",
-    "last": "2026-11-04T08:48:54Z"
+    "last": "2026-11-05T09:12:28Z"
    }
   },
   "ci.yml": {
-   "runs": 374,
+   "runs": 386,
    "by_conclusion": {
-    "success": 236,
-    "failure": 138
+    "success": 247,
+    "failure": 139
    },
    "scheduled": 0,
    "created": {
     "first": "2026-05-05T00:06:00Z",
-    "last": "2026-11-02T15:49:09Z"
+    "last": "2026-11-04T22:48:30Z"
    }
   }
  }
