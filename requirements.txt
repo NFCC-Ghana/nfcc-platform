@@ -87,7 +87,7 @@ click==8.5.0
 rich==15.0.0
 requests>=2.31.0
 gunicorn>=26.2.0
-apscheduler>=3.10.0
+apscheduler>=3.11.3
 # Pinned explicitly so the resolver can't drift it. 1.10.0 is what
 # fastapi==0.162.0 resolves to, and it clears the DoS advisory
 # GHSA-2c2j-9gv5-cj73 (fixed in 0.40.0) that the old fastapi==0.115.0
