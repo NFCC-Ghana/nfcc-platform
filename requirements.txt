@@ -36,7 +36,7 @@ plotly>=7.1.0
 
 # Alert Providers
 twilio>=8.0.0
-python-dotenv>=1.0.0
+python-dotenv>=1.2.4
 
 # Distributed alert cooldown (src/alerts/cooldown.py) - was imported
 # inside a try/except that silently fell back to memory-only mode on
