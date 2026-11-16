@@ -1,16 +1,16 @@
 # Core Framework
-fastapi==0.162.0
+fastapi==0.162.6
 uvicorn[standard]==0.54.0
 # Bumped from 2.5.0: google-genai (src/copilot/) hard-requires
 # pydantic>=2.12.5. Verified against the full existing test suite
 # before bumping; no other code in this repo depends on anything
 # specific to 2.5.0.
-pydantic==2.14.2
+pydantic==2.14.3
 # Bumped from 0.0.6: that version predates 0.0.7's fix for a ReDoS
 # advisory (CVE-2024-24762) in multipart/form-data parsing. 0.0.18
 # matches what fastapi==0.115.0 itself recommends as its "standard"/
 # "all" extra's minimum.
-python-multipart==0.0.32
+python-multipart==0.0.33
 email-validator>=2.0.0
 
 # ML & Data Processing
@@ -26,7 +26,7 @@ pandas==2.1.4
 # codebase before removing (see tests/test_imports.py's updated comment).
 
 # Dashboard & Visualization
-streamlit==1.66.1
+streamlit==1.67.0
 folium==0.20.0
 streamlit-folium==0.27.4
 # Pulled in by streamlit without a pin; pyarrow 26 needs numpy>=2 and
@@ -83,13 +83,13 @@ httpx==0.28.1
 # Utilities
 python-dateutil==3.0.0
 pyyaml==6.0.3
-click==8.5.0
+click==8.5.1
 rich==15.0.0
 requests>=2.31.0
 gunicorn>=26.2.0
 apscheduler>=3.10.0
 # Pinned explicitly so the resolver can't drift it. 1.10.0 is what
-# fastapi==0.162.0 resolves to, and it clears the DoS advisory
+# fastapi==0.162.6 resolves to, and it clears the DoS advisory
 # GHSA-2c2j-9gv5-cj73 (fixed in 0.40.0) that the old fastapi==0.115.0
 # pin (starlette<0.39.0) blocked.
 starlette==1.10.0
